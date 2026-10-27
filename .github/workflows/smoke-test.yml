@@ -17,6 +17,7 @@ jobs:
           curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q godot.zip
           mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
       - name: Import project
         run: timeout 300 ./godot --headless --path godot --import
       - name: Run smoke test
