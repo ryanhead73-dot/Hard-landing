@@ -8,6 +8,7 @@ var main: Node3D
 var kestrel: Kestrel
 var player: Player
 var failures := 0
+var finished := false
 
 
 func _ready() -> void:
@@ -16,6 +17,8 @@ func _ready() -> void:
 	kestrel = main.kestrel
 	player = main.player
 	await _run()
+	# A script error aborts _run without a FAIL line, so make sure it got to the end.
+	_check("test ran to the end", finished)
 	print("SMOKE TEST %s (%d failures)" % ["PASSED" if failures == 0 else "FAILED", failures])
 	get_tree().quit(1 if failures else 0)
 
@@ -24,6 +27,14 @@ func _run() -> void:
 	await _frames(30)
 	_check("player lands at spawn", player.is_on_floor(), "y=%.2f" % player.global_position.y)
 	_check("relay station faces the ship", main.station.global_basis.z.dot((kestrel.global_position - main.station.global_position).normalized()) > 0.95)
+	_check("sound effects load", Sfx.SOUNDS.all(func(id): return Sfx.has_sound(id)))
+	var wind: AudioStreamWAV = load("res://audio/wind_loop.wav")
+	_check("wind loop has loop points", wind.loop_mode != AudioStreamWAV.LOOP_DISABLED and wind.loop_end > 0, "mode=%d end=%d" % [wind.loop_mode, wind.loop_end])
+	var pause: PauseMenu = main.find_children("*", "PauseMenu", false, false)[0]
+	pause.open()
+	_check("pause menu pauses the game", get_tree().paused and pause.visible)
+	pause.close()
+	_check("resume unpauses", not get_tree().paused and not pause.visible)
 	_clear_scuttlers()
 
 	# --- Ship routes -------------------------------------------------------------------------
@@ -69,9 +80,35 @@ func _run() -> void:
 	await _frames(5)
 	var scrap_before := Game.scrap
 	for s in get_tree().get_nodes_in_group("scrap"):
+		if not is_instance_valid(s):
+			continue
 		_place(s.global_position + Vector3.UP * 0.3, 0.0)
 		await _frames(20)
 	_check("scrap drops and is collected", Game.scrap > scrap_before, "scrap=%d" % Game.scrap)
+
+	# A wall between the scuttler and the player: it has to find a way around.
+	player.revive(arena)
+	var wall := StaticBody3D.new()
+	wall.collision_layer = Game.LAYER_WORLD
+	var wall_shape := CollisionShape3D.new()
+	var wall_box := BoxShape3D.new()
+	wall_box.size = Vector3(7.0, 2.5, 0.4)
+	wall_shape.shape = wall_box
+	wall.add_child(wall_shape)
+	main.add_child(wall)
+	wall.global_position = arena + Vector3(0.0, 0.75, -3.5)
+	var flanker: Scuttler = main.spawn_scuttler(arena + Vector3(0.5, 0.0, -7.0))
+	flanker.alert(false)
+	var closest := 99.0
+	for i in 60 * 8:
+		await get_tree().physics_frame
+		closest = minf(closest, flanker.global_position.distance_to(player.global_position))
+		if closest < flanker.attack_range + 0.5:
+			break
+	_check("scuttler paths around a wall", closest < flanker.attack_range + 0.5, "closest=%.1f" % closest)
+	flanker.queue_free()
+	wall.queue_free()
+	await _frames(5)
 
 	player.revive(arena)
 	var biter: Scuttler = main.spawn_scuttler(arena + Vector3(0.0, 0.0, -3.0))
@@ -107,6 +144,7 @@ func _run() -> void:
 	await _frames(10)
 	await _press("interact")
 	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.stage == Game.Stage.INSTALLED and Game.carrying == "")
+	_check("ship hum starts with aux power", main._ship_hum != null and main._ship_hum.playing)
 
 	# --- Fabricator ---------------------------------------------------------------------------
 	Game.add_scrap(30)
@@ -130,6 +168,7 @@ func _run() -> void:
 		kestrel.set_repaired(id, false)
 	await _frames(5)
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
+	finished = true
 
 
 func _clear_scuttlers() -> void:

@@ -11,7 +11,6 @@ signal died
 @export var crouch_speed := 2.0
 @export var carry_speed_factor := 0.85
 @export var jump_velocity := 4.6
-@export var mouse_sensitivity := 0.0025
 @export var boom_length := 2.5
 @export var aim_boom_length := 1.6
 @export var shoulder_offset := 0.75
@@ -44,6 +43,8 @@ var _cell_pack: MeshInstance3D
 var _since_damage := 99.0
 var _combat_face := 0.0
 var _plated := false
+var _stride := 0.0
+var _foot := 0
 
 
 func _ready() -> void:
@@ -140,6 +141,7 @@ func take_damage(amount: float, _from: Vector3 = Vector3.ZERO) -> bool:
 		return false
 	health = maxf(health - amount, 0.0)
 	_since_damage = 0.0
+	Sfx.play("player_hurt", null, -3.0)
 	damaged.emit(amount)
 	health_changed.emit(health, max_health())
 	if health <= 0.0:
@@ -164,13 +166,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
-		var sens := mouse_sensitivity * (aim_fov / fov if aiming else 1.0)
+		var sens := Game.mouse_sensitivity * (aim_fov / fov if aiming else 1.0)
+		var look_y := -motion.relative.y if Game.invert_y else motion.relative.y
 		_yaw.rotate_y(-motion.relative.x * sens)
-		_pitch.rotation.x = clampf(_pitch.rotation.x - motion.relative.y * sens, deg_to_rad(-70.0), deg_to_rad(50.0))
+		_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * sens, deg_to_rad(-70.0), deg_to_rad(50.0))
 	elif event.is_action_pressed("flashlight"):
 		_flashlight.visible = not _flashlight.visible
 	elif event.is_action_pressed("reload") and not dead:
@@ -229,6 +230,18 @@ func _physics_process(delta: float) -> void:
 	elif dir.length() > 0.1:
 		_body.rotation.y = lerp_angle(_body.rotation.y, atan2(-dir.x, -dir.z), 12.0 * delta)
 	move_and_slide()
+	_footsteps(delta)
+
+
+func _footsteps(delta: float) -> void:
+	var moved := Vector2(velocity.x, velocity.z).length() * delta
+	if not is_on_floor() or moved < 0.001:
+		return
+	_stride += moved
+	if _stride >= (1.1 if crouching else 1.6):
+		_stride = 0.0
+		_foot = 1 - _foot
+		Sfx.play("footstep_%d" % _foot, global_position, -14.0 if crouching else -9.0, 0.1)
 
 
 func _update_crouch(want: bool) -> void:
