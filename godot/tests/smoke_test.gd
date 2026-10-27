@@ -8,6 +8,7 @@ var main: Node3D
 var kestrel: Kestrel
 var player: Player
 var failures := 0
+var finished := false
 
 
 func _ready() -> void:
@@ -16,6 +17,8 @@ func _ready() -> void:
 	kestrel = main.kestrel
 	player = main.player
 	await _run()
+	# A script error aborts _run without a FAIL line, so make sure it got to the end.
+	_check("test ran to the end", finished)
 	print("SMOKE TEST %s (%d failures)" % ["PASSED" if failures == 0 else "FAILED", failures])
 	get_tree().quit(1 if failures else 0)
 
@@ -69,6 +72,8 @@ func _run() -> void:
 	await _frames(5)
 	var scrap_before := Game.scrap
 	for s in get_tree().get_nodes_in_group("scrap"):
+		if not is_instance_valid(s):
+			continue
 		_place(s.global_position + Vector3.UP * 0.3, 0.0)
 		await _frames(20)
 	_check("scrap drops and is collected", Game.scrap > scrap_before, "scrap=%d" % Game.scrap)
@@ -130,6 +135,7 @@ func _run() -> void:
 		kestrel.set_repaired(id, false)
 	await _frames(5)
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
+	finished = true
 
 
 func _clear_scuttlers() -> void:
