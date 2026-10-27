@@ -27,6 +27,7 @@ func _run() -> void:
 	await _frames(30)
 	_check("player lands at spawn", player.is_on_floor(), "y=%.2f" % player.global_position.y)
 	_check("relay station faces the ship", main.station.global_basis.z.dot((kestrel.global_position - main.station.global_position).normalized()) > 0.95)
+	_check("hauler wreck faces the ship", main.wreck.global_basis.z.dot((kestrel.global_position - main.wreck.global_position).normalized()) > 0.95)
 	_check("sound effects load", Sfx.SOUNDS.all(func(id): return Sfx.has_sound(id)))
 	var wind: AudioStreamWAV = load("res://audio/wind_loop.wav")
 	_check("wind loop has loop points", wind.loop_mode != AudioStreamWAV.LOOP_DISABLED and wind.loop_end > 0, "mode=%d end=%d" % [wind.loop_mode, wind.loop_end])
@@ -62,7 +63,7 @@ func _run() -> void:
 	await _frames(10)
 
 	# --- Combat ------------------------------------------------------------------------------
-	var arena := Vector3(60.0, 0.5, -70.0)
+	var arena := Vector3(70.0, 0.5, 40.0)
 	_place(arena, 0.0)
 	await _frames(10)
 	var enemy: Scuttler = main.spawn_scuttler(arena + Vector3(0.6, 0.0, -9.0))
@@ -143,7 +144,7 @@ func _run() -> void:
 	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
 	await _frames(10)
 	await _press("interact")
-	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.stage == Game.Stage.INSTALLED and Game.carrying == "")
+	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.stage == Game.Stage.FIND_MANIFOLD and Game.carrying == "")
 	_check("ship hum starts with aux power", main._ship_hum != null and main._ship_hum.playing)
 
 	# --- Fabricator ---------------------------------------------------------------------------
@@ -152,6 +153,64 @@ func _run() -> void:
 	await _frames(10)
 	await _press("interact")
 	_check("fabricator builds the extended magazine", Game.has_upgrade("extended_mag") and player.weapon.mag_size() == 36, "scrap=%d" % Game.scrap)
+
+	# --- Steam vents --------------------------------------------------------------------------
+	_clear_scuttlers()
+	var vent: SteamVent = main.wreck.vents()[0]
+	player.revive(vent.global_position + Vector3.UP * 0.3)
+	await _frames(10)
+	var before_burst := player.health
+	vent.force_burst()
+	await get_tree().create_timer(0.6).timeout
+	_check("steam vent scalds the player", player.health < before_burst, "health=%.0f" % player.health)
+	player.revive(main.SPAWN)
+	await _frames(5)
+	var victim: Scuttler = main.spawn_scuttler(vent.global_position + Vector3.UP * 0.3)
+	await _frames(10)
+	vent.force_burst()
+	await get_tree().create_timer(0.6).timeout
+	_check("steam vent scalds scuttlers too", is_instance_valid(victim) and victim.health < victim.max_health)
+	_clear_scuttlers()
+
+	# --- Cooling manifold ---------------------------------------------------------------------
+	Game.add_scrap(40)
+	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
+	await _frames(10)
+	_check("heavy builds need cooling", main._interaction.get("label", "").contains("overheats"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("fabricator refuses plating while overheating", not Game.has_upgrade("plating"))
+
+	# Walk in through the cargo door to the manifold rack.
+	var door: Vector3 = main.wreck.to_global(Vector3(0.0, 0.3, 6.0))
+	var rack: Vector3 = main.wreck.manifold_point()
+	var heading := rack - door
+	_place(door, atan2(-heading.x, -heading.z))
+	Input.action_press("move_forward")
+	for i in 60 * 7:
+		await get_tree().physics_frame
+		if _flat_distance(player.global_position, rack) < 1.2:
+			break
+	Input.action_release("move_forward")
+	_check("hold is walkable from the cargo door to the manifold", _flat_distance(player.global_position, rack) < 1.6, "left=%.1f" % _flat_distance(player.global_position, rack))
+	_clear_scuttlers()
+
+	player.revive(rack + Vector3.UP * 0.2)
+	await _frames(10)
+	_check("manifold prompt in the wreck", main._interaction.get("label", "").contains("coolant manifold"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("manifold is carried", Game.carrying == "manifold" and not main.wreck.has_manifold() and Game.stage == Game.Stage.RETURN_MANIFOLD)
+	_check("scuttlers rise out of the pool", get_tree().get_nodes_in_group("scuttlers").size() >= 3)
+	_clear_scuttlers()
+
+	player.revive(kestrel.to_global(kestrel.interact_points["cooling"]) + Vector3.UP * 0.2)
+	await _frames(10)
+	_check("install bay accepts the manifold", main._interaction.get("label", "").contains("Fit the coolant manifold"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("fitting the manifold repairs cooling", kestrel.is_repaired("cooling") and Game.stage == Game.Stage.COOLED and Game.carrying == "")
+	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
+	await _frames(10)
+	await _press("interact")
+	_check("cooling unlocks suit plating", Game.has_upgrade("plating") and player.max_health() == 140.0, "max=%.0f" % player.max_health())
 
 	# --- Death and respawn --------------------------------------------------------------------
 	player.take_damage(999.0)
@@ -169,6 +228,10 @@ func _run() -> void:
 	await _frames(5)
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
 	finished = true
+
+
+func _flat_distance(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
 func _clear_scuttlers() -> void:

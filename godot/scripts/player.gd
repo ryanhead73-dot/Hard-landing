@@ -40,6 +40,7 @@ var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
 var _flashlight: SpotLight3D
 var _cell_pack: MeshInstance3D
+var _manifold_pack: MeshInstance3D
 var _since_damage := 99.0
 var _combat_face := 0.0
 var _plated := false
@@ -294,10 +295,24 @@ func _build_body() -> void:
 	_cell_pack.position = Vector3(0.0, 1.2, 0.42)
 	_cell_pack.visible = false
 	_body.add_child(_cell_pack)
+	# The coolant manifold is strapped across the back.
+	_manifold_pack = MeshInstance3D.new()
+	var pipes := BoxMesh.new()
+	pipes.size = Vector3(1.1, 0.45, 0.22)
+	_manifold_pack.mesh = pipes
+	var frost := glow.duplicate() as StandardMaterial3D
+	frost.albedo_color = Color("7fd6ff")
+	frost.emission = Color("7fd6ff")
+	frost.emission_energy_multiplier = 1.8
+	_manifold_pack.material_override = frost
+	_manifold_pack.position = Vector3(0.0, 1.25, 0.4)
+	_manifold_pack.visible = false
+	_body.add_child(_manifold_pack)
 
 
 func _on_carrying_changed(item: String) -> void:
 	_cell_pack.visible = item == "aux_cell"
+	_manifold_pack.visible = item == "manifold"
 
 
 func _on_upgrades_changed() -> void:

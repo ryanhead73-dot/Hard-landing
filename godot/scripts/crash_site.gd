@@ -7,7 +7,7 @@ const SEED := 7
 const SIZE := 400.0
 const SHIP_CLEAR_RADIUS := 22.0
 ## Other sites that props must keep clear of: [centre, radius]. Matches main.tscn.
-const KEEP_CLEAR := [[Vector3(-60.0, 0.0, 58.0), 22.0]]
+const KEEP_CLEAR := [[Vector3(-60.0, 0.0, 58.0), 22.0], [Vector3(48.0, 0.0, -58.0), 30.0]]
 
 var _moss_mat: StandardMaterial3D
 var _rim_mat: StandardMaterial3D

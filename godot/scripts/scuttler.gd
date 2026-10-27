@@ -44,6 +44,8 @@ func _ready() -> void:
 	collision_layer = Game.LAYER_ENEMY
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_PLAYER | Game.LAYER_ENEMY
 	floor_snap_length = 0.3
+	# Only ground and wreckage count as floor, so a scuttler never rides along on the player.
+	platform_floor_layers = Game.LAYER_WORLD
 	health = max_health
 	if home == Vector3.ZERO:
 		home = global_position
