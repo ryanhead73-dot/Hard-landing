@@ -6,6 +6,8 @@ extends Node3D
 const SEED := 7
 const SIZE := 400.0
 const SHIP_CLEAR_RADIUS := 22.0
+## Other sites that props must keep clear of: [centre, radius]. Matches main.tscn.
+const KEEP_CLEAR := [[Vector3(-60.0, 0.0, 58.0), 22.0]]
 
 var _moss_mat: StandardMaterial3D
 var _rim_mat: StandardMaterial3D
@@ -187,7 +189,10 @@ func _scatter(rng: RandomNumberGenerator, min_dist: float, max_dist: float) -> V
 		var p := Vector3(rng.randf_range(-max_dist, max_dist), 0.0, rng.randf_range(-max_dist, max_dist))
 		var d := Vector2(p.x, p.z).length()
 		var in_furrow := p.x > 15.0 and p.x < 85.0 and absf(p.z) < 6.0
-		if d >= min_dist and d <= max_dist and not in_furrow:
+		var blocked := in_furrow
+		for zone in KEEP_CLEAR:
+			blocked = blocked or p.distance_to(zone[0]) < zone[1]
+		if d >= min_dist and d <= max_dist and not blocked:
 			return p
 	return Vector3.ZERO
 

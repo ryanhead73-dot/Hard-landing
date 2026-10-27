@@ -1,8 +1,8 @@
 extends Node
-## Headless walk-through of the blockout. Run:
+## Headless walk-through of the vertical slice. Run:
 ##   godot --headless --path . res://tests/smoke_test.tscn
-## Drives the player along the main route and through the crawlway, flips every repair,
-## and prints PASS/FAIL lines. Exits with code 1 on any failure.
+## Walks the ship's routes, fights a scuttler, runs the recover/return/install loop, buys an
+## upgrade and checks death and respawn. Prints PASS/FAIL lines and exits 1 on any failure.
 
 var main: Node3D
 var kestrel: Kestrel
@@ -23,14 +23,15 @@ func _ready() -> void:
 func _run() -> void:
 	await _frames(30)
 	_check("player lands at spawn", player.is_on_floor(), "y=%.2f" % player.global_position.y)
+	_check("relay station faces the ship", main.station.global_basis.z.dot((kestrel.global_position - main.station.global_position).normalized()) > 0.95)
+	_clear_scuttlers()
 
-	# Door steps into the workshop: walk toward the ship (-Z).
+	# --- Ship routes -------------------------------------------------------------------------
 	_place(kestrel.to_global(kestrel.plan(12.9, 0.0, 20.6)), 0.0)
 	await _walk(3.0)
 	var local := kestrel.to_local(player.global_position)
 	_check("side door steps reach the workshop", local.z < 3.6 and local.y > -0.15, "local=%s" % local)
 
-	# Workshop to cockpit up the stairs, facing the nose (-X).
 	_place(kestrel.to_global(kestrel.plan(14.6, 0.1, 13.0)), PI * 0.5)
 	await _frames(10)
 	_check("workshop camera boom is clear", player.boom_current() > player.boom_length - 0.2, "boom=%.2f" % player.boom_current())
@@ -38,7 +39,6 @@ func _run() -> void:
 	local = kestrel.to_local(player.global_position)
 	_check("stairs reach the raised cockpit", local.x < kestrel.plan(8.0, 0, 0).x and local.y > 1.0, "local=%s" % local)
 
-	# Cargo to port crawlway, crouched (port is -Z).
 	_place(kestrel.to_global(kestrel.plan(27.0, 0.1, 13.0)), 0.0)
 	Input.action_press("crouch")
 	await _walk(2.5)
@@ -47,29 +47,108 @@ func _run() -> void:
 	Input.action_release("crouch")
 	await _frames(5)
 	_check("stays crouched under crawlway ceiling", player.crouching)
-
-	# Install aux power through the interaction.
-	_place(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.1, 0.0)
+	_place(main.SPAWN, 0.0)
 	await _frames(10)
-	Input.action_press("interact")
-	await _frames(2)
-	Input.action_release("interact")
-	_check("E installs aux power", kestrel.is_repaired("aux_power"))
 
+	# --- Combat ------------------------------------------------------------------------------
+	var arena := Vector3(60.0, 0.5, -70.0)
+	_place(arena, 0.0)
+	await _frames(10)
+	var enemy: Scuttler = main.spawn_scuttler(arena + Vector3(0.6, 0.0, -9.0))
+	await _frames(10)
+	var hits := [0]
+	player.weapon.hit_confirmed.connect(func(_k): hits[0] += 1)
+	Input.action_press("fire")
+	for i in 240:
+		if not is_instance_valid(enemy) or enemy.state == Scuttler.State.DEAD:
+			break
+		player.aim_at(enemy.global_position + Vector3.UP * 0.55)
+		await get_tree().physics_frame
+	Input.action_release("fire")
+	_check("rifle kills a scuttler", is_instance_valid(enemy) and enemy.state == Scuttler.State.DEAD, "hits=%d" % hits[0])
+	await _frames(5)
+	var scrap_before := Game.scrap
+	for s in get_tree().get_nodes_in_group("scrap"):
+		_place(s.global_position + Vector3.UP * 0.3, 0.0)
+		await _frames(20)
+	_check("scrap drops and is collected", Game.scrap > scrap_before, "scrap=%d" % Game.scrap)
+
+	player.revive(arena)
+	var biter: Scuttler = main.spawn_scuttler(arena + Vector3(0.0, 0.0, -3.0))
+	biter.alert(false)
+	await get_tree().create_timer(2.0).timeout
+	_check("scuttler bites the player", player.health < player.max_health(), "health=%.0f" % player.health)
+	biter.queue_free()
+
+	# --- Recover, return, install ------------------------------------------------------------
+	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
+	await _frames(10)
+	_check("aux bay asks for a power cell", main._interaction.get("label", "").contains("needs"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("cannot install without the cell", not kestrel.is_repaired("aux_power"))
+
+	_clear_scuttlers()
+	player.revive(main.station.cell_point() + Vector3.UP * 0.2)
+	await _frames(10)
+	_check("cell prompt at the station", main._interaction.get("label", "").contains("power cell"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("cell is carried", Game.carrying == "aux_cell" and not main.station.has_cell())
+	_check("ambush spawns on the way home", get_tree().get_nodes_in_group("scuttlers").size() >= 3)
+	_clear_scuttlers()
+
+	_check("one crate can be searched", main.station.crate_count() == 4)
+	player.revive(main.station.crate_point(0) + Vector3(0.0, 0.2, 1.2))
+	await _frames(10)
+	var before := Game.scrap
+	await _press("interact")
+	_check("searching a crate gives scrap", Game.scrap == before + RelayStation.CRATE_SCRAP, "scrap=%d" % Game.scrap)
+
+	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
+	await _frames(10)
+	await _press("interact")
+	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.stage == Game.Stage.INSTALLED and Game.carrying == "")
+
+	# --- Fabricator ---------------------------------------------------------------------------
+	Game.add_scrap(30)
+	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
+	await _frames(10)
+	await _press("interact")
+	_check("fabricator builds the extended magazine", Game.has_upgrade("extended_mag") and player.weapon.mag_size() == 36, "scrap=%d" % Game.scrap)
+
+	# --- Death and respawn --------------------------------------------------------------------
+	player.take_damage(999.0)
+	_check("player goes down", player.dead)
+	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout
+	_check("respawns at Kestrel with full health", not player.dead and player.health == player.max_health() and player.global_position.distance_to(main.SPAWN) < 2.0)
+
+	# --- Repair states ------------------------------------------------------------------------
 	for id in Kestrel.REPAIR_ORDER:
 		kestrel.set_repaired(id, true)
 	await get_tree().create_timer(3.5).timeout
-	_check("landing gear levels the ship", kestrel.rotation.length() < 0.001 and is_equal_approx(kestrel.position.y, Kestrel.LEVEL_DECK_Y), "rot=%s y=%.2f" % [kestrel.rotation, kestrel.position.y])
+	_check("landing gear levels the ship", kestrel.rotation.length() < 0.001 and is_equal_approx(kestrel.position.y, Kestrel.LEVEL_DECK_Y))
 	for id in Kestrel.REPAIR_ORDER:
 		kestrel.set_repaired(id, false)
 	await _frames(5)
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
 
 
+func _clear_scuttlers() -> void:
+	for s in get_tree().get_nodes_in_group("scuttlers"):
+		s.remove_from_group("scuttlers")
+		s.queue_free()
+
+
 func _place(pos: Vector3, yaw: float) -> void:
 	player.velocity = Vector3.ZERO
 	player.global_position = pos
 	player.face(yaw)
+
+
+func _press(action: String) -> void:
+	Input.action_press(action)
+	await _frames(2)
+	Input.action_release(action)
+	await _frames(2)
 
 
 func _walk(seconds: float) -> void:

@@ -1,0 +1,93 @@
+extends Node
+## Session state for the vertical slice: salvage, what the player carries, workshop upgrades
+## and the current objective. Autoloaded as "Game".
+
+signal scrap_changed(amount: int)
+signal carrying_changed(item: String)
+signal upgrades_changed
+signal objective_changed(text: String)
+signal message(text: String)
+
+## Physics layer bits shared by every script.
+const LAYER_WORLD := 1
+const LAYER_PLAYER := 2
+const LAYER_ENEMY := 4
+
+enum Stage { RECOVER_CELL, RETURN_CELL, INSTALLED }
+
+const UPGRADE_ORDER: Array[String] = ["extended_mag", "plating", "heavy_rounds"]
+const UPGRADES := {
+	"extended_mag": {"name": "Extended magazine", "cost": 30, "effect": "Magazine 24 to 36 rounds"},
+	"plating": {"name": "Suit plating", "cost": 40, "effect": "Max health 100 to 140"},
+	"heavy_rounds": {"name": "Heavy rounds", "cost": 45, "effect": "+30% damage"},
+}
+
+var scrap := 0
+var carrying := ""
+var stage := Stage.RECOVER_CELL
+var upgrades: Dictionary = {}
+
+
+func reset() -> void:
+	scrap = 0
+	carrying = ""
+	stage = Stage.RECOVER_CELL
+	upgrades.clear()
+	scrap_changed.emit(scrap)
+	carrying_changed.emit(carrying)
+	upgrades_changed.emit()
+	objective_changed.emit(objective_text())
+
+
+func add_scrap(amount: int) -> void:
+	scrap += amount
+	scrap_changed.emit(scrap)
+
+
+func has_upgrade(id: String) -> bool:
+	return upgrades.has(id)
+
+
+## The next upgrade the fabricator offers, or "" once everything is built.
+func next_upgrade() -> String:
+	for id in UPGRADE_ORDER:
+		if not has_upgrade(id):
+			return id
+	return ""
+
+
+func buy_upgrade(id: String) -> bool:
+	var cost: int = UPGRADES[id]["cost"]
+	if has_upgrade(id) or scrap < cost:
+		return false
+	scrap -= cost
+	upgrades[id] = true
+	scrap_changed.emit(scrap)
+	upgrades_changed.emit()
+	message.emit("%s fabricated. %s." % [UPGRADES[id]["name"], UPGRADES[id]["effect"]])
+	return true
+
+
+func take_cell() -> void:
+	carrying = "aux_cell"
+	stage = Stage.RETURN_CELL
+	carrying_changed.emit(carrying)
+	objective_changed.emit(objective_text())
+	message.emit("Aux power cell recovered. It's heavy, so you can't sprint while carrying it.")
+
+
+func install_cell() -> void:
+	carrying = ""
+	stage = Stage.INSTALLED
+	carrying_changed.emit(carrying)
+	objective_changed.emit(objective_text())
+	message.emit("Auxiliary power restored. The workshop fabricator is online.")
+
+
+func objective_text() -> String:
+	match stage:
+		Stage.RECOVER_CELL:
+			return "Recover the aux power cell from the relay station"
+		Stage.RETURN_CELL:
+			return "Return to Kestrel and install the cell in the aux bay"
+	return "Fabricate upgrades at the workshop bench using scrap"
