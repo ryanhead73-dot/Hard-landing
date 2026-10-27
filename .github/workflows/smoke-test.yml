@@ -1,0 +1,26 @@
+name: Smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  godot:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          # Keep the binary out of the checkout: the repo already has a godot/ project folder.
+          curl -sSL -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot-bin"
+          chmod +x "$RUNNER_TEMP/godot-bin"
+          echo "GODOT=$RUNNER_TEMP/godot-bin" >> "$GITHUB_ENV"
+      - name: Import project
+        run: timeout 300 "$GODOT" --headless --path godot --import
+      - name: Run smoke test
+        run: timeout 300 "$GODOT" --headless --path godot res://tests/smoke_test.tscn

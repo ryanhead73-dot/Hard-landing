@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/crash_site.gd" id="2_site"]
 [ext_resource type="Script" path="res://scripts/kestrel.gd" id="3_kestrel"]
+[ext_resource type="Script" path="res://scripts/relay_station.gd" id="4_station"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -13,3 +14,7 @@ script = ExtResource("2_site")
 [node name="Kestrel" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 script = ExtResource("3_kestrel")
+
+[node name="RelayStation" type="Node3D" parent="."]
+transform = Transform3D(-0.688, 0, 0.725, 0, 1, 0, -0.725, 0, -0.688, -60, 0, 58)
+script = ExtResource("4_station")
