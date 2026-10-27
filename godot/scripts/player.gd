@@ -46,6 +46,7 @@ var _combat_face := 0.0
 var _plated := false
 var _stride := 0.0
 var _foot := 0
+var _hold_fire := false
 
 
 func _ready() -> void:
@@ -166,6 +167,7 @@ func revive(at: Vector3) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_hold_fire = true
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
@@ -203,8 +205,10 @@ func _physics_process(delta: float) -> void:
 	_update_crouch(Input.is_action_pressed("crouch"))
 	aiming = Input.is_action_pressed("aim")
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
+	if _hold_fire and not Input.is_action_pressed("fire"):
+		_hold_fire = false
 	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or DisplayServer.get_name() == "headless"
-	var firing := can_fire and Input.is_action_pressed("fire")
+	var firing := can_fire and not _hold_fire and Input.is_action_pressed("fire")
 	if firing and weapon.try_fire(aiming):
 		_combat_face = 0.6
 

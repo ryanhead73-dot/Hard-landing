@@ -143,6 +143,9 @@ func _find_interaction() -> Dictionary:
 	if station.has_cell() and pos.distance_to(station.cell_point()) < INTERACT_RANGE:
 		return {"label": "[E] Take the aux power cell", "action": _take_cell}
 	if wreck.has_manifold() and pos.distance_to(wreck.manifold_point()) < INTERACT_RANGE:
+		# Out of order it would replace the cell in your hands and skip the first repair.
+		if Game.stage < Game.Stage.FIND_MANIFOLD:
+			return {"label": "Coolant manifold: no use until Kestrel has power to run the pumps"}
 		if Game.carrying != "":
 			return {"label": "Coolant manifold: your hands are full"}
 		return {"label": "[E] Take the coolant manifold", "action": _take_manifold}
@@ -241,6 +244,8 @@ func _on_scuttler_died(s: Scuttler) -> void:
 
 ## Aux power brings the ship to life: a hum you can hear from the workshop.
 func _on_repair_changed(id: String, repaired: bool) -> void:
+	if id == "cooling":
+		Game.cooling_repaired = repaired
 	if id != "aux_power":
 		return
 	if repaired and _ship_hum == null:

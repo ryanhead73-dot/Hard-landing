@@ -116,9 +116,25 @@ func _run() -> void:
 	biter.alert(false)
 	await get_tree().create_timer(2.0).timeout
 	_check("scuttler bites the player", player.health < player.max_health(), "health=%.0f" % player.health)
+	player.take_damage(999.0)
+	await _frames(5)
+	var flips := 0
+	for i in 30:
+		await get_tree().physics_frame
+		if biter.state != Scuttler.State.IDLE:
+			flips += 1
+	_check("scuttlers stand down while the player is down", flips == 0, "non-idle frames=%d" % flips)
 	biter.queue_free()
+	await get_tree().create_timer(main.RESPAWN_DELAY + 0.3).timeout
 
 	# --- Recover, return, install ------------------------------------------------------------
+	_clear_scuttlers()
+	player.revive(main.wreck.manifold_point() + Vector3.UP * 0.2)
+	await _frames(10)
+	_check("manifold waits until Kestrel has power", main._interaction.get("label", "").contains("no use"), main._interaction.get("label", ""))
+	await _press("interact")
+	_check("manifold can't be taken out of order", main.wreck.has_manifold() and Game.carrying == "")
+
 	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
 	await _frames(10)
 	_check("aux bay asks for a power cell", main._interaction.get("label", "").contains("needs"), main._interaction.get("label", ""))
@@ -157,6 +173,14 @@ func _run() -> void:
 	# --- Steam vents --------------------------------------------------------------------------
 	_clear_scuttlers()
 	var vent: SteamVent = main.wreck.vents()[0]
+	var starts: Array[float] = []
+	for v in main.wreck.vents():
+		starts.append(v.quiet_time - fmod(v.offset, v.quiet_time))
+	starts.sort()
+	var min_gap := 99.0
+	for i in range(1, starts.size()):
+		min_gap = minf(min_gap, starts[i] - starts[i - 1])
+	_check("vents start out of step", min_gap >= 0.3, "min gap=%.2f s" % min_gap)
 	player.revive(vent.global_position + Vector3.UP * 0.3)
 	await _frames(10)
 	var before_burst := player.health
@@ -222,11 +246,13 @@ func _run() -> void:
 	for id in Kestrel.REPAIR_ORDER:
 		kestrel.set_repaired(id, true)
 	await get_tree().create_timer(3.5).timeout
+	_check("cooling follows the repair, dev toggle included", Game.cooling_online())
 	_check("landing gear levels the ship", kestrel.rotation.length() < 0.001 and is_equal_approx(kestrel.position.y, Kestrel.LEVEL_DECK_Y))
 	for id in Kestrel.REPAIR_ORDER:
 		kestrel.set_repaired(id, false)
 	await _frames(5)
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
+	_check("heavy builds lock again without cooling", not Game.can_fabricate("heavy_rounds"))
 	finished = true
 
 
