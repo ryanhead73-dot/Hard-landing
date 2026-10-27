@@ -7,6 +7,7 @@ signal carrying_changed(item: String)
 signal upgrades_changed
 signal objective_changed(text: String)
 signal message(text: String)
+signal settings_changed
 
 ## Physics layer bits shared by every script.
 const LAYER_WORLD := 1
@@ -22,10 +23,42 @@ const UPGRADES := {
 	"heavy_rounds": {"name": "Heavy rounds", "cost": 45, "effect": "+30% damage"},
 }
 
+const SETTINGS_PATH := "user://settings.cfg"
+
+var mouse_sensitivity := 0.0025
+var invert_y := false
+var master_volume := 0.8
+
 var scrap := 0
 var carrying := ""
 var stage := Stage.RECOVER_CELL
 var upgrades: Dictionary = {}
+
+
+func _ready() -> void:
+	load_settings()
+
+
+func load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) == OK:
+		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
+		invert_y = cfg.get_value("controls", "invert_y", invert_y)
+		master_volume = cfg.get_value("audio", "master_volume", master_volume)
+	apply_settings()
+
+
+func save_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
+	cfg.set_value("controls", "invert_y", invert_y)
+	cfg.set_value("audio", "master_volume", master_volume)
+	cfg.save(SETTINGS_PATH)
+
+
+func apply_settings() -> void:
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
+	settings_changed.emit()
 
 
 func reset() -> void:
@@ -41,6 +74,7 @@ func reset() -> void:
 
 func add_scrap(amount: int) -> void:
 	scrap += amount
+	Sfx.play("scrap_pickup", null, -6.0)
 	scrap_changed.emit(scrap)
 
 
@@ -65,6 +99,7 @@ func buy_upgrade(id: String) -> bool:
 	scrap_changed.emit(scrap)
 	upgrades_changed.emit()
 	message.emit("%s fabricated. %s." % [UPGRADES[id]["name"], UPGRADES[id]["effect"]])
+	Sfx.play("fabricate")
 	return true
 
 
@@ -74,6 +109,7 @@ func take_cell() -> void:
 	carrying_changed.emit(carrying)
 	objective_changed.emit(objective_text())
 	message.emit("Aux power cell recovered. It's heavy, so you can't sprint while carrying it.")
+	Sfx.play("cell_pickup")
 
 
 func install_cell() -> void:
@@ -82,6 +118,7 @@ func install_cell() -> void:
 	carrying_changed.emit(carrying)
 	objective_changed.emit(objective_text())
 	message.emit("Auxiliary power restored. The workshop fabricator is online.")
+	Sfx.play("power_up")
 
 
 func objective_text() -> String:

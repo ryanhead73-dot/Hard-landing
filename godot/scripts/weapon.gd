@@ -79,6 +79,7 @@ func start_reload() -> void:
 		return
 	reloading = true
 	_reload_left = reload_time
+	Sfx.play("rifle_reload", null, -4.0, 0.0)
 	ammo_changed.emit(in_mag, mag_size(), true)
 
 
@@ -93,6 +94,7 @@ func try_fire(aiming: bool) -> bool:
 	if reloading or _cooldown > 0.0 or camera == null:
 		return false
 	if in_mag <= 0:
+		Sfx.play("rifle_empty", null, -6.0)
 		start_reload()
 		return false
 	in_mag -= 1
@@ -115,9 +117,11 @@ func try_fire(aiming: bool) -> bool:
 		if target.has_method("take_damage"):
 			var killed: bool = target.take_damage(shot_damage(), result.position, dir)
 			hit_confirmed.emit(killed)
+			Sfx.play("kill_tick" if killed else "hit_tick", null, -4.0, 0.0)
 		_impact(result.position, result.normal)
 	_tracer(_muzzle.global_position, end)
 	_show_flash()
+	Sfx.play("rifle_shot", null, -3.0, 0.08)
 	fired.emit()
 	ammo_changed.emit(in_mag, mag_size(), false)
 	if in_mag == 0:

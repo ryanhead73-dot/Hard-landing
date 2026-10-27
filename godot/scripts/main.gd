@@ -38,6 +38,7 @@ var _env: Environment
 var _sky: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _interaction: Dictionary = {}
+var _ship_hum: Node
 
 
 func _ready() -> void:
@@ -65,6 +66,11 @@ func _ready() -> void:
 	hud.set_scrap(Game.scrap)
 	hud.set_objective(Game.objective_text())
 	hud.show_message("Kestrel is dead without power. Follow the red beacon to the relay station and find a power cell.")
+
+	add_child(PauseMenu.new())
+	Sfx.loop("wind_loop", null, -14.0)
+	station.beacon_flashed.connect(func(at: Vector3): Sfx.play("beacon_ping", at, -4.0, 0.0))
+	kestrel.repair_changed.connect(_on_repair_changed)
 
 	for p in station.spawn_points():
 		spawn_scuttler(p)
@@ -190,6 +196,20 @@ func _on_scuttler_died(s: Scuttler) -> void:
 		scrap.target = player
 		add_child(scrap)
 		scrap.global_position = s.global_position + Vector3(randf_range(-0.6, 0.6), 0.0, randf_range(-0.6, 0.6))
+
+
+## Aux power brings the ship to life: a hum you can hear from the workshop.
+func _on_repair_changed(id: String, repaired: bool) -> void:
+	if id != "aux_power":
+		return
+	if repaired and _ship_hum == null:
+		var anchor := Node3D.new()
+		kestrel.add_child(anchor)
+		anchor.position = kestrel.plan(FABRICATOR_POINT.x, 1.6, FABRICATOR_POINT.z - 2.0)
+		_ship_hum = Sfx.loop("ship_hum_loop", anchor, -6.0)
+	elif not repaired and _ship_hum:
+		_ship_hum.get_parent().queue_free()
+		_ship_hum = null
 
 
 func _on_player_died() -> void:

@@ -7,6 +7,11 @@ signal died(scuttler: Scuttler)
 
 enum State { IDLE, CHASE, WINDUP, RECOVER, DEAD }
 
+## Feeler angles in radians, tried in order until one is clear of walls.
+const WHISKERS := [0.4, 0.8, 1.2, 1.6, 2.0, 2.4]
+const WHISKER_LENGTH := 2.2
+const STEER_INTERVAL := 0.2
+
 @export var max_health := 60.0
 @export var speed := 5.0
 @export var attack_damage := 14.0
@@ -25,8 +30,9 @@ var state := State.IDLE
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _timer := 0.0
 var _wander := Vector3.ZERO
-var _sidestep := 0.0
-var _sidestep_dir := 1.0
+var _steer := Vector3.ZERO
+var _steer_timer := 0.0
+var _steer_side := 0.0
 var _gait := 0.0
 var _visual: Node3D
 var _glow: StandardMaterial3D
@@ -87,6 +93,7 @@ func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, dir: Vector3 = V
 	health -= amount
 	velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 1.5
 	_flash()
+	Sfx.play("scuttler_hurt", global_position, -6.0, 0.15)
 	if health <= 0.0:
 		_die()
 		return true
@@ -100,6 +107,7 @@ func alert(spread := true) -> void:
 		return
 	if state == State.IDLE:
 		state = State.CHASE
+		Sfx.play("scuttler_alert", global_position, -2.0, 0.15)
 	if spread:
 		for other in get_tree().get_nodes_in_group("scuttlers"):
 			if other != self and other.global_position.distance_to(global_position) < alert_radius:
@@ -136,19 +144,55 @@ func _chase(delta: float) -> Vector3:
 	if to_target.length() < attack_range and is_on_floor():
 		state = State.WINDUP
 		_timer = windup_time
+		Sfx.play("scuttler_lunge", global_position, -4.0, 0.1)
 		return Vector3.ZERO
 	if _flat(global_position - home).length() > leash_range and to_target.length() > sight_range:
 		calm()
 		return Vector3.ZERO
-	var dir := to_target.normalized()
-	if is_on_wall() and _sidestep <= 0.0:
-		_sidestep = 0.6
-		_sidestep_dir = 1.0 if randf() > 0.5 else -1.0
-	if _sidestep > 0.0:
-		_sidestep -= delta
-		dir = (dir + dir.cross(Vector3.UP) * _sidestep_dir * 1.5).normalized()
+	var dir := _steer_around_walls(to_target.normalized(), delta)
 	_face(global_position + dir, delta * 10.0)
 	return dir * speed
+
+
+## Short feelers find a clear heading around walls and wreckage. Once it picks a side of an
+## obstacle it keeps to that side until the way ahead is clear, so it doesn't dither.
+func _steer_around_walls(want: Vector3, delta: float) -> Vector3:
+	_steer_timer -= delta
+	if _steer_timer > 0.0 and _steer != Vector3.ZERO:
+		return _steer
+	_steer_timer = STEER_INTERVAL
+	var space := get_world_3d().direct_space_state
+	var origin := global_position + Vector3.UP * 0.5
+	if _whisker_clear(space, origin, want):
+		_steer_side = 0.0
+		_steer = want
+		return want
+	if _steer_side == 0.0:
+		# New obstacle: go round whichever side opens up sooner.
+		var left := _first_clear_angle(space, origin, want, 1.0)
+		var right := _first_clear_angle(space, origin, want, -1.0)
+		_steer_side = 1.0 if left < right or (left == right and randf() < 0.5) else -1.0
+	var angle := _first_clear_angle(space, origin, want, _steer_side)
+	if angle > PI:
+		_steer_side = -_steer_side
+		angle = _first_clear_angle(space, origin, want, _steer_side)
+	_steer = want.rotated(Vector3.UP, angle * _steer_side) if angle <= PI else -want
+	return _steer
+
+
+## The smallest whisker angle on one side that is clear, or INF if none are.
+func _first_clear_angle(space: PhysicsDirectSpaceState3D, origin: Vector3, want: Vector3, side: float) -> float:
+	for angle in WHISKERS:
+		if _whisker_clear(space, origin, want.rotated(Vector3.UP, angle * side)):
+			return angle
+	return INF
+
+
+func _whisker_clear(space: PhysicsDirectSpaceState3D, origin: Vector3, heading: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + heading * WHISKER_LENGTH, Game.LAYER_WORLD)
+	var hit := space.intersect_ray(query)
+	# Walkable slopes are not obstacles.
+	return hit.is_empty() or (hit.normal as Vector3).y > 0.6
 
 
 func _lunge() -> void:
@@ -175,6 +219,7 @@ func _die() -> void:
 	collision_layer = 0
 	collision_mask = Game.LAYER_WORLD
 	died.emit(self)
+	Sfx.play("scuttler_death", global_position, 0.0, 0.1)
 	_glow.emission_energy_multiplier = 0.0
 	var tween := create_tween()
 	tween.tween_property(_visual, "scale", Vector3(1.2, 0.25, 1.2), 0.25)

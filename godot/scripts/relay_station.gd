@@ -14,6 +14,11 @@ const CRATE_POINTS := [
 ]
 const CRATE_SCRAP := 10
 const CELL_POSITION := Vector3(0.0, 1.35, -7.6)
+const BEACON_POSITION := Vector3(6.0, 16.3, -8.0)
+const BEACON_PERIOD := 1.6
+
+## Fires at the start of each beacon flash, in the game only (not in the editor).
+signal beacon_flashed(at: Vector3)
 
 var _crates: Array[Node3D] = []
 var _crate_searched: Array[bool] = []
@@ -41,9 +46,13 @@ func build() -> void:
 
 
 func _process(delta: float) -> void:
+	var before := fmod(_beacon_time, BEACON_PERIOD)
 	_beacon_time += delta
+	var phase := fmod(_beacon_time, BEACON_PERIOD)
 	if _beacon_mat:
-		_beacon_mat.emission_energy_multiplier = 6.0 if fmod(_beacon_time, 1.6) < 0.5 else 0.6
+		_beacon_mat.emission_energy_multiplier = 6.0 if phase < 0.5 else 0.6
+	if phase < before and not Engine.is_editor_hint():
+		beacon_flashed.emit(to_global(BEACON_POSITION))
 
 
 func cell_point() -> Vector3:
@@ -172,7 +181,7 @@ func _build_mast() -> void:
 	beacon.mesh = sphere
 	_beacon_mat = _emissive(Color("ff4030"), 6.0)
 	beacon.material_override = _beacon_mat
-	beacon.position = Vector3(6.0, 16.3, -8.0)
+	beacon.position = BEACON_POSITION
 	add_child(beacon)
 
 
