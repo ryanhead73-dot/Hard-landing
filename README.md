@@ -63,7 +63,7 @@ Replacement parts use a mismatched grey-green salvage finish on purpose, so the 
 - `godot/scripts/hud.gd` draws the objective, waypoint, crosshair and hit markers, ammo, suit health, scrap, prompts and damage flash.
 - `godot/scripts/crash_site.gd` builds the basin: ridges, basalt columns, steaming pools, glowing moss, a plough berm and the crash furrow with debris. It uses a fixed seed, so the site looks the same every time.
 - `blender/kestrel_blockout.py` builds the same layout in Blender: a single boolean shell (`Shell-col`), floors, fixtures, the exterior, and one mount empty per repair with placeholder volumes for both states. Model the real parts inside those empties.
-- `godot/tests/smoke_test.tscn` plays the slice headless with 23 checks: ship routes, killing a scuttler, scrap pickup, taking a bite, the cell loop, crate search, fabricator, death and respawn, and the repair states. Run it with `godot --headless --path godot res://tests/smoke_test.tscn`.
+- `godot/tests/smoke_test.tscn` plays the slice headless with 23 checks: ship routes, killing a scuttler, scrap pickup, taking a bite, the cell loop, crate search, fabricator, death and respawn, and the repair states. Run it with `godot --headless --path godot res://tests/smoke_test.tscn`. GitHub Actions runs it on every pull request.
 
 ## Known gaps
 
