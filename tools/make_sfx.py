@@ -151,6 +151,16 @@ def main():
     ship = sine(55, d) + 0.6 * sine(110, d) + 0.15 * sine(165, d) + 0.1 * sine(440, d) * (0.5 + 0.5 * sine(0.5, d))
     write("ship_hum_loop", ship, peak=0.5, loop=True)
 
+    # Added after the loops so earlier sounds keep the same random noise.
+    d = 0.9
+    write("steam_hiss", highpass(noise(d), 2500) * (t(d) / d) ** 2 * np.minimum((d - t(d)) / 0.05, 1.0), peak=0.5)
+    d = 1.4
+    roar = bandpass(noise(d), 300, 4000) * np.minimum(t(d) / 0.03, 1.0) * np.exp(-t(d) * 1.6)
+    write("steam_burst", roar + 0.5 * lowpass(noise(d), 200) * env(d, 0.005, 4))
+    d = 1.0
+    ring = (sine(430, d) + 0.7 * sine(1170, d) + 0.4 * sine(2290, d)) * env(d, 0.001, 6)
+    write("manifold_pickup", place(d, (0.0, lowpass(noise(0.15), 900) * env(0.15, 0.001, 20)), (0.0, ring * 0.6)))
+
 
 if __name__ == "__main__":
     main()

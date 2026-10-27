@@ -359,6 +359,7 @@ func _build_cooling(damaged: Node3D, fixed: Node3D) -> void:
 	_rot(_cyl(damaged, Vector3(16.2, 2.0, 16.6), 0.08, 1.6, "y", "metal"), Vector3(0.0, 0.0, 0.5))
 	_box(damaged, [21.5, 22.5], [0.0, 0.03], [13.0, 14.0], "void", false)
 	_rot(_box(damaged, [21.5, 22.5], [0.0, 1.0], [12.94, 13.0], "metal", false), Vector3(0.3, 0.0, 0.0))
+	damaged.add_child(_coolant_leak(plan(16.2, 2.7, 16.6)))
 	for y in [2.55, 2.85]:
 		_cyl(fixed, Vector3(17.9, y, 16.72), 0.08, 10.8, "x", "salvage")
 	var bx := 12.8
@@ -366,6 +367,48 @@ func _build_cooling(damaged: Node3D, fixed: Node3D) -> void:
 		_box(fixed, [bx - 0.05, bx + 0.05], [2.4, 3.0], [16.6, 16.9], "metal_dark", false)
 		bx += 1.8
 	_box(fixed, [21.5, 22.5], [0.0, 0.035], [13.0, 14.0], "salvage", false)
+
+
+## Coolant venting from the cracked manifold: a visible fault that stops once it's repaired.
+func _coolant_leak(at: Vector3) -> CPUParticles3D:
+	var leak := CPUParticles3D.new()
+	leak.position = at
+	leak.amount = 16
+	leak.lifetime = 1.2
+	leak.direction = Vector3(0.0, -0.3, -1.0)
+	leak.spread = 18.0
+	leak.gravity = Vector3(0.0, 0.4, 0.0)
+	leak.initial_velocity_min = 1.0
+	leak.initial_velocity_max = 1.8
+	leak.scale_amount_min = 0.2
+	leak.scale_amount_max = 0.5
+	var puff := QuadMesh.new()
+	puff.size = Vector2(0.6, 0.6)
+	puff.material = _puff_material(Color(0.75, 0.9, 1.0, 0.4))
+	leak.mesh = puff
+	return leak
+
+
+## Soft round puff for steam particles, so they don't read as flat squares.
+func _puff_material(color: Color) -> StandardMaterial3D:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	gradient.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(0.5, 0.0)
+	texture.width = 64
+	texture.height = 64
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.albedo_texture = texture
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	return m
 
 
 func _build_canopy(damaged: Node3D, fixed: Node3D) -> void:

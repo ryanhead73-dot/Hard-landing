@@ -1,7 +1,8 @@
 extends Node3D
 ## Vertical slice flow: sky and sun, player, HUD, enemies, interactions and dev controls.
-## Loop: recover the aux power cell from the relay station, carry it home, install it,
-## then spend scrap at the now-powered workshop fabricator.
+## Loop: recover the aux power cell from the relay station, carry it home and install it, which
+## powers the workshop fabricator. Then salvage a coolant manifold from the hauler wreck in the hot
+## springs, which lets the fabricator run heavy builds.
 
 const SPAWN := Vector3(-3.0, 0.5, 15.0)
 const INTERACT_RANGE := 1.8
@@ -28,6 +29,7 @@ const BUTTONS := {
 @onready var kestrel: Kestrel = $Kestrel
 @onready var site: CrashSite = $CrashSite
 @onready var station: RelayStation = $RelayStation
+@onready var wreck: HaulerWreck = $HaulerWreck
 
 var player: Player
 var hud: Hud
@@ -69,10 +71,18 @@ func _ready() -> void:
 
 	add_child(PauseMenu.new())
 	Sfx.loop("wind_loop", null, -14.0)
-	station.beacon_flashed.connect(func(at: Vector3): Sfx.play("beacon_ping", at, -4.0, 0.0))
+	# Only the site you're heading for pings, so the sound points the way.
+	station.beacon_flashed.connect(func(at: Vector3):
+		if Game.stage == Game.Stage.RECOVER_CELL:
+			Sfx.play("beacon_ping", at, -4.0, 0.0))
+	wreck.strobe_flashed.connect(func(at: Vector3):
+		if Game.stage == Game.Stage.FIND_MANIFOLD:
+			Sfx.play("beacon_ping", at, -4.0, 0.0))
 	kestrel.repair_changed.connect(_on_repair_changed)
 
 	for p in station.spawn_points():
+		spawn_scuttler(p)
+	for p in wreck.spawn_points():
 		spawn_scuttler(p)
 	for p in ROAMER_POINTS:
 		spawn_scuttler(p)
@@ -108,6 +118,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		Game.add_scrap(50)
 	elif key == KEY_T:
 		player.revive(station.cell_point() + Vector3(0.0, 0.5, 4.0))
+	elif key == KEY_G:
+		player.revive(wreck.manifold_point() + Vector3(0.0, 0.5, 0.0))
 	elif key == KEY_H:
 		player.revive(SPAWN)
 
@@ -130,14 +142,24 @@ func _find_interaction() -> Dictionary:
 	var pos := player.global_position
 	if station.has_cell() and pos.distance_to(station.cell_point()) < INTERACT_RANGE:
 		return {"label": "[E] Take the aux power cell", "action": _take_cell}
-	for i in station.crate_count():
-		if not station.crate_searched(i) and pos.distance_to(station.crate_point(i)) < INTERACT_RANGE:
-			return {"label": "[E] Search salvage crate", "action": _search_crate.bind(i)}
+	if wreck.has_manifold() and pos.distance_to(wreck.manifold_point()) < INTERACT_RANGE:
+		if Game.carrying != "":
+			return {"label": "Coolant manifold: your hands are full"}
+		return {"label": "[E] Take the coolant manifold", "action": _take_manifold}
+	for site in [station, wreck]:
+		for i in site.crate_count():
+			if not site.crate_searched(i) and pos.distance_to(site.crate_point(i)) < INTERACT_RANGE:
+				return {"label": "[E] Search salvage crate", "action": _search_crate.bind(site, i)}
 	var aux_point := kestrel.to_global(kestrel.interact_points["aux_power"])
 	if not kestrel.is_repaired("aux_power") and pos.distance_to(aux_point) < INTERACT_RANGE:
 		if Game.carrying == "aux_cell":
 			return {"label": "[E] Install the aux power cell", "action": _install_cell}
 		return {"label": "Aux power bay: needs a replacement power cell"}
+	var bay := kestrel.to_global(kestrel.interact_points["cooling"])
+	if not kestrel.is_repaired("cooling") and pos.distance_to(bay) < INTERACT_RANGE:
+		if Game.carrying == "manifold":
+			return {"label": "[E] Fit the coolant manifold", "action": _install_manifold}
+		return {"label": "Cooling: the manifold is cracked and venting coolant"}
 	var bench := kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
 	if pos.distance_to(bench) < INTERACT_RANGE + 0.6:
 		if not kestrel.is_repaired("aux_power"):
@@ -146,6 +168,8 @@ func _find_interaction() -> Dictionary:
 		if id == "":
 			return {"label": "Fabricator: every upgrade built"}
 		var info: Dictionary = Game.UPGRADES[id]
+		if not Game.can_fabricate(id):
+			return {"label": "%s: the fabricator overheats on heavy builds until cooling is fixed" % info["name"]}
 		if Game.scrap < int(info["cost"]):
 			return {"label": "%s needs %d scrap (%s)" % [info["name"], info["cost"], info["effect"]]}
 		return {"label": "[E] Fabricate %s, %d scrap (%s)" % [info["name"], info["cost"], info["effect"]], "action": Game.buy_upgrade.bind(id)}
@@ -164,8 +188,21 @@ func _take_cell() -> void:
 		spawn_scuttler(p + side + Vector3.UP * 0.5).alert(false)
 
 
-func _search_crate(i: int) -> void:
-	var found := station.search_crate(i)
+func _take_manifold() -> void:
+	wreck.take_manifold()
+	Game.take_manifold()
+	# Prising it loose rattles the whole hull: scuttlers come up out of the pool.
+	for p in wreck.ambush_points():
+		spawn_scuttler(p).alert(false)
+
+
+func _install_manifold() -> void:
+	kestrel.set_repaired("cooling", true)
+	Game.install_manifold()
+
+
+func _search_crate(site: Node3D, i: int) -> void:
+	var found: int = site.search_crate(i)
 	Game.add_scrap(found)
 	hud.show_message("Found %d scrap." % found)
 
@@ -181,8 +218,12 @@ func _waypoint():
 			return station.cell_point()
 		Game.Stage.RETURN_CELL:
 			return kestrel.to_global(kestrel.interact_points["aux_power"])
+		Game.Stage.FIND_MANIFOLD:
+			return wreck.manifold_point()
+		Game.Stage.RETURN_MANIFOLD:
+			return kestrel.to_global(kestrel.interact_points["cooling"])
 	var id := Game.next_upgrade()
-	if id != "" and Game.scrap >= int(Game.UPGRADES[id]["cost"]):
+	if id != "" and Game.can_fabricate(id) and Game.scrap >= int(Game.UPGRADES[id]["cost"]):
 		return kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
 	return null
 
@@ -224,7 +265,7 @@ func _on_player_died() -> void:
 # --- Setup --------------------------------------------------------------------------------
 
 func _dev_text() -> String:
-	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T station · H home"]
+	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T station · G wreck · H home"]
 	for i in Kestrel.REPAIR_ORDER.size():
 		var id := Kestrel.REPAIR_ORDER[i]
 		lines.append("%d %s %s" % [i + 1, Kestrel.REPAIR_NAMES[id], "■" if kestrel.is_repaired(id) else "□"])
