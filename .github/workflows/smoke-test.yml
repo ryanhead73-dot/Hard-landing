@@ -14,11 +14,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download Godot
         run: |
-          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q godot.zip
-          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
-          chmod +x godot
+          # Keep the binary out of the checkout: the repo already has a godot/ project folder.
+          curl -sSL -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot-bin"
+          chmod +x "$RUNNER_TEMP/godot-bin"
+          echo "GODOT=$RUNNER_TEMP/godot-bin" >> "$GITHUB_ENV"
       - name: Import project
-        run: timeout 300 ./godot --headless --path godot --import
+        run: timeout 300 "$GODOT" --headless --path godot --import
       - name: Run smoke test
-        run: timeout 300 ./godot --headless --path godot res://tests/smoke_test.tscn
+        run: timeout 300 "$GODOT" --headless --path godot res://tests/smoke_test.tscn
