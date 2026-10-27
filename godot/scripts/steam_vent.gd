@@ -14,7 +14,7 @@ const TICK := 0.25
 @export var warning_time := 0.9
 @export var burst_time := 1.3
 @export var damage_per_second := 32.0
-## Seconds into the cycle at start, so neighbouring vents don't fire together.
+## Seconds into the quiet phase at start, so neighbouring vents don't fire together.
 @export var offset := 0.0
 
 var phase := Phase.QUIET
@@ -28,7 +28,7 @@ var _crust: StandardMaterial3D
 
 func _ready() -> void:
 	_build()
-	_timer = maxf(quiet_time - offset, 0.05)
+	_timer = maxf(quiet_time - fmod(offset, quiet_time), 0.05)
 
 
 func _physics_process(delta: float) -> void:

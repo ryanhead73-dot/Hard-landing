@@ -34,6 +34,8 @@ var scrap := 0
 var carrying := ""
 var stage := Stage.RECOVER_CELL
 var upgrades: Dictionary = {}
+## Mirrors Kestrel's cooling repair, so the dev panel toggle unlocks heavy builds too.
+var cooling_repaired := false
 
 
 func _ready() -> void:
@@ -67,6 +69,7 @@ func reset() -> void:
 	carrying = ""
 	stage = Stage.RECOVER_CELL
 	upgrades.clear()
+	cooling_repaired = false
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
@@ -92,7 +95,7 @@ func next_upgrade() -> String:
 
 
 func cooling_online() -> bool:
-	return stage == Stage.COOLED
+	return cooling_repaired
 
 
 ## True when the fabricator can run this build at all, scrap aside.

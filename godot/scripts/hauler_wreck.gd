@@ -16,7 +16,7 @@ const VENT_POINTS := [
 	Vector3(-3.5, 0.0, 9.0), Vector3(2.8, 0.0, 11.5), Vector3(-0.8, 0.0, 14.2),
 	Vector3(5.2, 0.0, 14.0), Vector3(-6.2, 0.0, 12.8), Vector3(1.0, 0.0, 6.6),
 ]
-const CRATE_POINTS := [Vector3(-1.9, 0.0, -9.0), Vector3(1.9, 0.0, -3.0), Vector3(-7.5, 0.0, -4.0)]
+const CRATE_POINTS := [Vector3(-1.9, 0.0, -10.6), Vector3(1.9, 0.0, -3.0), Vector3(-7.5, 0.0, -4.0)]
 const CRATE_SCRAP := 12
 const MANIFOLD_POSITION := Vector3(0.0, 1.25, -14.6)
 const STROBE_POSITION := Vector3(0.0, 9.6, 1.0)
@@ -138,8 +138,8 @@ func _build_hull() -> void:
 	_csg(hull, Vector3(5.4, 3.9, 19.4), Vector3(0.0, 1.95, -6.0), inner, true)
 	# Open cargo door at the back, cut down through the floor so the threshold is flush with the ground.
 	_csg(hull, Vector3(4.6, 3.6, 1.0), Vector3(0.0, 1.6, 4.0), inner, true)
-	# Breach in the starboard side, a second way in.
-	_csg(hull, Vector3(1.0, 2.4, 3.0), Vector3(3.0, 1.4, -7.0), inner, true)
+	# Breach in the starboard side, a second way in, clear of the fallen container.
+	_csg(hull, Vector3(1.0, 2.4, 3.0), Vector3(3.0, 1.4, -10.5), inner, true)
 	# Torn-off nose: the front of the hold is open to the sky and the pool.
 	_csg(hull, Vector3(5.0, 2.0, 1.0), Vector3(0.0, 3.3, -16.0), inner, true)
 
@@ -245,7 +245,7 @@ func _build_vents() -> void:
 	for i in VENT_POINTS.size():
 		var vent := SteamVent.new()
 		vent.position = VENT_POINTS[i]
-		vent.offset = fmod(i * 1.7, 5.4)
+		vent.offset = i * 0.55
 		add_child(vent)
 		_vents.append(vent)
 

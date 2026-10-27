@@ -105,7 +105,7 @@ func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, dir: Vector3 = V
 
 ## Starts hunting the target. Nearby scuttlers join in when the alarm spreads.
 func alert(spread := true) -> void:
-	if state == State.DEAD or target == null:
+	if state == State.DEAD or not _target_alive():
 		return
 	if state == State.IDLE:
 		state = State.CHASE
@@ -124,7 +124,7 @@ func calm() -> void:
 
 
 func _idle() -> Vector3:
-	if target and _can_see_target():
+	if _target_alive() and _can_see_target():
 		alert()
 		return Vector3.ZERO
 	if _flat(global_position).distance_to(_flat(_wander)) < 0.8:
@@ -139,7 +139,7 @@ func _idle() -> Vector3:
 
 
 func _chase(delta: float) -> Vector3:
-	if target == null or ("dead" in target and target.dead):
+	if not _target_alive():
 		calm()
 		return Vector3.ZERO
 	var to_target := _flat(target.global_position - global_position)
@@ -204,6 +204,10 @@ func _lunge() -> void:
 	velocity += to_target.normalized() * 7.0
 	if to_target.length() < attack_range + 0.6 and target.has_method("take_damage"):
 		target.take_damage(attack_damage, global_position)
+
+
+func _target_alive() -> bool:
+	return target != null and not ("dead" in target and target.dead)
 
 
 func _can_see_target() -> bool:
