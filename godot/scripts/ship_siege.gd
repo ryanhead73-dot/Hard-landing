@@ -137,9 +137,8 @@ func stand_down() -> void:
 		flee.global_position = centre + away.normalized() * 90.0
 		e.target = flee
 		e.alert(false)
-		get_tree().create_timer(randf_range(5.0, 8.0)).timeout.connect(func():
-			if is_instance_valid(e):
-				e.queue_free())
+		# Bound to the creature itself, so the call simply drops if it's killed first.
+		get_tree().create_timer(randf_range(5.0, 8.0)).timeout.connect(e.queue_free)
 		get_tree().create_timer(9.0).timeout.connect(flee.queue_free)
 	_enemies.clear()
 	hull_changed.emit(-1.0, MAX_HULL)
