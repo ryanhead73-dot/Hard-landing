@@ -72,10 +72,11 @@ func _shake() -> void:
 	var aim := -player.camera().global_basis.z
 	var fired := player.weapon.try_fire(false)
 	var kick := player._kick
+	# The kick decays with real time, so a slow headless frame can eat it before a frame is
+	# drawn: apply it with no time passed and read the camera.
+	player._update_shake(0.0)
+	_check("a shot kicks the view", fired and kick > 0.02 and player.camera().v_offset < -0.02, "fired=%s kick %.3f v_offset %.4f" % [fired, kick, player.camera().v_offset])
 	await _frames(1)
-	# The kick decays with real time, so a slow headless frame can eat most of it: check the
-	# impulse, and that the camera moved at all.
-	_check("a shot kicks the view", fired and kick > 0.02 and player.camera().v_offset < 0.0, "fired=%s kick %.3f v_offset %.4f" % [fired, kick, player.camera().v_offset])
 	_check("the kick never moves the aim", (-player.camera().global_basis.z).angle_to(aim) < 0.01)
 	await _frames(40)
 	_check("the kick recovers", absf(player.camera().v_offset) < 0.003, "%.4f" % player.camera().v_offset)

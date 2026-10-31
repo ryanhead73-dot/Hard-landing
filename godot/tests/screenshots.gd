@@ -22,6 +22,9 @@ func _ready() -> void:
 			continue
 		main.day_cycle = false
 		main.set_daylight(1.0 if String(shot[0]).ends_with("_dusk") else 0.0)
+		if shot[1] == "kestrel":
+			var k: Kestrel = main.kestrel
+			shot = [shot[0], "", k.to_global(k.plan(shot[2].x, shot[2].y, shot[2].z)), k.to_global(k.plan(shot[3].x, shot[3].y, shot[3].z))]
 		if shot[1] == "pool":
 			var pool: Array = main.site.pools[1]
 			shot = [shot[0], "", pool[0] + Vector3(pool[1] + 6.0, 0.5, 4.0), pool[0]]
@@ -53,6 +56,9 @@ func _ready() -> void:
 				var e: Node3D = main.spawn_enemy(kind, at + fwd * (6.0 + i) + right * (float(i) - 1.0) * 2.6)
 				e.look_at(at, Vector3.UP)
 				beasts.append(e)
+		await _frames(2)
+		for e in beasts:
+			e.process_mode = Node.PROCESS_MODE_DISABLED
 		await _frames(40)
 		for e in beasts:
 			e.process_mode = Node.PROCESS_MODE_DISABLED
@@ -81,7 +87,8 @@ func _shots() -> Array:
 		["basin", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
 		["ship_front", "", Vector3(-30.0, 0.5, -8.0), Vector3(0.0, 2.5, 0.0)],
 		["ship_side", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
-		["workshop", "", Vector3(-3.0, 1.5, 15.0), Vector3(-3.0, 2.0, 2.0)],
+		["workshop", "kestrel", Vector3(13.0, 0.3, 14.5), Vector3(22.0, 1.4, 12.0)],
+		["cockpit", "kestrel", Vector3(7.6, 1.5, 13.0), Vector3(3.6, 2.4, 13.0)],
 		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
 		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
 		["basin_dusk", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],

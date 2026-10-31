@@ -8,7 +8,18 @@ The whole repair campaign is playable: seven expeditions, each recovering one co
 
 ## The campaign
 
-Each repair is one expedition. Follow the site's beacon (only the site you need flashes bright, and only it pings), recover the component, carry it home on your back (no sprinting) and install it. Taking a component stirs up an ambush. Components found out of order say what Kestrel needs first.
+Each repair is one expedition. Follow the site's beacon (only the site you need flashes bright, and only it pings), then work through the site's mission before the component comes free: throw breakers, close valves, lock winches, restart floodlights, triangulate transponders, find a keycard, hold a machine while waves come in, or kill a named elite. Some objectives need E held for a few seconds and break if you're hit; at the Loom they only work between pulses. Banners mark each stage and the HUD shows the next objective. Then carry the component home on your back (no sprinting) and install it. Taking a component stirs up an ambush. Components found out of order say what Kestrel needs first.
+
+| # | Repair | Mission |
+| --- | --- | --- |
+| 1 | Aux power | Throw three breakers round the relay, then hold the station while the cradle releases the cell |
+| 2 | Cooling | Close three valves to quiet the vents, cut two clamps, kill the spitter matriarch |
+| 3 | Canopy | Climb to the skiff, lock both winch anchors before the glazing comes free |
+| 4 | Landing gear | Restart three floodlights in the dark bay, then defend the crawler's crane as it lowers the struts |
+| 5 | Wing | Find three rescue transponders in the spore fog, kill the bull ram, cut the panel free |
+| 6 | Engine | Find the chief engineer's keycard, kill the yard guardian, hold the engine room while the coil unlocks |
+| 7 | Navigation | Tune three resonators between the Loom's pulses |
+
 
 | # | Repair | Site | Beacon | Twist | Benefit |
 | --- | --- | --- | --- | --- | --- |
@@ -47,13 +58,14 @@ A new game opens with Kestrel's crash (E, Space or Esc skips it).
 | Key | Action |
 | --- | --- |
 | WASD / mouse | Move / look (click to capture the mouse) |
-| Esc | Pause menu: mouse sensitivity, invert Y, volume, music volume, difficulty; save and quit to title |
+| Esc | Pause menu: mouse sensitivity, invert Y, volume, music volume, difficulty, screen shake, graphics (Performance / Quality); save and quit to title |
 | Right mouse / left mouse / R | Aim / fire / reload |
 | 1 / 2 / 3, mouse wheel | Rifle / scattergun / arc lance (the ones you own) |
 | Q | Use a stim (heals 55; carry 3, or 5 with the stim pouch) |
 | Tab or I | Inventory: weapons, ammo, stims, upgrades, components |
 | L | Logs: read the newest data slate, or the list of all of them |
 | Shift / Space / C | Sprint / jump / crouch (crawlways need crouch) |
+| V or Alt | Dodge roll: you can't be hurt in the first third of it |
 | E | Interact: take components, search crates, install, fabricate, rest in the bunk (saves) |
 | F | Flashlight |
 | F1 | Dev panel |
@@ -108,15 +120,19 @@ Juno Vale's salvage ship *Kestrel* is down on HD-4471 b, "the Kettle", pulled ou
 - `godot/scripts/pause_menu.gd` is the Esc menu. Settings are saved to `user://settings.cfg`.
 - `godot/scripts/steam_vent.gd` is the vent hazard: quiet, then a hiss and glowing crust as warning, then a burst that damages the player and scuttlers inside it.
 - `godot/scripts/hud.gd` draws the compass strip (with the waypoint marker), objective, waypoint, crosshair and hit markers, ammo, suit health, scrap, prompts and damage flash.
-- `godot/scripts/crash_site.gd` builds the basin: ridges, basalt columns, steaming pools, glowing moss, a plough berm and the crash furrow with debris. It uses a fixed seed, so the site looks the same every time.
+- `godot/scripts/crash_site.gd` builds the basin: a generated terrain mesh with a height-map collider (flat at the ship, the sites and the paths between them), steaming pools, basalt clusters, boulders and crags, moss and reeds, a plough berm and the crash furrow. It uses a fixed seed, so the site looks the same every time. `godot/shaders/` holds the terrain (wet, moss and cliff masks), rock, water and sky shaders; `world_props.gd` places and scatters the rock and ground-cover models from `blender/build_world.py`.
+- `godot/scripts/mission_runner.gd` (`main.missions`) runs each site's mission (the `mission` array a site fills in `_mission()`): reach, activate, pulse, defend and elite stages, then the take. `mission_device.gd` is the breaker, valve, winch, floodlight and other objective props. Progress saves in `Game.mission_stage` / `Game.mission_done`.
+- Feel lives in `player.gd`: the dodge roll, camera shake (trauma), recoil kick, hit stop on kills, sprint FOV, landing thump and footstep splashes in pools; `hud.gd` draws red arcs toward whatever hit you.
+- `godot/scripts/bevel.gd` gives every box part of Kestrel and the sites chamfered edges that catch the light.
+- `blender/build_kestrel.py` builds Kestrel's modelled skin over the CSG: arched roof fairings, keel, nose cone, cockpit bezel, fins and nacelles, fitted to the deck plan (`godot/assets/kestrel/`).
 - `blender/build_models.py` builds every character, weapon, component and the salvage crate as rigid-part rigs (named pivots such as `Hips`, `ArmL`, `LegL1`, `Muzzle` with meshes under them) and exports them to `godot/assets/models/<name>.glb`. Run it with Blender (`blender -b -P blender/build_models.py`) or headless `bpy` 4.2 (`python blender/build_models.py [-- juno warden]` to rebuild only some). `godot/scripts/rig.gd` loads them, finds joints and gives an instance its own copy of a material (so one creature's glow can pulse alone). A missing GLB falls back to an empty node.
 - Animation is procedural, posing the rigs' joints in code. `rig_pose.gd` sets joint rotations on top of each rest pose. `juno_animator.gd` (`player.anim`) blends walk and run cycles, crouch, jump, aim pitch, recoil, reload, carrying, flinches and going down, and plays one-shot actions (`install`, `interact`, `stim`). The weapon rides on her `Chest` joint. `creature_animator.gd` (`enemy.anim`) walks six legs in a tripod gait and four in diagonal pairs, poses each creature's states from `anim_state()` (jaws, the spitter's neck and sac, the ram's head, the Warden's arms and opening carapace), plays `attack` / `slam` / `hurt` one-shots and curls the legs on death. Installing a part springs it into place with sparks (`Repairable.play_repair`), the wing turret sweeps while idle, and a new game opens with the crash intro (`main.play_intro`, skipped with E, Space or Esc).
 - `godot/scripts/surfaces.gd` generates the hull panelling, basalt and grime textures at startup (greyscale albedo plus normal map, applied triplanar, so CSG needs no UVs). `vfx.gd` builds the particles: death puffs, acid splashes, the muzzle star, Kestrel's engine exhaust and the moss motes around the player.
 - `blender/kestrel_blockout.py` builds the same layout in Blender: a single boolean shell (`Shell-col`), floors, fixtures, the exterior, and one mount empty per repair with placeholder volumes for both states. Model the real parts inside those empties.
-- `godot/tests/` holds the headless tests. `smoke_test.tscn` plays the slice (audio, pause, ship routes, combat, the first two repair loops, fabricator, vents, death and respawn). `campaign_test.tscn` checks every site's layout and routes, every hazard, each repair loop in order with its benefit, and the launch. `mechanics_test.tscn` covers weapons, ammo, stims, the fabricator and inventory, every enemy, sieges, difficulty, balance numbers, save/load and the title screen. `story_test.tscn` checks the story data, where logs are found and that they save, when HOB and Juno speak, and the whole finale through to the ending card. `audio_test.tscn` checks every sound and loop, the music stems, buses, adaptive music, ambience zones, the spool whine and story sounds. `animation_test.tscn` checks Juno's poses and actions, every creature's gait and state poses, the repair spring, the turret sweep and the crash intro. `visuals_test.tscn` checks every model and its joints, that the player, weapons, wildlife, components and crates use them, hit flashes, particles, surfaces, the engine exhaust and the compass. Run one with `godot --headless --path godot res://tests/smoke_test.tscn`; GitHub Actions runs every `*_test.tscn` on each pull request. `screenshots.tscn` renders review shots (see the script header).
+- `godot/tests/` holds the headless tests. `smoke_test.tscn` plays the slice (audio, pause, ship routes, combat, the first two repair loops, fabricator, vents, death and respawn). `campaign_test.tscn` checks every site's layout and routes, every hazard, each repair loop in order with its benefit, and the launch. `mechanics_test.tscn` covers weapons, ammo, stims, the fabricator and inventory, every enemy, sieges, difficulty, balance numbers, save/load and the title screen. `story_test.tscn` checks the story data, where logs are found and that they save, when HOB and Juno speak, and the whole finale through to the ending card. `audio_test.tscn` checks every sound and loop, the music stems, buses, adaptive music, ambience zones, the spool whine and story sounds. `animation_test.tscn` checks Juno's poses and actions, every creature's gait and state poses, the repair spring, the turret sweep and the crash intro. `missions_test.tscn` plays every mission stage, including holds, interrupts, defends, elites and a save in the middle of a mission. `feel_test.tscn` checks the roll, shake, recoil, sprint FOV, splashes, damage arcs and the graphics setting. `visuals_test.tscn` checks every model and its joints, that the player, weapons, wildlife, components and crates use them, hit flashes, particles, surfaces, the engine exhaust and the compass. Run one with `godot --headless --path godot res://tests/smoke_test.tscn`; GitHub Actions runs every `*_test.tscn` on each pull request. `screenshots.tscn` renders review shots (see the script header).
 
 ## Known gaps
 
 - Enemies steer with ray feelers rather than a navmesh. They get round walls and wreckage, but a deep dead end can still trap one.
 - Sounds and music are synthesised placeholders (see `tools/make_sfx.py`); any WAV with the same name replaces one.
-- The interior ambient darkening uses a reflection probe, which works in Forward+ only. The Compatibility renderer will look brighter inside.
+- The interior ambient darkening uses one reflection probe per room, which works in Forward+ only. The Compatibility renderer will look brighter inside.

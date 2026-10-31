@@ -50,4 +50,6 @@ Tests: a new `missions_test` plays every mission stage by stage, plus save/load 
 ## Where things stand
 
 - M7 (missions): MissionRunner + MissionDevice, all seven missions, elites, missions_test. Merged in PR #13.
-- M8 (world): terrain mesh + height-map collider with hills, rim and pool hollows (flat at the ship, sites and the paths between); terrain, rock, water and sky shaders; Blender basalt clusters, boulders, crags, moss and reeds (`blender/build_world.py`).
+- M8 (world), merged in PR #14: terrain mesh + height-map collider with hills, rim and pool hollows (flat at the ship, sites and the paths between); terrain, rock, water and sky shaders; Blender basalt clusters, boulders, crags, moss and reeds (`blender/build_world.py`).
+- M9 (models): Kestrel's modelled skin (`blender/build_kestrel.py`: roof fairings, keel, nose, cockpit bezel, fins, nacelles), Juno and the wildlife rebuilt from smooth volumes, chamfered edges on every box part of the ship and sites (`bevel.gd`).
+- M10 (lighting and feel): soft four-split sun shadows, SSIL, a basin haze with sun shafts, per-room interior probes, a Performance/Quality setting; dodge roll, camera shake and recoil kick, hit stop, sprint FOV, pool splashes, damage-direction arcs, landing thump, screen-shake setting. `feel_test`.

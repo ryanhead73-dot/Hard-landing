@@ -572,9 +572,7 @@ func _box(parent: Node, x: Array, y: Array, z: Array, mat_id: String, collide :=
 	var size := Vector3(x[1] - x[0], y[1] - y[0], z[1] - z[0])
 	var centre := plan((x[0] + x[1]) * 0.5, (y[0] + y[1]) * 0.5, (z[0] + z[1]) * 0.5)
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
+	mesh.mesh = Bevel.box(size)
 	mesh.material_override = _mat(mat_id)
 	if not collide:
 		mesh.position = centre
