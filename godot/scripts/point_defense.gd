@@ -69,11 +69,12 @@ func _physics_process(delta: float) -> void:
 		# Idle: the head sweeps slowly back and forth, watching the basin.
 		_scan += delta
 		var sweep := Basis(Vector3.UP, sin(_scan * 0.5) * 1.1) * Basis(Vector3.RIGHT, 0.08)
-		_head.basis = _head.basis.slerp(sweep, clampf(delta * 2.0, 0.0, 1.0)).orthonormalized()
+		_head.basis = _head.basis.orthonormalized().slerp(sweep, clampf(delta * 2.0, 0.0, 1.0)).orthonormalized()
 		return
 	var aim := target.global_position + Vector3.UP * 0.5
 	var want := _head.global_transform.looking_at(aim, Vector3.UP).basis
-	_head.global_basis = _head.global_basis.slerp(want.orthonormalized(), clampf(turn_speed * delta, 0.0, 1.0)).orthonormalized()
+	# Orthonormalize first: the wing springs into place with a little scale overshoot when fitted.
+	_head.global_basis = _head.global_basis.orthonormalized().slerp(want.orthonormalized(), clampf(turn_speed * delta, 0.0, 1.0)).orthonormalized()
 	if _cooldown <= 0.0 and (-_head.global_basis.z).dot((aim - _head.global_position).normalized()) > 0.97:
 		_fire(aim)
 

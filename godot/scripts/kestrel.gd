@@ -379,10 +379,11 @@ func _apply_pose(level: bool, animate: bool) -> void:
 	_pose_tween.tween_property(self, "position:y", target_y, 3.0)
 
 
-## Ground-level points around the hull that besieging wildlife goes for (local space).
+## Ground-level points around the hull that besieging wildlife goes for (local space). None under
+## the nose: it's buried in the ploughed berm, and wildlife that picked it got stuck short of it.
 func hull_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
-	for p in [Vector2(14.0, 8.0), Vector2(22.0, 8.0), Vector2(16.0, 18.0), Vector2(22.0, 18.0), Vector2(31.5, 13.0), Vector2(2.0, 13.0), Vector2(8.0, 9.0), Vector2(8.0, 17.0)]:
+	for p in [Vector2(14.0, 8.0), Vector2(22.0, 8.0), Vector2(16.0, 18.0), Vector2(22.0, 18.0), Vector2(31.5, 13.0), Vector2(8.0, 7.5), Vector2(8.0, 18.5)]:
 		out.append(plan(p.x, -0.9, p.y))
 	return out
 
