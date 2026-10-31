@@ -290,6 +290,18 @@ func _siege() -> void:
 			break
 	_check("besiegers damage the hull", siege.hull < hull_before, "hull=%.0f" % siege.hull)
 	_check("with Juno aboard, besiegers stay on the hull", kestrel.is_inside(player.global_position) and siege.siege_enemies().all(func(e): return e.target is HullPoint))
+	var buried: PackedStringArray = []
+	var space := player.get_world_3d().direct_space_state
+	var probe := PhysicsShapeQueryParameters3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = 0.2
+	probe.shape = ball
+	probe.collision_mask = Game.LAYER_WORLD
+	for hp in siege._points:
+		probe.transform = Transform3D(Basis(), Vector3(hp.global_position.x, 0.25, hp.global_position.z))
+		if not space.intersect_shape(probe, 1).is_empty():
+			buried.append(str(hp.global_position))
+	_check("every hull point stands in the open, where wildlife can reach it", buried.is_empty(), ", ".join(buried))
 	_check("outside isn't aboard", not kestrel.is_inside(main.SPAWN + Vector3(0.0, 0.0, 12.0)))
 	# Clear every wave by hand.
 	var scrap_before := Game.scrap
