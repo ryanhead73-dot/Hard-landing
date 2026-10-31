@@ -33,10 +33,16 @@ func _ready() -> void:
 	cam.fov = 50
 	add_child(cam)
 	cam.current = true
-	var views := {"k_front": Vector3(-30, 6, 10), "k_side": Vector3(4, 5, 32), "k_aft": Vector3(32, 7, -14), "k_top": Vector3(-14, 22, -18)}
+	var centre := Vector3(0, 2.5, 0)
+	var views := {
+		"k_front": [Vector3(-30, 6, 10), centre], "k_side": [Vector3(4, 5, 32), centre],
+		"k_aft": [Vector3(32, 7, -14), centre], "k_top": [Vector3(-14, 22, -18), centre],
+		"k_gear": [Vector3(6.0, 0.9, -8.0), Vector3(1.5, 0.6, -2.6)],
+		"k_mast": [Vector3(14.0, 7.5, -5.0), Vector3(10.0, 5.0, 0.0)],
+	}
 	for name in views:
-		cam.position = views[name]
-		cam.look_at(Vector3(0, 2.5, 0))
+		cam.position = views[name][0]
+		cam.look_at(views[name][1])
 		for i in 6:
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw

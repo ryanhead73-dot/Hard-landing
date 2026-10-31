@@ -101,3 +101,112 @@ static func _tri(verts: PackedVector3Array, normals: PackedVector3Array, a: Vect
 		c = t
 	verts.append_array([a, b, c])
 	normals.append_array([n, n, n])
+
+
+## A flat-shaded copy of a primitive mesh's first surface: every triangle gets its own face
+## normal, so a six-sided cylinder reads as a cut hexagonal prism. Faces keep the side the
+## source normals point to.
+static func flat(source: Mesh) -> ArrayMesh:
+	var arrays := source.surface_get_arrays(0)
+	var src_v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var src_n: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if idx.is_empty():
+		idx.resize(src_v.size())
+		for i in src_v.size():
+			idx[i] = i
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for t in range(0, idx.size() - 2, 3):
+		var a := src_v[idx[t]]
+		var b := src_v[idx[t + 1]]
+		var c := src_v[idx[t + 2]]
+		var n := (b - a).cross(c - a)
+		if n.length_squared() < 1e-12:
+			continue
+		n = n.normalized()
+		if n.dot(src_n[idx[t]] + src_n[idx[t + 1]] + src_n[idx[t + 2]]) < 0.0:
+			n = -n
+		verts.append_array([a, b, c])
+		normals.append_array([n, n, n])
+	var out := []
+	out.resize(Mesh.ARRAY_MAX)
+	out[Mesh.ARRAY_VERTEX] = verts
+	out[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, out)
+	return mesh
+
+
+## A flat plate from an outline (x, z points) between heights y0 and y1, with its edges
+## tapered like an airfoil: a full-size middle ring, an inset underside and a deeper inset top.
+static func tapered_plate(outline: PackedVector2Array, y0: float, y1: float, top_inset := 0.32, bottom_inset := 0.1) -> ArrayMesh:
+	var mid_y := lerpf(y0, y1, 0.35)
+	var rings := [
+		[_inset(outline, bottom_inset), y0],
+		[outline, mid_y],
+		[_inset(outline, top_inset), y1],
+	]
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var n := outline.size()
+	var centre := Vector2.ZERO
+	for p in outline:
+		centre += p
+	centre /= n
+	for r in 2:
+		var lo: PackedVector2Array = rings[r][0]
+		var hi: PackedVector2Array = rings[r + 1][0]
+		var ylo: float = rings[r][1]
+		var yhi: float = rings[r + 1][1]
+		for i in n:
+			var j := (i + 1) % n
+			var a := Vector3(lo[i].x, ylo, lo[i].y)
+			var b := Vector3(lo[j].x, ylo, lo[j].y)
+			var c := Vector3(hi[j].x, yhi, hi[j].y)
+			var d := Vector3(hi[i].x, yhi, hi[i].y)
+			var mid := (outline[i] + outline[j]) * 0.5
+			var out := Vector3(mid.x - centre.x, 0.0, mid.y - centre.y).normalized()
+			var face := (b - a).cross(d - a).normalized()
+			if face.dot(out) < 0.0:
+				face = -face
+			_tri(verts, normals, a, b, c, face)
+			_tri(verts, normals, a, c, d, face)
+	for cap in [[rings[0], Vector3.DOWN], [rings[2], Vector3.UP]]:
+		var pts: PackedVector2Array = cap[0][0]
+		var y: float = cap[0][1]
+		var tris := Geometry2D.triangulate_polygon(pts)
+		for t in range(0, tris.size(), 3):
+			var a := Vector3(pts[tris[t]].x, y, pts[tris[t]].y)
+			var b := Vector3(pts[tris[t + 1]].x, y, pts[tris[t + 1]].y)
+			var c := Vector3(pts[tris[t + 2]].x, y, pts[tris[t + 2]].y)
+			_tri(verts, normals, a, b, c, cap[1])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+## Moves each corner of a polygon inward by `d` along its bisector (mitred, clamped at sharp
+## corners). Works for either winding.
+static func _inset(poly: PackedVector2Array, d: float) -> PackedVector2Array:
+	var n := poly.size()
+	var area := 0.0
+	for i in n:
+		var a := poly[i]
+		var b := poly[(i + 1) % n]
+		area += a.x * b.y - b.x * a.y
+	var inward_sign := 1.0 if area > 0.0 else -1.0
+	var out := PackedVector2Array()
+	for i in n:
+		var p := poly[i]
+		var e1 := (p - poly[(i - 1 + n) % n]).normalized()
+		var e2 := (poly[(i + 1) % n] - p).normalized()
+		var n1 := Vector2(-e1.y, e1.x) * inward_sign
+		var n2 := Vector2(-e2.y, e2.x) * inward_sign
+		var m := (n1 + n2).normalized()
+		out.append(p + m * d / maxf(m.dot(n1), 0.35))
+	return out
