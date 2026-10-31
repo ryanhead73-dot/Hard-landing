@@ -63,16 +63,14 @@ func _build_pad_and_building() -> void:
 
 
 func _build_cover() -> void:
-	var concrete := _mat(Color("6f746e"), 0.95)
-	var rust := _mat(Color("8a4a2a"), 0.8)
-	_static_box(Vector3(4.0, 1.2, 0.4), Vector3(-7.5, 0.7, 3.0), concrete)
-	_static_box(Vector3(0.4, 1.2, 5.0), Vector3(7.0, 0.7, 1.0), concrete)
-	var low_wall := _static_box(Vector3(5.0, 1.1, 0.4), Vector3(-1.5, 0.65, 7.0), concrete)
-	low_wall.rotation.y = 0.25
-	var broken_wall := _static_box(Vector3(3.0, 1.0, 0.4), Vector3(10.5, 0.6, -6.0), concrete)
-	broken_wall.rotation.y = -0.6
-	var container := _static_box(Vector3(6.0, 2.6, 2.4), Vector3(-10.0, 1.3, -5.0), rust)
-	container.rotation = Vector3(0.0, 0.3, 0.08)
+	# Jersey barriers and a tipped shipping container (modelled props over box collision).
+	_prop("prop_barrier", Vector3(4.0, 1.2, 0.4), Vector3(-7.5, 0.7, 3.0))
+	_prop("prop_barrier", Vector3(5.0, 1.2, 0.4), Vector3(7.0, 0.7, 1.0), Vector3(0.0, PI * 0.5, 0.0))
+	_prop("prop_barrier", Vector3(5.0, 1.1, 0.4), Vector3(-1.5, 0.65, 7.0), Vector3(0.0, 0.25, 0.0))
+	_prop("prop_barrier", Vector3(3.0, 1.0, 0.4), Vector3(10.5, 0.6, -6.0), Vector3(0.0, -0.6, 0.0))
+	_prop("prop_container", Vector3(6.0, 2.6, 2.4), Vector3(-10.0, 1.3, -5.0), Vector3(0.0, 0.3, 0.08))
+	_prop("prop_generator", Vector3(2.4, 1.6, 1.3), Vector3(5.6, 0.9, -12.2), Vector3(0.0, 0.1, 0.0))
+	_prop("prop_pipes", Vector3(4.0, 0.9, 1.3), Vector3(-8.5, 0.55, -12.0))
 	for p in [Vector3(3.0, 0.6, 4.5), Vector3(9.0, 0.6, -3.0), Vector3(-5.5, 0.6, 9.0), Vector3(4.2, 0.6, 9.5)]:
 		var crate := _static_box(Vector3(1.1, 1.1, 1.1), p, _mat(Color("6b6a52"), 0.9))
 		crate.rotation.y = p.x

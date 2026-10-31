@@ -32,6 +32,9 @@ var spawn_kinds: Array = []
 var ambush_kinds: Array = []
 ## The mission worked before the component can be taken: stage dictionaries (see MissionRunner).
 var mission: Array = []
+## Torn hull shards scattered round the site (see _build_debris), and the ring they lie on.
+var debris_count := 10
+var debris_radius := Vector2(9.0, 24.0)
 ## True when this is the site the player should head for: the beacon flashes bright.
 var active := false
 ## The resident pack has been spawned (once per game).
@@ -58,6 +61,7 @@ func build() -> void:
 	_crate_searched.clear()
 	_configure()
 	_build_site()
+	_build_debris()
 	_build_component()
 	_build_crates()
 	_build_beacon()
@@ -316,7 +320,8 @@ func _column(pos: Vector3, radius: float, height: float, mat: Material, sides :=
 	cyl.height = height
 	cyl.radial_segments = sides
 	cyl.rings = 1
-	mesh.mesh = cyl
+	# Flat-shaded facets, so a column reads as cut stone rather than a smooth pipe.
+	mesh.mesh = Bevel.flat(cyl)
 	# Dark stone columns share the world's basalt.
 	var dark := mat is StandardMaterial3D and (mat as StandardMaterial3D).albedo_color.get_luminance() < 0.2
 	mesh.material_override = WorldProps.rock_material() if dark else mat
@@ -357,6 +362,92 @@ func _slab(from: Vector3, to: Vector3, width: float, thickness: float, mat: Mate
 	body.add_child(shape)
 	add_child(body)
 	return body
+
+
+## A modelled prop standing in for a box: the box's collision, with a Blender model
+## (blender/build_props.py) fitted to the box's size for the look.
+func _prop(model: String, size: Vector3, pos: Vector3, rot := Vector3.ZERO, collide := true) -> Node3D:
+	var holder: Node3D
+	if collide:
+		var body := StaticBody3D.new()
+		var shape := CollisionShape3D.new()
+		var box_shape := BoxShape3D.new()
+		box_shape.size = size
+		shape.shape = box_shape
+		body.add_child(shape)
+		holder = body
+	else:
+		holder = Node3D.new()
+	holder.name = model.to_pascal_case()
+	holder.position = pos
+	holder.rotation = rot
+	add_child(holder)
+	var visual := Rig.spawn(model, holder)
+	var box := _model_aabb(visual)
+	if box.size.x > 0.0 and box.size.y > 0.0 and box.size.z > 0.0:
+		var k := size / box.size
+		visual.scale = k
+		visual.position = -(box.position + box.size * 0.5) * k
+	return holder
+
+
+static func _model_aabb(root: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	for mesh in Rig.meshes(root):
+		if mesh.mesh == null:
+			continue
+		var xf := root.global_transform.affine_inverse() * mesh.global_transform if root.is_inside_tree() else _local_xf(root, mesh)
+		var box := xf * mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out
+
+
+static func _local_xf(root: Node3D, node: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var n: Node = node
+	while n != root and n is Node3D:
+		xf = (n as Node3D).transform * xf
+		n = n.get_parent()
+	return xf
+
+
+## Torn hull shards round the site: the wreck's own debris, scattered on a ring outside the
+## core so they never sit on an objective. No collision.
+func _build_debris() -> void:
+	if debris_count <= 0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(get_script().resource_path)
+	var keep := mission_points()
+	keep.append(component_pos)
+	keep.append(component_stand)
+	for c in crate_pts:
+		keep.append(c)
+	var placed := 0
+	var tries := 0
+	while placed < debris_count and tries < debris_count * 8:
+		tries += 1
+		var a := rng.randf() * TAU
+		var r := rng.randf_range(debris_radius.x, debris_radius.y)
+		var p := Vector3(cos(a) * r, -0.04, sin(a) * r)
+		var clear := true
+		for k in keep:
+			if Vector2(k.x - p.x, k.z - p.z).length() < 3.0:
+				clear = false
+				break
+		if not clear:
+			continue
+		var model: String = ["prop_shard_0", "prop_shard_1", "prop_shard_2"][rng.randi() % 3]
+		var piece := Node3D.new()
+		piece.name = "Debris%d" % placed
+		piece.position = p
+		piece.rotation = Vector3(rng.randf_range(-0.15, 0.15), rng.randf() * TAU, rng.randf_range(-0.2, 0.2))
+		piece.scale = Vector3.ONE * rng.randf_range(0.7, 1.2)
+		add_child(piece)
+		Rig.spawn(model, piece)
+		placed += 1
 
 
 func _light(pos: Vector3, color: Color, energy: float, light_range: float) -> OmniLight3D:

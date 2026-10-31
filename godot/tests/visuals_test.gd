@@ -15,6 +15,8 @@ const MODELS := {
 	"scattergun": ["Muzzle", "Pump"],
 	"arc_lance": ["Muzzle"],
 	"aux_cell": [], "manifold": [], "glazing": [], "struts": [], "wing_panel": [], "drive_coil": [], "nav_core": [], "crate": [],
+	"prop_container": [], "prop_barrier": [], "prop_generator": [], "prop_pipes": [],
+	"prop_shard_0": [], "prop_shard_1": [], "prop_shard_2": [],
 }
 
 
@@ -96,6 +98,20 @@ func _models() -> void:
 			missing.append(model + " has no meshes")
 	holder.queue_free()
 	_check("every model is exported with its joints", missing.is_empty(), ", ".join(missing))
+	# Sites: modelled props fitted to their collision boxes, and a debris field round each.
+	var short: PackedStringArray = []
+	for id in main.sites:
+		var site: ExpeditionSite = main.sites[id]
+		var debris := site.get_children().filter(func(c): return String(c.name).begins_with("Debris")).size()
+		if debris < 5:
+			short.append("%s: %d" % [id, debris])
+	_check("every site has a debris field", short.is_empty(), ", ".join(short))
+	var container := main.station.find_child("PropContainer", false, false) as Node3D
+	var fitted := false
+	if container:
+		var box := ExpeditionSite._model_aabb(container)
+		fitted = box.size.distance_to(Vector3(6.0, 2.6, 2.4)) < 0.3
+	_check("the relay's container is a modelled prop fitted to its box", fitted)
 	_check("a missing model falls back to an empty node", Rig.spawn("no_such_model", self) is Node3D and not Rig.exists("no_such_model"))
 
 

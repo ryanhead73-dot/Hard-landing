@@ -101,3 +101,38 @@ static func _tri(verts: PackedVector3Array, normals: PackedVector3Array, a: Vect
 		c = t
 	verts.append_array([a, b, c])
 	normals.append_array([n, n, n])
+
+
+## A flat-shaded copy of a primitive mesh's first surface: every triangle gets its own face
+## normal, so a six-sided cylinder reads as a cut hexagonal prism. Faces keep the side the
+## source normals point to.
+static func flat(source: Mesh) -> ArrayMesh:
+	var arrays := source.surface_get_arrays(0)
+	var src_v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var src_n: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if idx.is_empty():
+		idx.resize(src_v.size())
+		for i in src_v.size():
+			idx[i] = i
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for t in range(0, idx.size() - 2, 3):
+		var a := src_v[idx[t]]
+		var b := src_v[idx[t + 1]]
+		var c := src_v[idx[t + 2]]
+		var n := (b - a).cross(c - a)
+		if n.length_squared() < 1e-12:
+			continue
+		n = n.normalized()
+		if n.dot(src_n[idx[t]] + src_n[idx[t + 1]] + src_n[idx[t + 2]]) < 0.0:
+			n = -n
+		verts.append_array([a, b, c])
+		normals.append_array([n, n, n])
+	var out := []
+	out.resize(Mesh.ARRAY_MAX)
+	out[Mesh.ARRAY_VERTEX] = verts
+	out[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, out)
+	return mesh
