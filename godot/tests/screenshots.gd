@@ -103,6 +103,8 @@ func _shots() -> Array:
 		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
+		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
+		["relay_inside", "aux_power", Vector3(-3.0, 0.5, -3.0), Vector3(2.0, 1.5, -8.0)],
 	]
 
 

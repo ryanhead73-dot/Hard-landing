@@ -19,7 +19,7 @@ const MODELS := {
 	"prop_shard_0": [], "prop_shard_1": [], "prop_shard_2": [], "prop_gear": ["Wheel"], "prop_gear_broken": ["Wheel"],
 	"prop_mast": ["Dish"], "prop_mast_down": ["Dish"], "prop_hull_plate": [],
 	"site_crawler": ["Boom", "Head"], "site_rib": [], "site_rib_broken": [], "site_engine": [],
-	"site_hauler": ["Fin"], "site_hauler_nose": [],
+	"site_hauler": ["Fin"], "site_hauler_nose": [], "site_relay": ["Dish"], "prop_cargo_case": [],
 }
 
 
@@ -104,6 +104,10 @@ func _set_pieces() -> void:
 	_check("the hauler's hold has walls", port != null and absf(port.x + 2.7) < 0.05, str(port))
 	_check("the hauler's cargo door is open", ray.call(hauler, Vector3(0.0, 2.5, 10.0), Vector3(0.0, 2.5, -5.0)) == null)
 	_check("the hauler's breach is open", ray.call(hauler, Vector3(6.0, 1.4, -10.5), Vector3(1.0, 1.4, -10.5)) == null)
+	var relay: Node3D = main.sites["aux_power"]
+	var back_wall: Variant = ray.call(relay, Vector3(0.0, 1.5, 4.0), Vector3(0.0, 1.5, -12.0))
+	_check("the relay hut's door is open to its back wall", back_wall != null and absf(back_wall.z + 8.8) < 0.05, str(back_wall))
+	_check("the relay hut's side door is open", ray.call(relay, Vector3(8.0, 1.2, -5.8), Vector3(3.0, 1.2, -5.8)) == null)
 	var yard: Node3D = main.sites["engine"]
 	var roof: Variant = ray.call(yard, Vector3(0.0, 4.2, -24.0), Vector3(0.0, 12.0, -24.0))
 	_check("the engine section has a shell", roof != null and absf(roof.y - 8.0) < 0.15, str(roof))

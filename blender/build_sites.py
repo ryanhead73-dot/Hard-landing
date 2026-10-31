@@ -641,6 +641,156 @@ def hauler_nose():
     export("site_hauler_nose")
 
 
+# --- Relay station -------------------------------------------------------------------------
+
+def relay():
+    """In relay site coordinates (scripts/relay_station.gd): a 10 x 4 x 7 m prefab hut round
+    (0, 2, -5.5) with 0.2 m walls, a front door and two windows facing +z, a side door in the
+    east wall, and a hole in the roof over the cell; the 16 m lattice mast at (6, -8)."""
+    rng = random.Random(3)
+    wall = m.mat("relay_wall", "8a8f86", 0.85, 0.05)
+    wall_dark = m.mat("relay_wall_dark", "6a6f68", 0.9)
+    inner = m.mat("relay_inner", "5c615c", 0.9)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.55, 0.55)
+    steel = m.mat("steel", m.STEEL, 0.35, 0.8)
+    band = m.mat("oxide", m.OXIDE, 0.6)
+    hazard = m.mat("hazard", HAZARD, 0.7)
+    black = m.mat("hazard_black", BLACK, 0.8)
+    rust = m.mat("rust_streak", RUST, 0.9)
+    glass = m.mat("cab_glass", GLASS, 0.15, 0.3, 0.1)
+    beacon = m.mat("beacon_red", "ff4030", 0.4, 0.0, 1.5)
+    root = m.pivot("Relay")
+    shell = m.box("shell", (10.0, 4.0, 7.0), (0, 2.0, -5.5), root, wall, bevel=0.0)
+    hole = m.box("hole", (9.6, 3.7, 6.6), (0, 1.95, -5.5), None, inner, bevel=0.0)
+    carve(shell, [hole, _cutter((2.0, 2.5, 0.8), (0, 1.35, -2.0)), _cutter((2.0, 1.0, 0.8), (3.2, 1.9, -2.0)),
+                  _cutter((2.0, 1.0, 0.8), (-3.2, 1.9, -2.0)), _cutter((0.8, 2.3, 1.5), (5.0, 1.25, -5.8)),
+                  _cutter((3.0, 0.8, 3.0), (1.5, 4.0, -6.8))])
+    # Prefab panels: vertical cover strips on every outside wall, a plinth and a roof parapet.
+    for k in range(11):
+        x = -5.0 + k * 1.0
+        if abs(x) < 1.2 or 2.1 < abs(x) < 4.3:
+            m.box("strip_f%d" % k, (0.08, 1.35, 0.05), (x, 0.75, -1.97), root, wall_dark, bevel=0.0)
+            m.box("strip_fu%d" % k, (0.08, 1.35, 0.05), (x, 3.25, -1.97), root, wall_dark, bevel=0.0) if abs(x) > 1.2 else None
+        else:
+            m.box("strip_f%d" % k, (0.08, 3.9, 0.05), (x, 2.0, -1.97), root, wall_dark, bevel=0.0)
+        m.box("strip_b%d" % k, (0.08, 3.9, 0.05), (x, 2.0, -9.03), root, wall_dark, bevel=0.0)
+    for k in range(8):
+        z = -9.0 + k * 1.0
+        m.box("strip_w%d" % k, (0.05, 3.9, 0.08), (-5.03, 2.0, z), root, wall_dark, bevel=0.0)
+        if not -6.7 < z < -4.9:
+            m.box("strip_e%d" % k, (0.05, 3.9, 0.08), (5.03, 2.0, z), root, wall_dark, bevel=0.0)
+    m.box("plinth", (10.3, 0.3, 7.3), (0, 0.1, -5.5), root, wall_dark, bevel=0.03)
+    for zc, sx, sz in ((-1.95, 10.2, 0.15), (-9.05, 10.2, 0.15)):
+        m.box("parapet%d" % int(zc), (sx, 0.25, sz), (0, 4.12, zc), root, wall_dark, bevel=0.02)
+    for xc in (-5.05, 5.05):
+        m.box("parapet_s%d" % int(xc), (0.15, 0.25, 7.2), (xc, 4.12, -5.5), root, wall_dark, bevel=0.02)
+    # Door and window frames, a hazard-striped side door, cracked glass in one window.
+    m.box("door_frame_l", (0.12, 2.6, 0.3), (-1.06, 1.3, -2.0), root, dark, bevel=0.0)
+    m.box("door_frame_r", (0.12, 2.6, 0.3), (1.06, 1.3, -2.0), root, dark, bevel=0.0)
+    m.box("door_head", (2.24, 0.12, 0.3), (0, 2.62, -2.0), root, dark, bevel=0.0)
+    for k in range(5):
+        m.box("dstripe%d" % k, (0.42, 0.12, 0.02), (-0.84 + k * 0.42, 2.82, -1.93), root, hazard if k % 2 == 0 else black, bevel=0.0)
+    for sx in (-1, 1):
+        x = sx * 3.2
+        m.box("win_sill%d" % sx, (2.2, 0.1, 0.32), (x, 1.37, -1.98), root, dark, bevel=0.0)
+        m.box("win_head%d" % sx, (2.2, 0.1, 0.3), (x, 2.43, -2.0), root, dark, bevel=0.0)
+        m.box("win_mull%d" % sx, (0.08, 1.0, 0.2), (x, 1.9, -2.0), root, dark, bevel=0.0)
+    m.box("glass_l", (0.9, 0.95, 0.02), (-3.7, 1.9, -2.05), root, glass, bevel=0.0)
+    m.box("glass_shard", (0.5, 0.4, 0.02), (-2.75, 2.2, -2.05), root, glass, bevel=0.0, rot=(0, 0, 25))
+    m.box("side_frame", (0.3, 0.12, 1.7), (5.0, 2.42, -5.8), root, dark, bevel=0.0)
+    for zc in (-6.62, -4.98):
+        m.box("side_jamb%d" % int(zc * 10), (0.3, 2.3, 0.12), (5.0, 1.25, zc), root, dark, bevel=0.0)
+    # Stencilled band and rust under the roof edge.
+    m.box("band_f", (10.04, 0.3, 0.02), (0, 3.45, -1.99), root, band, bevel=0.0)
+    m.box("band_e", (0.02, 0.3, 7.04), (5.0, 3.45, -5.5), root, band, bevel=0.0)
+    for k in range(6):
+        x = rng.uniform(-4.6, 4.6)
+        h = rng.uniform(0.6, 1.6)
+        if abs(x) < 1.3:
+            continue
+        m.box("streak%d" % k, (rng.uniform(0.08, 0.2), h, 0.02), (x, 3.3 - h * 0.5, -1.985), root, rust, bevel=0.0)
+    # The roof hole's torn edge: bent sheets hanging into the room.
+    for k in range(5):
+        m.box("flap%d" % k, (rng.uniform(0.5, 0.9), 0.04, rng.uniform(0.4, 0.7)),
+              (0.2 + k * 0.6, 3.6, -5.25 - rng.uniform(0.0, 0.2)), root, inner, bevel=0.0, rot=(rng.uniform(30, 60), 0, rng.uniform(-10, 10)))
+    # Roof kit: two cooling units, a cable tray running to the mast, a hatch.
+    for k, x in enumerate((-3.2, -1.2)):
+        m.box("ac%d" % k, (1.4, 0.7, 1.0), (x, 4.35, -7.6), root, wall_dark, bevel=0.03)
+        m.cyl("fan%d" % k, 0.38, 0.06, (x, 4.72, -7.6), root, dark, verts=16)
+    m.box("hatch", (0.9, 0.12, 0.9), (-3.5, 4.06, -3.5), root, dark, bevel=0.02)
+    m.box("tray", (0.3, 0.08, 4.0), (4.2, 4.08, -5.5), root, steel, bevel=0.0)
+    m.box("tray_run", (1.8, 0.08, 0.3), (5.0, 4.08, -7.6), root, steel, bevel=0.0)
+    # The mast: a tapering four-legged lattice tower with a platform, a dish and the beacon.
+    mx, mz = 6.0, -8.0
+    height = 16.0
+    legs = []
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            legs.append((sx, sz))
+            strut("leg%d%d" % (sx, sz), (mx + sx * 0.6, 0.1, mz + sz * 0.6), (mx + sx * 0.2, height, mz + sz * 0.2), 0.05, root, steel, verts=6)
+    bays = 10
+    for b in range(bays):
+        y0 = 0.1 + b * (height - 0.1) / bays
+        y1 = y0 + (height - 0.1) / bays
+        w0 = 0.6 - 0.4 * (y0 / height)
+        w1 = 0.6 - 0.4 * (y1 / height)
+        for face in range(4):
+            if face == 0:
+                a0, a1 = (mx - w0, y0, mz - w0), (mx + w1, y1, mz - w1)
+            elif face == 1:
+                a0, a1 = (mx + w0, y0, mz - w0), (mx + w1, y1, mz + w1)
+            elif face == 2:
+                a0, a1 = (mx + w0, y0, mz + w0), (mx - w1, y1, mz + w1)
+            else:
+                a0, a1 = (mx - w0, y0, mz + w0), (mx - w1, y1, mz - w1)
+            strut("brace%d_%d" % (b, face), a0, a1, 0.022, root, steel, verts=5)
+        w = w1
+        for face in range(2):
+            m.box("ring%d_%d" % (b, face), (w * 2, 0.05, 0.05) if face == 0 else (0.05, 0.05, w * 2),
+                  (mx, y1, mz - w if face == 0 else mz), root, steel, bevel=0.0)
+            m.box("ringb%d_%d" % (b, face), (w * 2, 0.05, 0.05) if face == 0 else (0.05, 0.05, w * 2),
+                  (mx, y1, mz + w if face == 0 else mz), root, steel, bevel=0.0) if face == 0 else None
+            if face == 1:
+                for sx in (-1, 1):
+                    m.box("ringc%d_%d" % (b, sx), (0.05, 0.05, w * 2), (mx + sx * w, y1, mz), root, steel, bevel=0.0)
+    m.box("platform", (1.6, 0.08, 1.6), (mx, 12.0, mz), root, dark, bevel=0.0)
+    for sx in (-1, 1):
+        m.box("rail_x%d" % sx, (1.6, 0.04, 0.04), (mx, 12.9, mz + sx * 0.8), root, hazard, bevel=0.0)
+        m.box("rail_z%d" % sx, (0.04, 0.04, 1.6), (mx + sx * 0.8, 12.9, mz), root, hazard, bevel=0.0)
+    m.box("yard", (2.0, 0.1, 0.1), (mx, 14.0, mz), root, dark, bevel=0.0)
+    for sx in (-1, 1):
+        m.cyl("whip%d" % sx, 0.015, 1.4, (mx + sx * 0.95, 14.7, mz), root, dark, verts=6, bevel=0.0)
+    m.cyl("cap", 0.12, 0.3, (mx, 16.15, mz), root, dark, verts=10)
+    m.ball("beacon", 0.13, (mx, 16.4, mz), root, beacon)
+    dish_root = prot("Dish", (mx - 0.5, 12.6, mz + 0.3), (0, -40, 0), root)
+    me = bpy.data.meshes.new("dish_bowl")
+    bm = bmesh.new()
+    rings, segs, radius, depth = 6, 24, 0.9, 0.28
+    grid = []
+    for r in range(rings + 1):
+        rr = radius * r / rings
+        row = []
+        for k in range(segs):
+            a = math.tau * k / segs
+            row.append(bm.verts.new(m.g(math.cos(a) * rr, math.sin(a) * rr, -depth * (rr / radius) ** 2)))
+        grid.append(row)
+    for r in range(rings):
+        for k in range(segs):
+            k2 = (k + 1) % segs
+            bm.faces.new((grid[r][k], grid[r][k2], grid[r + 1][k2], grid[r + 1][k]))
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    bowl = mesh_obj("dish_bowl", bm, dish_root, wall, smooth=True)
+    bowl.modifiers.new("solid", "SOLIDIFY").thickness = 0.04
+    m.cyl("feed", 0.05, 0.6, (0, 0, 0.3), dish_root, dark, axis="z", verts=8, bevel=0.0)
+    # Conduit down the mast to the hut's roof.
+    strut("conduit", (mx + 0.15, 12.0, mz + 0.15), (mx + 0.55, 0.3, mz + 0.55), 0.04, root, dark, verts=6)
+    strut("conduit_run", (mx - 0.6, 4.1, mz + 0.4), (mx - 1.0, 4.1, mz + 0.4), 0.04, root, dark, verts=6)
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            m.box("footing%d%d" % (sx, sz), (0.4, 0.3, 0.4), (mx + sx * 0.6, 0.15, mz + sz * 0.6), root, wall_dark, bevel=0.03)
+    export("site_relay")
+
+
 BUILDERS = {
     "crawler": crawler,
     "rib": lambda: rib(False),
@@ -649,6 +799,7 @@ BUILDERS = {
     "engine": engine,
     "hauler": hauler,
     "hauler_nose": hauler_nose,
+    "relay": relay,
 }
 
 
