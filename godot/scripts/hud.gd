@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · L logs · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _waypoint: Label
@@ -29,6 +29,10 @@ var _bar_fill: ColorRect
 var _bar_label: Label
 var _boss: Enemy
 var _hull_ratio := -1.0
+var _voice: RichTextLabel
+var _ending_text: Label
+var _log_toast: Label
+var _log_toast_time := 0.0
 
 var _hit_time := 0.0
 var _hit_killed := false
@@ -112,6 +116,26 @@ func _ready() -> void:
 	_anchor(_prompt, 0.5, 1.0, -400, -150, 400, -118)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
+	# Subtitles for HOB and Juno, low and centred, under the action.
+	_voice = RichTextLabel.new()
+	_voice.bbcode_enabled = true
+	_voice.fit_content = true
+	_voice.scroll_active = false
+	_voice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_voice.add_theme_font_size_override("normal_font_size", 19)
+	_voice.add_theme_font_size_override("bold_font_size", 19)
+	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	_voice.add_theme_constant_override("shadow_offset_x", 1)
+	_voice.add_theme_constant_override("shadow_offset_y", 1)
+	_anchor(_voice, 0.5, 1.0, -480, -250, 480, -160)
+	_voice.visible = false
+	add_child(_voice)
+
+	_log_toast = _label(16, Vector2.ZERO)
+	_anchor(_log_toast, 0.0, 0.5, 16, 40, 520, 90)
+	_log_toast.add_theme_color_override("font_color", Color("9fe8d8"))
+	_log_toast.visible = false
+
 	_message = _label(18, Vector2.ZERO)
 	_anchor(_message, 0.5, 0.0, -560, 88, 560, 140)
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -140,12 +164,14 @@ func _ready() -> void:
 	_ending.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ending.visible = false
 	add_child(_ending)
-	var ending_text := _label(26, Vector2.ZERO)
-	ending_text.reparent(_ending)
-	ending_text.set_anchors_preset(Control.PRESET_FULL_RECT)
-	ending_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ending_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ending_text.text = "Kestrel climbs out through the steam.\n\nHARD LANDING\n\nThanks for playing."
+	_ending_text = _label(22, Vector2.ZERO)
+	_ending_text.reparent(_ending)
+	_ending_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_ending_text.offset_left = 160
+	_ending_text.offset_right = -160
+	_ending_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ending_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ending_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 
 func _process(delta: float) -> void:
@@ -153,6 +179,10 @@ func _process(delta: float) -> void:
 	_crosshair.queue_redraw()
 	if _vignette.color.a > 0.0:
 		_vignette.color.a = maxf(_vignette.color.a - delta * 0.8, 0.0)
+	if _log_toast_time > 0.0:
+		_log_toast_time -= delta
+		_log_toast.modulate.a = clampf(_log_toast_time, 0.0, 1.0)
+		_log_toast.visible = _log_toast_time > 0.0
 	if _message_time > 0.0:
 		_message_time -= delta
 		_message.modulate.a = clampf(_message_time, 0.0, 1.0)
@@ -234,7 +264,7 @@ func show_boss(boss: Enemy) -> void:
 ## Kestrel's hull during a siege, 0..1, or a negative value to hide it.
 func set_hull(ratio: float, wave_text := "") -> void:
 	_hull_ratio = ratio
-	_bar_label.text = "KESTREL HULL  %s" % wave_text if ratio >= 0.0 else ""
+	_bar_label.text = "KESTREL HULL   ·   %s" % wave_text if ratio >= 0.0 else ""
 
 
 func bar_visible() -> bool:
@@ -258,9 +288,46 @@ func _update_bar() -> void:
 		_bar_fill.color = color
 
 
-func show_ending() -> void:
+## The closing card: fades to black, then the given text. Empty text just fades.
+func show_ending(text := "") -> void:
 	_ending.visible = true
-	create_tween().tween_property(_ending, "color:a", 0.85, 6.0).set_delay(2.0)
+	_ending_text.text = text
+	_ending_text.modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(_ending, "color:a", 1.0, 2.5)
+	tween.tween_property(_ending_text, "modulate:a", 1.0, 1.5)
+
+
+## Cutscene mode for the launch: everything but the subtitles and the ending card steps aside.
+func enter_cinematic() -> void:
+	for c in get_children():
+		if c is CanvasItem and c != _voice and c != _ending:
+			(c as CanvasItem).visible = false
+	set_process(false)
+
+
+func ending_text() -> String:
+	return _ending_text.text
+
+
+func set_voice(speaker: String, text: String) -> void:
+	_voice.visible = text != ""
+	if text == "":
+		_voice.text = ""
+		return
+	var colour := "9fe8d8" if speaker == Story.HOB else "ffd08a"
+	_voice.text = "[center][b][color=#%s]%s[/color][/b]   %s[/center]" % [colour, speaker.to_upper(), text]
+
+
+func voice_text() -> String:
+	return _voice.get_parsed_text() if _voice.visible else ""
+
+
+func show_log_toast(title: String) -> void:
+	_log_toast.text = "◈ Log recovered: %s   [L] read" % title
+	_log_toast_time = 6.0
+	_log_toast.visible = true
+	_log_toast.modulate.a = 1.0
 
 
 func ending_visible() -> bool:

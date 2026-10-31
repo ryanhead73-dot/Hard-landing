@@ -15,6 +15,16 @@ const SIEGES := [
 	[["scuttler", "scuttler", "spitter", "scuttler", "scuttler"], ["ram", "scuttler", "scuttler", "spitter", "scuttler", "scuttler"]],
 	[["scuttler", "spitter", "scuttler", "spitter", "scuttler", "scuttler"], ["ram", "scuttler", "scuttler", "spitter", "ram", "scuttler"], ["scuttler", "scuttler", "spitter", "spitter", "scuttler", "scuttler", "scuttler"]],
 ]
+## The last stand while the engine spools: waves keep coming, cycling through these, until
+## stand_down(). Its index is FINALE (one past the ordinary sieges).
+const FINALE_WAVES := [
+	["scuttler", "scuttler", "spitter", "scuttler", "scuttler", "scuttler"],
+	["ram", "scuttler", "spitter", "scuttler", "scuttler", "spitter"],
+	["scuttler", "scuttler", "scuttler", "ram", "spitter", "scuttler", "scuttler"],
+	["ram", "ram", "spitter", "scuttler", "scuttler", "spitter", "scuttler"],
+]
+const FINALE := 3
+const FINALE_WAVE_GAP := 2.5
 ## Which repair arms which siege.
 const ARMED_BY := {"canopy": 0, "landing_gear": 1, "wing": 2}
 const MAX_HULL := 300.0
@@ -35,6 +45,8 @@ var player: Player
 
 ## Siege index waiting to happen, or -1.
 var pending := -1
+## The siege that most recently ended (read it in an `ended` handler).
+var last_ended := -1
 ## When false, armed sieges wait and never start (tests that cover other systems turn this off).
 var enabled := true
 var active := -1
@@ -83,7 +95,10 @@ func _physics_process(delta: float) -> void:
 	if _enemies.is_empty():
 		_gap -= delta
 		if _gap <= 0.0:
-			if wave + 1 < SIEGES[active].size():
+			if active == FINALE:
+				# The last two waves repeat until the spool is done.
+				_spawn_wave(wave + 1 if wave + 1 < FINALE_WAVES.size() else FINALE_WAVES.size() - 2)
+			elif wave + 1 < SIEGES[active].size():
 				_spawn_wave(wave + 1)
 			else:
 				_finish(true)
@@ -97,6 +112,41 @@ func start(index: int) -> void:
 	hull_changed.emit(hull, MAX_HULL)
 	started.emit(index)
 	_spawn_wave(0)
+
+
+## The finale's endless assault.
+func start_finale() -> void:
+	start(FINALE)
+
+
+## Ends the finale assault without a winner: the wildlife breaks and runs for the rim.
+func stand_down() -> void:
+	if active < 0:
+		return
+	active = -1
+	wave = -1
+	var centre := kestrel.global_position
+	for e in _enemies:
+		if not is_instance_valid(e) or e.dead:
+			continue
+		var away := (e.global_position - centre) * Vector3(1.0, 0.0, 1.0)
+		if away.length() < 1.0:
+			away = Vector3.FORWARD
+		var flee := Marker3D.new()
+		add_child(flee)
+		flee.global_position = centre + away.normalized() * 90.0
+		e.target = flee
+		e.alert(false)
+		get_tree().create_timer(randf_range(5.0, 8.0)).timeout.connect(func():
+			if is_instance_valid(e):
+				e.queue_free())
+		get_tree().create_timer(9.0).timeout.connect(flee.queue_free)
+	_enemies.clear()
+	hull_changed.emit(-1.0, MAX_HULL)
+
+
+func waves_in(index: int) -> int:
+	return FINALE_WAVES.size() if index == FINALE else SIEGES[index].size()
 
 
 func damage_hull(amount: float) -> void:
@@ -114,8 +164,8 @@ func siege_enemies() -> Array[Enemy]:
 
 func _spawn_wave(i: int) -> void:
 	wave = i
-	_gap = WAVE_GAP
-	var kinds: Array = SIEGES[active][i]
+	_gap = FINALE_WAVE_GAP if active == FINALE else WAVE_GAP
+	var kinds: Array = FINALE_WAVES[i] if active == FINALE else SIEGES[active][i]
 	var base := randf() * TAU
 	for k in kinds.size():
 		# They come over the rim from one side, in a spread.
@@ -128,7 +178,7 @@ func _spawn_wave(i: int) -> void:
 		e.target = _nearest_point(e.global_position)
 		e.alert(false)
 		_enemies.append(e)
-	wave_started.emit(i, SIEGES[active].size())
+	wave_started.emit(i, waves_in(active))
 	Sfx.play("siege_horn", null, -2.0, 0.0)
 
 
@@ -156,8 +206,18 @@ func _nearest_point(from: Vector3) -> HullPoint:
 
 func _finish(success: bool) -> void:
 	var index := active
+	last_ended = index
 	active = -1
 	wave = -1
+	if index == FINALE:
+		# The finale handles its own failure: no stores lost, no re-arm, the spool just dumps.
+		for e in _enemies:
+			if is_instance_valid(e):
+				e.queue_free()
+		_enemies.clear()
+		hull_changed.emit(-1.0, MAX_HULL)
+		ended.emit(success)
+		return
 	if success:
 		Game.add_scrap(REWARD_SCRAP)
 		Game.add_stims(1)
