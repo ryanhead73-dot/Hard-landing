@@ -366,7 +366,7 @@ func _apply_aux(on: bool) -> void:
 	for lamp in _lamps:
 		lamp.material_override = _mat("amber_glow" if on else "metal_dark")
 	for screen in _screens:
-		screen.material_override = _mat("screen_on" if on else "screen_off")
+		screen.material_override = _screen_material() if on else _mat("screen_off")
 	for probe in _interior_probes:
 		probe.ambient_color = Color(0.32, 0.25, 0.17) if on else Color(0.09, 0.11, 0.14)
 		probe.ambient_color_energy = 0.8 if on else 0.6
@@ -442,6 +442,9 @@ func _build_cooling(damaged: Node3D, fixed: Node3D) -> void:
 	var bx := 12.8
 	while bx < 23.3:
 		_box(fixed, [bx - 0.05, bx + 0.05], [2.4, 3.0], [16.6, 16.9], "metal_dark", false)
+		# Bolted flanges where the salvaged lengths join, beside each bracket.
+		for y in [2.55, 2.85]:
+			_cyl(fixed, Vector3(bx + 0.14, y, 16.72), 0.115, 0.06, "x", "metal_dark")
 		bx += 1.8
 	_box(fixed, [21.5, 22.5], [0.0, 0.035], [13.0, 14.0], "salvage", false)
 
@@ -710,6 +713,15 @@ func _omni(pos: Vector3, color: Color, energy: float, light_range: float) -> Omn
 	light.shadow_enabled = true
 	add_child(light)
 	return light
+
+
+## Live console readouts (shaders/screen.gdshader).
+func _screen_material() -> Material:
+	if not _mats.has("screen_live"):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://shaders/screen.gdshader")
+		_mats["screen_live"] = m
+	return _mats["screen_live"]
 
 
 func _mat(id: String) -> StandardMaterial3D:

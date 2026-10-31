@@ -22,6 +22,8 @@ func _ready() -> void:
 			continue
 		main.day_cycle = false
 		main.set_daylight(1.0 if String(shot[0]).ends_with("_dusk") else 0.0)
+		if String(shot[0]).ends_with("_lit"):
+			main.kestrel.set_repaired("aux_power", true)
 		if shot[1] == "kestrel":
 			var k: Kestrel = main.kestrel
 			shot = [shot[0], "", k.to_global(k.plan(shot[2].x, shot[2].y, shot[2].z)), k.to_global(k.plan(shot[3].x, shot[3].y, shot[3].z))]
@@ -88,6 +90,8 @@ func _shots() -> Array:
 		["ship_front", "", Vector3(-30.0, 0.5, -8.0), Vector3(0.0, 2.5, 0.0)],
 		["ship_side", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["workshop", "kestrel", Vector3(13.0, 0.3, 14.5), Vector3(22.0, 1.4, 12.0)],
+		["workshop_lit", "kestrel", Vector3(13.0, 0.3, 14.5), Vector3(22.0, 1.4, 12.0)],
+		["cabin_lit", "kestrel", Vector3(11.0, 0.3, 13.0), Vector3(8.5, 1.2, 10.5)],
 		["cockpit", "kestrel", Vector3(7.6, 1.5, 13.0), Vector3(3.6, 2.4, 13.0)],
 		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
 		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
