@@ -38,8 +38,13 @@ func build() -> void:
 
 
 func set_dusk(dusk: bool) -> void:
-	_moss_mat.emission_energy_multiplier = 3.0 if dusk else 1.2
-	_rim_mat.emission_energy_multiplier = 1.6 if dusk else 0.5
+	set_glow(1.0 if dusk else 0.0)
+
+
+## Moss and pool rims glow brighter as the light goes (0 day .. 1 dusk).
+func set_glow(amount: float) -> void:
+	_moss_mat.emission_energy_multiplier = lerpf(1.2, 3.0, amount)
+	_rim_mat.emission_energy_multiplier = lerpf(0.5, 1.6, amount)
 
 
 func _build_ground() -> void:

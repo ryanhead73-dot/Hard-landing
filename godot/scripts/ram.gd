@@ -188,7 +188,7 @@ func _on_calm() -> void:
 func _die() -> void:
 	state = State.DEAD
 	super._die()
-	Sfx.play("scuttler_death", global_position, 2.0, 0.0)
+	Sfx.play("ram_death", global_position, 2.0, 0.05)
 	_crest.emission_energy_multiplier = 0.0
 	var tween := create_tween()
 	tween.tween_property(_visual, "rotation:z", 1.3, 0.5)

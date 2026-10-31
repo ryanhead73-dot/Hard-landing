@@ -30,3 +30,50 @@ jobs:
             timeout 400 "$GODOT" --headless --path godot "res://tests/$name"
             echo "::endgroup::"
           done
+
+  export:
+    # Builds the game for Linux and Windows and uploads both as workflow artifacts.
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl -sSL -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot-bin"
+          chmod +x "$RUNNER_TEMP/godot-bin"
+          echo "GODOT=$RUNNER_TEMP/godot-bin" >> "$GITHUB_ENV"
+      - name: Cache export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-templates-${{ env.GODOT_VERSION }}-linux-windows
+      - name: Download export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dir"
+          curl -sSL -o "$RUNNER_TEMP/templates.tpz" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          # Only the two templates the presets use.
+          unzip -q -j "$RUNNER_TEMP/templates.tpz" templates/version.txt templates/linux_release.x86_64 templates/windows_release_x86_64.exe -d "$dir"
+          rm "$RUNNER_TEMP/templates.tpz"
+      - name: Import project
+        run: timeout 300 "$GODOT" --headless --path godot --import
+      - name: Export Linux and Windows
+        run: |
+          mkdir -p build/linux build/windows
+          timeout 300 "$GODOT" --headless --path godot --export-release "Linux" ../build/linux/HardLanding.x86_64
+          timeout 300 "$GODOT" --headless --path godot --export-release "Windows" ../build/windows/HardLanding.exe
+          test -s build/linux/HardLanding.x86_64
+          test -s build/windows/HardLanding.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HardLanding-linux
+          path: build/linux/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HardLanding-windows
+          path: build/windows/
