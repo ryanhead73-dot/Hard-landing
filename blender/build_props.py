@@ -177,11 +177,63 @@ def shard(name, seed, length, arc_deg, radius, band_at=None, ribbed=False):
     m.export("prop_" + name)
 
 
+def _wheel(name, at, parent, rot=None):
+    rubber = m.mat("tyre", "1b1d1f", 0.9)
+    hub = m.mat("plate", m.CREAM_WORN, 0.5)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    w = m.pivot(name, at, parent)
+    if rot:
+        w.rotation_euler = tuple(math.radians(a) for a in (rot[0], -rot[2], rot[1]))
+    m.cyl(name + "_tyre", 0.45, 0.32, (0, 0, 0), w, rubber, axis="z", verts=28, bevel=0.04)
+    m.cyl(name + "_hub", 0.24, 0.34, (0, 0, 0), w, hub, axis="z", verts=20)
+    m.cyl(name + "_axle", 0.07, 0.5, (0, 0, 0), w, dark, axis="z", verts=10)
+    for i in range(5):
+        a = i * math.tau / 5
+        m.cyl(name + "_bolt%d" % i, 0.025, 0.36, (math.cos(a) * 0.15, math.sin(a) * 0.15, 0), w, dark, axis="z", verts=6, bevel=0.0)
+    return w
+
+
+def gear():
+    """A landing-gear leg as it hangs under Kestrel: origin at the mount, wheel centre 0.95 m down."""
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    steel = m.mat("steel", m.STEEL, 0.25, 0.85)
+    band = m.mat("oxide", m.OXIDE, 0.55)
+    root = m.pivot("Gear")
+    m.pod("mount", (0.8, 0.08, 0.8), (0, -0.22, 0), root, band, n=4.0)
+    m.cyl("cylinder", 0.11, 0.42, (0, -0.45, 0), root, dark, verts=16)
+    m.cyl("oleo", 0.07, 0.36, (0, -0.8, 0), root, steel, verts=16)
+    m.cyl("collar", 0.13, 0.06, (0, -0.64, 0), root, dark, verts=16)
+    # Torque links on the front of the oleo.
+    m.box("link_upper", (0.05, 0.2, 0.05), (0, -0.6, -0.12), root, dark, rot=(25, 0, 0))
+    m.box("link_lower", (0.05, 0.2, 0.05), (0, -0.78, -0.12), root, dark, rot=(-25, 0, 0))
+    for z in (-0.2, 0.2):
+        m.box("fork%d" % int(z * 10), (0.14, 0.32, 0.04), (0, -0.88, z), root, dark)
+    _wheel("Wheel", (0, -0.95, 0), root)
+    m.export("prop_gear")
+
+
+def gear_broken():
+    """The same leg after the crash: strut snapped and folded, wheel torn off beside it."""
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    steel = m.mat("steel", m.STEEL, 0.25, 0.85)
+    band = m.mat("oxide", m.OXIDE, 0.55)
+    root = m.pivot("GearBroken")
+    m.pod("mount", (0.8, 0.08, 0.8), (0, -0.22, 0), root, band, n=4.0)
+    m.cyl("cylinder", 0.11, 0.3, (0, -0.38, 0), root, dark, verts=16)
+    # Snapped oleo folded back under the hull.
+    m.cyl("oleo", 0.07, 0.5, (0.22, -0.48, 0), root, steel, verts=16, rot=(0, 0, 70))
+    m.box("link", (0.05, 0.2, 0.05), (0.1, -0.55, -0.12), root, dark, rot=(0, 0, 50))
+    _wheel("Wheel", (0.7, -0.62, 0.25), root, rot=(80, 0, 10))
+    m.export("prop_gear_broken")
+
+
 BUILDERS = {
     "container": container,
     "barrier": barrier,
     "generator": generator,
     "pipes": pipes,
+    "gear": gear,
+    "gear_broken": gear_broken,
     "shard_0": lambda: shard("shard_0", 3, 2.6, 50, 2.2, band_at=0.4),
     "shard_1": lambda: shard("shard_1", 7, 1.6, 70, 1.4, ribbed=True),
     "shard_2": lambda: shard("shard_2", 11, 3.4, 35, 3.0, band_at=-0.8, ribbed=True),

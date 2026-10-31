@@ -507,11 +507,12 @@ func _build_landing_gear(damaged: Node3D, fixed: Node3D) -> void:
 	for leg in [Vector2(18.0, 10.4), Vector2(18.0, 15.6), Vector2(2.6, 13.0)]:
 		var x: float = leg.x
 		var z: float = leg.y
-		_box(fixed, [x - 0.12, x + 0.12], [-1.0, -0.2], [z - 0.12, z + 0.12], "salvage")
-		_cyl(fixed, Vector3(x, -0.95, z), 0.45, 0.35, "z", "metal_dark")
-		_box(fixed, [x - 0.4, x + 0.4], [-0.27, -0.2], [z - 0.4, z + 0.4], "oxide", false)
-		_rot(_box(damaged, [x - 0.5, x + 0.5], [-0.45, -0.25], [z - 0.12, z + 0.12], "metal", false), Vector3(0.0, 0.0, 0.25))
-		_rot(_cyl(damaged, Vector3(x + 0.6, -0.6, z + 0.2), 0.45, 0.3, "y", "metal_dark"), Vector3(0.3, 0.0, 0.0))
+		# The strut's collision stays a box; the look is the modelled leg (blender/build_props.py).
+		var strut := _box(fixed, [x - 0.12, x + 0.12], [-1.0, -0.2], [z - 0.12, z + 0.12], "salvage")
+		for mesh in strut.find_children("*", "MeshInstance3D", false, false):
+			mesh.visible = false
+		Rig.spawn("prop_gear", fixed).position = plan(x, 0.0, z)
+		Rig.spawn("prop_gear_broken", damaged).position = plan(x, 0.0, z)
 
 
 func _build_wing(damaged: Node3D, fixed: Node3D) -> void:
@@ -623,19 +624,19 @@ func _sphere(parent: Node, centre: Vector3, radius: float, mat_id: String) -> Me
 
 
 ## Wing panel from a plan-view outline (x, z), sitting on top of the hull at roof height.
-func _wing(parent: Node, outline: Array, mat_id: String) -> CSGPolygon3D:
-	var poly := CSGPolygon3D.new()
+## A wing panel from its plan outline: a plate with airfoil-tapered edges (visual only; the
+## wings have never had collision).
+func _wing(parent: Node, outline: Array, mat_id: String) -> MeshInstance3D:
 	var points := PackedVector2Array()
 	for pt in outline:
 		var v := plan(pt.x, 0.0, pt.y)
-		points.append(Vector2(v.x, -v.z))
-	poly.polygon = points
-	poly.depth = 0.35
-	poly.rotation.x = -PI * 0.5
-	poly.position.y = 3.75
-	poly.material = _mat(mat_id)
-	parent.add_child(poly)
-	return poly
+		points.append(Vector2(v.x, v.z))
+	var mesh := MeshInstance3D.new()
+	mesh.name = "WingPanel"
+	mesh.mesh = Bevel.tapered_plate(points, 3.4, 3.75)
+	mesh.material_override = _mat(mat_id)
+	parent.add_child(mesh)
+	return mesh
 
 
 ## Exhaust from both nacelles: 0 is off, 1 is full lift-off thrust.
