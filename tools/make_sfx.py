@@ -211,6 +211,7 @@ def main():
     write("siege_horn", horn, peak=0.7)
 
     milestone6()
+    refinement()
 
 
 # --- Milestone 6: music, ambience and the remaining sounds ---------------------------------
@@ -372,6 +373,24 @@ def milestone6():
     roar = lowpass(noise(d), 400) * rise * np.minimum((d - tt) / 2.0, 1.0)
     jet = sine(lambda x: 180 + 500 * (x / d) ** 1.5, d) * 0.3 * rise * np.minimum((d - tt) / 2.0, 1.0)
     write("launch_roar", roar + jet + 0.6 * sine(40, d) * rise * np.minimum((d - tt) / 2.0, 1.0), peak=0.9)
+
+
+
+# --- Refinement: game feel -----------------------------------------------------------------
+
+def refinement():
+    global rng
+    rng = np.random.default_rng(31)
+    # A boot in shallow water: a wet slap, then a short trickle of droplets.
+    for i, cutoff in enumerate((900, 1300)):
+        slap = bandpass(noise(0.06), 300, cutoff) * env(0.06, 0.002, 50)
+        drops = sum(sine(rng.uniform(900, 1800), 0.05) * env(0.05, 0.001, 70) * 0.25 for _ in range(1))
+        trickle = highpass(noise(0.2), 2000) * env(0.2, 0.01, 18) * 0.25
+        write(f"splash_{i}", place(0.25, (0.0, slap), (0.03, drops), (0.04, trickle)), peak=0.5)
+    # Dodge roll: a cloth-and-gear whoosh.
+    d = 0.35
+    sweep = bandpass(noise(d), 200, 1400) * np.sin(np.pi * t(d) / d) ** 2
+    write("roll_whoosh", sweep, peak=0.45)
 
 
 if __name__ == "__main__":

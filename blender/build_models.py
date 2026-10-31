@@ -171,49 +171,99 @@ def export(name):
 
 # --- Juno ----------------------------------------------------------------------------------
 
+def pod(name, size, at, parent, material, n=2.6, taper=1.0, segs=20, rings=12, rot=None, taper_axis="y"):
+    """A smooth rounded volume (superellipsoid) sized in Godot axes: n=2 is an ellipsoid, higher
+    is boxier. taper scales one end: the bottom (-y) in x and z by default, or with
+    taper_axis="z" the front (-z) in x and y, like box()'s taper."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=rings, radius=1.0)
+    e = 2.0 / n
+    for v in bm.verts:
+        x, y, z = v.co  # blender axes: z is Godot up, +y is Godot's front (-z)
+        f = lambda a: math.copysign(abs(a) ** e, a)
+        x, y, z = f(x), f(y), f(z)
+        if taper_axis == "z":
+            k = taper + (1.0 - taper) * (1.0 - (y + 1.0) * 0.5)
+            v.co = Vector((x * size[0] * 0.5 * k, y * size[2] * 0.5, z * size[1] * 0.5 * k))
+        else:
+            k = taper + (1.0 - taper) * (z + 1.0) * 0.5
+            v.co = Vector((x * size[0] * 0.5 * k, y * size[2] * 0.5 * k, z * size[1] * 0.5))
+    bm.to_mesh(me)
+    bm.free()
+    obj = _finish(bpy.data.objects.new(name, me), name, at, parent, material, 0.0, rot)
+    for poly in obj.data.polygons:
+        poly.use_smooth = True
+    return obj
+
+
+def obox(name, size, at, parent, material, bevel=0.0, rot=None, taper=None, n=2.8):
+    """box() for creatures: the same size, placement and front taper, as a rounded pod."""
+    t = taper[0] if taper else 1.0
+    return pod(name, size, at, parent, material, n=n, taper=t, segs=16, rings=10, rot=rot, taper_axis="z")
+
+
 def juno():
-    suit = mat("suit", "4a5a66", 0.8)
-    plate = mat("plate", CREAM, 0.55)
-    orange = mat("oxide", OXIDE, 0.6)
-    dark = mat("dark_metal", DARK_METAL, 0.45, 0.6)
-    visor = mat("visor", AMBER, 0.2, 0.0, 2.5)
+    suit = mat("suit", "3f4d58", 0.85)
+    weave = mat("suit_dark", "2a333b", 0.9)
+    plate = mat("plate", CREAM, 0.45)
+    orange = mat("oxide", OXIDE, 0.55)
+    dark = mat("dark_metal", DARK_METAL, 0.4, 0.6)
+    visor = mat("visor", "e08a2c", 0.08, 0.3, 0.9)
+    lamp = mat("lamp", "5fe0c8", 0.3, 0.0, 2.0)
 
     root = pivot("Juno")
     hips = pivot("Hips", (0, 0.95, 0), root)
-    box("pelvis", (0.36, 0.2, 0.24), (0, 0, 0), hips, suit)
-    box("belt", (0.38, 0.06, 0.26), (0, 0.08, 0), hips, dark)
+    pod("pelvis", (0.34, 0.2, 0.24), (0, -0.01, 0), hips, suit, n=3.0, taper=0.85)
+    pod("belt", (0.37, 0.07, 0.27), (0, 0.08, 0), hips, dark, n=4.0)
+    pod("buckle", (0.1, 0.06, 0.04), (0, 0.08, -0.135), hips, orange, n=3.0)
+    for s in (-1, 1):
+        pod("pouch%d" % s, (0.08, 0.1, 0.07), (0.16 * s, 0.02, -0.05), hips, weave, n=3.0)
     spine = pivot("Spine", (0, 0.12, 0), hips)
-    box("abdomen", (0.32, 0.22, 0.22), (0, 0.12, 0), spine, suit)
+    pod("abdomen", (0.29, 0.24, 0.21), (0, 0.12, 0), spine, weave, n=2.6)
     chest = pivot("Chest", (0, 0.25, 0), spine)
-    box("torso", (0.44, 0.34, 0.28), (0, 0.17, 0), chest, suit)
-    box("chest_plate", (0.4, 0.26, 0.06), (0, 0.19, -0.15), chest, plate, taper=(0.9, 0.9))
-    box("chest_stripe", (0.41, 0.04, 0.065), (0, 0.27, -0.155), chest, orange)
-    box("back_plate", (0.38, 0.3, 0.05), (0, 0.18, 0.15), chest, plate)
+    pod("torso", (0.44, 0.36, 0.28), (0, 0.16, 0), chest, suit, n=3.0, taper=0.78)
+    pod("chest_plate", (0.38, 0.25, 0.1), (0, 0.2, -0.11), chest, plate, n=3.2, taper=0.85)
+    pod("chest_stripe", (0.3, 0.035, 0.1), (0, 0.29, -0.125), chest, orange, n=4.0)
+    pod("chest_lamp", (0.04, 0.025, 0.02), (0.11, 0.2, -0.165), chest, lamp, n=3.0)
+    pod("collar", (0.3, 0.08, 0.26), (0, 0.35, 0), chest, dark, n=3.5)
+    pod("back_plate", (0.36, 0.3, 0.06), (0, 0.18, 0.13), chest, plate, n=3.2)
     pack = pivot("PackMount", (0, 0.12, 0.2), chest)
-    box("life_support", (0.3, 0.36, 0.14), (0, 0.06, 0.03), pack, dark)
-    cyl("tank_l", 0.05, 0.3, (-0.1, 0.06, 0.12), pack, plate)
-    cyl("tank_r", 0.05, 0.3, (0.1, 0.06, 0.12), pack, plate)
+    pod("life_support", (0.32, 0.4, 0.16), (0, 0.06, 0.03), pack, dark, n=3.4, taper=0.9)
+    pod("pack_cap", (0.28, 0.06, 0.14), (0, 0.27, 0.03), pack, orange, n=3.0)
+    for side, s in (("l", -1), ("r", 1)):
+        pod("tank_" + side, (0.1, 0.34, 0.1), (0.1 * s, 0.05, 0.13), pack, plate, n=2.2)
+    pod("pack_lamp", (0.05, 0.03, 0.02), (0, -0.08, 0.115), pack, lamp, n=3.0)
     neck = pivot("Neck", (0, 0.36, 0), chest)
+    pod("neck_ring", (0.2, 0.06, 0.19), (0, 0.02, 0), neck, weave, n=2.4)
     head = pivot("Head", (0, 0.06, 0), neck)
-    ball("helmet", 0.16, (0, 0.13, 0.01), head, plate, scale=(1.0, 1.05, 1.1))
-    box("visor", (0.24, 0.09, 0.06), (0, 0.14, -0.14), head, visor, bevel=0.01, taper=(0.9, 0.8))
-    box("helmet_ridge", (0.05, 0.05, 0.28), (0, 0.29, 0.01), head, orange)
+    pod("helmet", (0.33, 0.35, 0.36), (0, 0.14, 0.01), head, plate, n=2.3)
+    # The visor bulges out of the helmet's face: a flattened ellipsoid set forward.
+    pod("visor", (0.27, 0.15, 0.2), (0, 0.13, -0.08), head, visor, n=2.4)
+    pod("visor_brow", (0.29, 0.04, 0.18), (0, 0.21, -0.085), head, dark, n=3.0)
+    pod("helmet_ridge", (0.05, 0.05, 0.3), (0, 0.3, 0.02), head, orange, n=3.0)
+    for s in (-1, 1):
+        pod("ear%d" % s, (0.05, 0.1, 0.1), (0.165 * s, 0.12, 0.02), head, dark, n=2.6)
+    cyl("antenna", 0.006, 0.16, (0.15, 0.27, 0.07), head, dark, verts=6, bevel=0.0)
     for side, s in (("L", -1), ("R", 1)):
         shoulder = pivot("Arm" + side, (0.27 * s, 0.3, 0), chest)
-        box("pauldron" + side, (0.16, 0.1, 0.18), (0.02 * s, 0.02, 0), shoulder, plate)
-        box("upper_arm" + side, (0.1, 0.28, 0.11), (0, -0.15, 0), shoulder, suit)
+        pod("pauldron" + side, (0.17, 0.13, 0.2), (0.01 * s, 0.0, 0), shoulder, plate, n=2.4)
+        pod("pauldron_trim" + side, (0.18, 0.03, 0.18), (0.015 * s, -0.055, 0), shoulder, orange, n=3.0)
+        pod("upper_arm" + side, (0.11, 0.3, 0.12), (0, -0.15, 0), shoulder, suit, n=2.4, taper=0.85)
         elbow = pivot("Forearm" + side, (0, -0.3, 0), shoulder)
-        box("forearm" + side, (0.1, 0.26, 0.11), (0, -0.13, 0), elbow, suit)
-        box("bracer" + side, (0.115, 0.12, 0.125), (0, -0.12, 0), elbow, plate)
-        box("glove" + side, (0.09, 0.09, 0.1), (0, -0.3, 0), elbow, dark)
+        pod("elbow" + side, (0.1, 0.08, 0.1), (0, 0.0, 0), elbow, weave, n=2.2)
+        pod("forearm" + side, (0.1, 0.27, 0.11), (0, -0.13, 0), elbow, suit, n=2.4, taper=0.85)
+        pod("bracer" + side, (0.12, 0.14, 0.13), (0, -0.13, 0), elbow, plate, n=3.0, taper=0.9)
+        pod("glove" + side, (0.09, 0.11, 0.1), (0, -0.3, 0), elbow, dark, n=2.6)
         hip = pivot("Leg" + side, (0.1 * s, -0.06, 0), hips)
-        box("thigh" + side, (0.14, 0.42, 0.15), (0, -0.21, 0), hip, suit)
-        box("thigh_plate" + side, (0.12, 0.2, 0.04), (0, -0.18, -0.08), hip, plate)
+        pod("thigh" + side, (0.15, 0.44, 0.16), (0, -0.21, 0), hip, suit, n=2.4, taper=0.8)
+        pod("thigh_plate" + side, (0.12, 0.22, 0.06), (0, -0.18, -0.07), hip, plate, n=3.0, taper=0.85)
         knee = pivot("Shin" + side, (0, -0.43, 0), hip)
-        box("knee" + side, (0.12, 0.08, 0.06), (0, 0.0, -0.08), knee, orange)
-        box("shin" + side, (0.13, 0.4, 0.14), (0, -0.2, 0), knee, suit)
-        box("shin_plate" + side, (0.11, 0.24, 0.04), (0, -0.18, -0.08), knee, plate)
-        box("boot" + side, (0.14, 0.1, 0.26), (0, -0.4, -0.05), knee, dark)
+        pod("knee" + side, (0.12, 0.1, 0.08), (0, 0.0, -0.075), knee, orange, n=2.6)
+        pod("shin" + side, (0.13, 0.4, 0.14), (0, -0.19, 0), knee, suit, n=2.4, taper=0.82)
+        pod("shin_plate" + side, (0.11, 0.25, 0.06), (0, -0.17, -0.065), knee, plate, n=3.0, taper=0.85)
+        pod("boot" + side, (0.15, 0.13, 0.28), (0, -0.39, -0.045), knee, dark, n=3.2)
+        pod("sole" + side, (0.155, 0.035, 0.29), (0, -0.445, -0.045), knee, weave, n=4.0)
     export("juno")
 
 
@@ -228,21 +278,21 @@ def scuttler():
     ball("carapace", 0.6, (0, 0.08, 0.05), body, shell, scale=(1.0, 0.55, 1.25), segs=10, rings=6)
     ball("underside", 0.48, (0, -0.04, 0.05), body, belly, scale=(1.0, 0.5, 1.2), segs=10, rings=6)
     for i in range(4):
-        box("spine%d" % i, (0.07, 0.24, 0.07), (0, 0.38 - abs(i - 1.5) * 0.04, -0.32 + i * 0.24), body, glow, rot=(-20, 0, 0))
+        obox("spine%d" % i, (0.07, 0.24, 0.07), (0, 0.38 - abs(i - 1.5) * 0.04, -0.32 + i * 0.24), body, glow, rot=(-20, 0, 0))
     head = pivot("Head", (0, 0.02, -0.66), body)
     ball("head_shell", 0.24, (0, 0, -0.06), head, shell, scale=(1.2, 0.7, 1.0), segs=8, rings=5)
     for side, s in (("L", -1), ("R", 1)):
         ball("eye" + side, 0.055, (0.13 * s, 0.07, -0.22), head, glow, segs=8, rings=5)
         jaw = pivot("Jaw" + side, (0.1 * s, -0.06, -0.2), head)
-        box("mandible" + side, (0.05, 0.05, 0.22), (0.02 * s, 0, -0.1), jaw, belly, rot=(0, -15 * s, 0))
+        obox("mandible" + side, (0.05, 0.05, 0.22), (0.02 * s, 0, -0.1), jaw, belly, rot=(0, -15 * s, 0))
         for j in range(3):
             z = -0.32 + j * 0.34
             hip = pivot("Leg%s%d" % (side, j + 1), (0.42 * s, -0.02, z), body)
             hip.rotation_euler[1] = math.radians(-25 * s)  # splay upward
-            box("upper%s%d" % (side, j), (0.48, 0.07, 0.07), (0.24 * s, 0, 0), hip, shell)
+            obox("upper%s%d" % (side, j), (0.48, 0.07, 0.07), (0.24 * s, 0, 0), hip, shell)
             knee = pivot("Foot%s%d" % (side, j + 1), (0.48 * s, 0, 0), hip)
             knee.rotation_euler[1] = math.radians(75 * s)  # knee bends down
-            box("lower%s%d" % (side, j), (0.5, 0.06, 0.06), (0.25 * s, 0, 0), knee, belly, taper=None)
+            obox("lower%s%d" % (side, j), (0.5, 0.06, 0.06), (0.25 * s, 0, 0), knee, belly, taper=None)
     export("scuttler")
 
 
@@ -254,11 +304,11 @@ def spitter():
     root = pivot("Spitter")
     body = pivot("Body", (0, 0.85, 0), root)
     ball("torso", 0.4, (0, 0, 0.1), body, hide, scale=(1.0, 0.9, 1.3), segs=12, rings=8)
-    box("back_plate", (0.5, 0.08, 0.7), (0, 0.32, 0.1), body, plate, rot=(-8, 0, 0))
+    obox("back_plate", (0.5, 0.08, 0.7), (0, 0.32, 0.1), body, plate, rot=(-8, 0, 0))
     sac_p = pivot("Sac", (0, 0.42, 0.28), body)
     ball("sac", 0.28, (0, 0.05, 0), sac_p, sac, scale=(1.0, 0.85, 1.0))
     neck = pivot("Neck", (0, 0.18, -0.35), body)
-    box("neck", (0.2, 0.2, 0.42), (0, 0.1, -0.15), neck, hide, rot=(30, 0, 0))
+    obox("neck", (0.2, 0.2, 0.42), (0, 0.1, -0.15), neck, hide, rot=(30, 0, 0))
     head = pivot("Head", (0, 0.28, -0.32), neck)
     ball("head", 0.17, (0, 0, -0.05), head, hide, scale=(1.0, 0.8, 1.3), segs=10, rings=6)
     cyl("mouth", 0.08, 0.14, (0, -0.02, -0.25), head, sac, axis="z", verts=10, radius2=0.05)
@@ -267,9 +317,9 @@ def spitter():
     for side, s in (("L", -1), ("R", 1)):
         for j, z in enumerate((-0.15, 0.3)):
             hip = pivot("Leg%s%d" % (side, j + 1), (0.3 * s, -0.05, z), body)
-            box("thigh%s%d" % (side, j), (0.09, 0.5, 0.09), (0.12 * s, -0.2, 0), hip, hide, rot=(0, 0, 25 * s))
+            obox("thigh%s%d" % (side, j), (0.09, 0.5, 0.09), (0.12 * s, -0.2, 0), hip, hide, rot=(0, 0, 25 * s))
             knee = pivot("Foot%s%d" % (side, j + 1), (0.24 * s, -0.42, 0), hip)
-            box("shin%s%d" % (side, j), (0.07, 0.48, 0.07), (0.04 * s, -0.22, 0), knee, plate, rot=(0, 0, -10 * s))
+            obox("shin%s%d" % (side, j), (0.07, 0.48, 0.07), (0.04 * s, -0.22, 0), knee, plate, rot=(0, 0, -10 * s))
     export("spitter")
 
 
@@ -280,27 +330,27 @@ def ram():
     horn = mat("ram_horn", "8a8170", 0.6)
     root = pivot("Ram")
     body = pivot("Body", (0, 0.95, 0), root)
-    box("barrel", (1.3, 1.0, 2.0), (0, 0, 0.1), body, hide, bevel=0.12)
-    box("hump", (1.0, 0.4, 1.1), (0, 0.55, -0.15), body, hide, bevel=0.12)
+    obox("barrel", (1.3, 1.0, 2.0), (0, 0, 0.1), body, hide, bevel=0.12)
+    obox("hump", (1.0, 0.4, 1.1), (0, 0.55, -0.15), body, hide, bevel=0.12)
     for x in (-0.25, 0.25):
-        box("vent%d" % int(x * 10), (0.14, 0.1, 1.3), (x, 0.78, 0.15), body, crest, bevel=0.02)
+        obox("vent%d" % int(x * 10), (0.14, 0.1, 1.3), (x, 0.78, 0.15), body, crest, bevel=0.02)
     for i, z in enumerate((-0.4, 0.2, 0.75)):
-        box("back_plate%d" % i, (1.2, 0.12, 0.5), (0, 0.55 - i * 0.05, z), body, plate, bevel=0.03)
+        obox("back_plate%d" % i, (1.2, 0.12, 0.5), (0, 0.55 - i * 0.05, z), body, plate, bevel=0.03)
     tail = pivot("Tail", (0, 0.1, 1.1), body)
-    box("tail", (0.25, 0.25, 0.6), (0, -0.1, 0.25), tail, hide, rot=(-25, 0, 0))
+    obox("tail", (0.25, 0.25, 0.6), (0, -0.1, 0.25), tail, hide, rot=(-25, 0, 0))
     head = pivot("Head", (0, -0.05, -1.0), body)
-    box("skull", (0.8, 0.7, 0.6), (0, -0.05, -0.15), head, hide, bevel=0.1)
-    box("head_plate", (1.6, 1.15, 0.35), (0, 0.0, -0.45), head, plate, bevel=0.06, taper=(0.85, 0.85))
-    box("plate_rim", (1.62, 0.1, 0.37), (0, 0.5, -0.45), head, crest, bevel=0.02)
+    obox("skull", (0.8, 0.7, 0.6), (0, -0.05, -0.15), head, hide, bevel=0.1)
+    obox("head_plate", (1.6, 1.15, 0.35), (0, 0.0, -0.45), head, plate, bevel=0.06, taper=(0.85, 0.85))
+    obox("plate_rim", (1.62, 0.1, 0.37), (0, 0.5, -0.45), head, crest, bevel=0.02)
     for s in (-1, 1):
-        box("horn%d" % s, (0.18, 0.18, 0.7), (0.72 * s, 0.25, -0.65), head, horn, rot=(15, 20 * s, 0), taper=(0.3, 0.3))
+        obox("horn%d" % s, (0.18, 0.18, 0.7), (0.72 * s, 0.25, -0.65), head, horn, rot=(15, 20 * s, 0), taper=(0.3, 0.3))
     for side, s in (("L", -1), ("R", 1)):
         for j, (name, z) in enumerate((("F", -0.65), ("B", 0.7))):
             hip = pivot("Leg%s%s" % (name, side), (0.55 * s, -0.35, z), body)
-            box("thigh%s%s" % (name, side), (0.34, 0.45, 0.4), (0, -0.15, 0), hip, hide, bevel=0.06)
+            obox("thigh%s%s" % (name, side), (0.34, 0.45, 0.4), (0, -0.15, 0), hip, hide, bevel=0.06)
             knee = pivot("Foot%s%s" % (name, side), (0, -0.38, 0), hip)
-            box("shin%s%s" % (name, side), (0.26, 0.3, 0.28), (0, -0.12, 0), knee, plate, bevel=0.04)
-            box("hoof%s%s" % (name, side), (0.32, 0.08, 0.36), (0, -0.27, -0.02), knee, horn, bevel=0.02)
+            obox("shin%s%s" % (name, side), (0.26, 0.3, 0.28), (0, -0.12, 0), knee, plate, bevel=0.04)
+            obox("hoof%s%s" % (name, side), (0.32, 0.08, 0.36), (0, -0.27, -0.02), knee, horn, bevel=0.02)
     export("ram")
 
 
@@ -318,21 +368,21 @@ def warden():
         plate = pivot("Plate" + side, (0.15 * s, 0.75, 0.2), body)
         ball("carapace" + side, 1.25, (0.42 * s, -0.05, 0), plate, shell, scale=(0.6, 0.4, 1.5), segs=12, rings=7)
         for i in range(4):
-            box("ridge%s%d" % (side, i), (0.12, 0.5, 0.12), (0.65 * s, 0.62, -1.0 + i * 0.6), plate, glow, rot=(0, 0, 20 * s))
+            obox("ridge%s%d" % (side, i), (0.12, 0.5, 0.12), (0.65 * s, 0.62, -1.0 + i * 0.6), plate, glow, rot=(0, 0, 20 * s))
         arm = pivot("Arm" + side, (0.95 * s, 0.1, -1.4), body)
-        box("arm_upper" + side, (0.35, 1.1, 0.35), (0.1 * s, -0.4, -0.2), arm, shell, bevel=0.05, rot=(-30, 0, 0))
+        obox("arm_upper" + side, (0.35, 1.1, 0.35), (0.1 * s, -0.4, -0.2), arm, shell, bevel=0.05, rot=(-30, 0, 0))
         fore = pivot("Fist" + side, (0.15 * s, -0.95, -0.55), arm)
-        box("arm_lower" + side, (0.45, 0.9, 0.45), (0, -0.4, 0), fore, shell, bevel=0.06, taper=(0.7, 0.7))
-        box("knuckle" + side, (0.55, 0.2, 0.55), (0, -0.85, 0), fore, glow, bevel=0.04)
+        obox("arm_lower" + side, (0.45, 0.9, 0.45), (0, -0.4, 0), fore, shell, bevel=0.06, taper=(0.7, 0.7))
+        obox("knuckle" + side, (0.55, 0.2, 0.55), (0, -0.85, 0), fore, glow, bevel=0.04)
         for j in range(3):
             hip = pivot("Leg%s%d" % (side, j + 1), (1.0 * s, -0.4, -0.6 + j * 1.0), body)
             hip.rotation_euler[1] = math.radians(-20 * s)
-            box("leg_upper%s%d" % (side, j), (1.3, 0.24, 0.24), (0.65 * s, 0, 0), hip, shell, bevel=0.04)
+            obox("leg_upper%s%d" % (side, j), (1.3, 0.24, 0.24), (0.65 * s, 0, 0), hip, shell, bevel=0.04)
             knee = pivot("Foot%s%d" % (side, j + 1), (1.3 * s, 0, 0), hip)
             knee.rotation_euler[1] = math.radians(70 * s)
-            box("leg_lower%s%d" % (side, j), (1.2, 0.2, 0.2), (0.6 * s, 0, 0), knee, hide, bevel=0.03, taper=None)
+            obox("leg_lower%s%d" % (side, j), (1.2, 0.2, 0.2), (0.6 * s, 0, 0), knee, hide, bevel=0.03, taper=None)
     head = pivot("Head", (0, -0.1, -1.75), body)
-    box("brow", (1.2, 0.5, 0.6), (0, 0.15, -0.1), head, shell, bevel=0.1, taper=(0.7, 0.8))
+    obox("brow", (1.2, 0.5, 0.6), (0, 0.15, -0.1), head, shell, bevel=0.1, taper=(0.7, 0.8))
     for s in (-1, 1):
         ball("eye%d" % s, 0.15, (0.35 * s, 0.05, -0.38), head, core, segs=8, rings=5)
     export("warden")

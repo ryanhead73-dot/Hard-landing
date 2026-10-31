@@ -282,9 +282,7 @@ func _disc(pos: Vector3, radius: float, height: float, mat: Material) -> MeshIns
 
 func _mesh_box(size: Vector3, pos: Vector3, mat: Material, parent: Node = null) -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
+	mesh.mesh = Bevel.box(size)
 	mesh.material_override = mat
 	mesh.position = pos
 	(parent if parent else self).add_child(mesh)
@@ -295,9 +293,7 @@ func _static_box(size: Vector3, pos: Vector3, mat: Material, parent: Node = null
 	var body := StaticBody3D.new()
 	body.position = pos
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
+	mesh.mesh = Bevel.box(size)
 	mesh.material_override = mat
 	var shape := CollisionShape3D.new()
 	var box_shape := BoxShape3D.new()
@@ -351,9 +347,7 @@ func _slab(from: Vector3, to: Vector3, width: float, thickness: float, mat: Mate
 	body.transform = Transform3D(Basis(across, up, forward), (from + to) * 0.5 - up * thickness * 0.5)
 	var size := Vector3(width, thickness, length)
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
+	mesh.mesh = Bevel.box(size)
 	mesh.material_override = mat
 	var shape := CollisionShape3D.new()
 	var box_shape := BoxShape3D.new()

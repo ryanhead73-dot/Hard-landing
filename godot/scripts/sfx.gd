@@ -14,7 +14,7 @@ const SOUNDS: Array[String] = [
 	"music_calm", "music_combat", "music_finale",
 	"amb_springs_loop", "amb_loom_loop", "amb_interior_loop", "spool_loop",
 	"crash_impact", "repair_clunk", "log_chime", "ui_click", "warden_slam",
-	"spitter_death", "ram_death", "launch_roar",
+	"spitter_death", "ram_death", "launch_roar", "splash_0", "splash_1", "roll_whoosh",
 ]
 
 var _streams: Dictionary = {}

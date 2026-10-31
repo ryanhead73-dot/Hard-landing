@@ -81,6 +81,8 @@ func _process(delta: float) -> void:
 func _state_name(hv: float, grounded: bool) -> String:
 	if player.dead:
 		return "down"
+	if player.is_rolling():
+		return "roll"
 	if not grounded:
 		return "jump" if player.velocity.y > 0.0 else "fall"
 	if player.crouching:
@@ -139,6 +141,27 @@ func _base_pose() -> Dictionary:
 	if action != "":
 		_blend_action(p)
 
+	# Roll: tuck tight and turn a full forward somersault about the hips.
+	var rolling := player.is_rolling()
+	if rolling:
+		var t := clampf(player.roll_t / Player.ROLL_TIME, 0.0, 1.0)
+		var tuck := sin(t * PI)
+		var tucked := {
+			"LegL": Vector3(105.0, 0.0, 0.0), "ShinL": Vector3(-130.0, 0.0, 0.0),
+			"LegR": Vector3(100.0, 0.0, 0.0), "ShinR": Vector3(-125.0, 0.0, 0.0),
+			"Spine": Vector3(-35.0, 0.0, 0.0), "Chest": Vector3(-20.0, 0.0, 0.0),
+			"Head": Vector3(-30.0, 0.0, 0.0),
+			"ArmL": Vector3(70.0, 0.0, 20.0), "ForearmL": Vector3(80.0, 0.0, 0.0),
+			"ArmR": Vector3(60.0, 0.0, -10.0), "ForearmR": Vector3(80.0, 0.0, 0.0),
+		}
+		for j in tucked:
+			p[j] = (p.get(j, Vector3.ZERO) as Vector3).lerp(tucked[j], minf(tuck * 1.8, 1.0))
+		# Rotate the whole rig about a pivot at hip height so she stays on the ground.
+		var a := -TAU * smoothstep(0.05, 0.95, t)
+		var h := 0.55
+		p["#Root"] = Vector3(rad_to_deg(a), 0.0, 0.0)
+		p["@Root"] = Vector3(0.0, h - h * cos(a) - 0.35 * tuck, -h * sin(a))
+
 	# Down: she topples backwards and lies still, arms out.
 	if _down > 0.0:
 		var e := ease(_down, -2.0)
@@ -152,7 +175,7 @@ func _base_pose() -> Dictionary:
 		p["LegL"] = p["LegL"].lerp(Vector3(18.0, 0.0, 0.0), e)
 		p["ShinL"] = p["ShinL"].lerp(Vector3(-35.0, 0.0, 0.0), e)
 		p["Head"] = p["Head"].lerp(Vector3(10.0, 25.0, 0.0), e)
-	else:
+	elif not rolling:
 		p["#Root"] = Vector3.ZERO
 		p["@Root"] = Vector3.ZERO
 	return p

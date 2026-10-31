@@ -23,6 +23,17 @@ signal died
 @export var base_max_health := 100.0
 @export var regen_delay := 4.0
 @export var regen_rate := 12.0
+## Sprinting widens the view a little, for a sense of speed.
+@export var sprint_fov_boost := 7.0
+
+## Dodge roll: a quick burst along the move direction (backwards if standing still), briefly
+## untouchable at the start.
+const ROLL_TIME := 0.5
+const ROLL_SPEED := 8.5
+const ROLL_GUARD := 0.32
+const ROLL_COOLDOWN := 0.3
+## Camera kick per shot (metres of view offset), by weapon.
+const KICK := {"rifle": 0.035, "scattergun": 0.14, "arc_lance": 0.08}
 
 var crouching := false
 var aiming := false
@@ -50,6 +61,20 @@ var _plating_seen := 0
 var _stride := 0.0
 var _foot := 0
 var _hold_fire := false
+## Dodge roll: time into the roll (-1 when not rolling) and its direction.
+var roll_t := -1.0
+var _roll_dir := Vector3.FORWARD
+var _roll_cool := 0.0
+## Camera shake: trauma (0-1) decays; the shake is trauma squared, so small knocks stay small.
+var trauma := 0.0
+var _kick := 0.0
+var _shake_noise := FastNoiseLite.new()
+var _shake_t := 0.0
+var _airborne_speed := 0.0
+var _sprinting := false
+var _stop_until := 0
+## Where the last hit came from (world space), for the HUD's damage arcs.
+var last_hit_from := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -115,6 +140,12 @@ func _ready() -> void:
 	anim.name = "Animator"
 	add_child(anim)
 	anim.setup(self, rig)
+	weapon.fired.connect(_on_fired)
+	weapon.hit_confirmed.connect(func(killed: bool):
+		if killed:
+			hit_stop(0.05)
+			add_trauma(0.12))
+	_shake_noise.frequency = 2.5
 
 	Game.carrying_changed.connect(_on_carrying_changed)
 	Game.upgrades_changed.connect(_on_upgrades_changed)
@@ -156,13 +187,15 @@ func aim_at(point: Vector3) -> void:
 	_body.rotation.y = _yaw.rotation.y
 
 
-func take_damage(amount: float, _from: Vector3 = Vector3.ZERO) -> bool:
-	if dead:
+func take_damage(amount: float, from: Vector3 = Vector3.ZERO) -> bool:
+	if dead or is_dodging():
 		return false
+	last_hit_from = from
 	amount *= Game.damage_taken_scale()
 	health = maxf(health - amount, 0.0)
 	_since_damage = 0.0
 	Sfx.play("player_hurt", null, -3.0)
+	add_trauma(clampf(amount / 45.0, 0.2, 0.6))
 	damaged.emit(amount)
 	health_changed.emit(health, max_health())
 	if health <= 0.0:
@@ -171,6 +204,58 @@ func take_damage(amount: float, _from: Vector3 = Vector3.ZERO) -> bool:
 		died.emit()
 		return true
 	return false
+
+
+## Shakes the camera. Amounts add up to 1.
+func add_trauma(amount: float) -> void:
+	trauma = minf(trauma + amount, 1.0)
+
+
+func is_rolling() -> bool:
+	return roll_t >= 0.0
+
+
+## In the untouchable opening of a roll.
+func is_dodging() -> bool:
+	return roll_t >= 0.0 and roll_t < ROLL_GUARD
+
+
+## Starts a dodge roll if on the ground and free to move. Returns true if it started.
+func start_roll() -> bool:
+	if dead or is_rolling() or _roll_cool > 0.0 or not is_on_floor() or crouching:
+		return false
+	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	if input.length() < 0.2:
+		input = Vector2(0.0, 1.0)
+	var dir := _yaw.global_basis * Vector3(input.x, 0.0, input.y)
+	dir.y = 0.0
+	_roll_dir = dir.normalized()
+	roll_t = 0.0
+	_body.rotation.y = atan2(-_roll_dir.x, -_roll_dir.z)
+	Sfx.play("roll_whoosh", global_position, -4.0, 0.1)
+	return true
+
+
+## Freezes time for a beat (a kill landing). Skipped headless, where tests count frames.
+func hit_stop(seconds: float) -> void:
+	if DisplayServer.get_name() == "headless" or get_tree().paused:
+		return
+	_stop_until = maxi(_stop_until, Time.get_ticks_msec() + int(seconds * 1000.0))
+	Engine.time_scale = 0.05
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(func():
+		if Time.get_ticks_msec() >= _stop_until - 5:
+			Engine.time_scale = 1.0)
+
+
+func big_kill() -> void:
+	hit_stop(0.16)
+	add_trauma(0.55)
+
+
+func _on_fired() -> void:
+	_kick += KICK.get(weapon.current, 0.04)
+	if weapon.current == "scattergun":
+		add_trauma(0.18)
 
 
 ## Uses a stim if hurt and carrying one. Returns true if it healed.
@@ -223,6 +308,8 @@ func _poll_actions() -> void:
 		return
 	if Input.is_action_just_pressed("stim"):
 		use_stim()
+	if Input.is_action_just_pressed("dodge"):
+		start_roll()
 	for i in Weapon.ORDER.size():
 		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
 			weapon.equip(Weapon.ORDER[i])
@@ -231,7 +318,9 @@ func _poll_actions() -> void:
 func _process(delta: float) -> void:
 	_poll_actions()
 	var t := clampf(delta * 12.0, 0.0, 1.0)
-	_camera.fov = lerpf(_camera.fov, aim_fov if aiming else fov, t)
+	var want_fov := aim_fov if aiming else fov + (sprint_fov_boost if _sprinting else 0.0)
+	_camera.fov = lerpf(_camera.fov, want_fov, clampf(delta * (12.0 if aiming else 5.0), 0.0, 1.0))
+	_update_shake(delta)
 	_arm.spring_length = lerpf(_arm.spring_length, aim_boom_length if aiming else boom_length, t)
 	_arm.position.x = lerpf(_arm.position.x, aim_shoulder_offset if aiming else shoulder_offset, t)
 	_since_damage += delta
@@ -241,13 +330,36 @@ func _process(delta: float) -> void:
 		health_changed.emit(health, max_health())
 
 
+func _update_shake(delta: float) -> void:
+	_roll_cool = maxf(_roll_cool - delta, 0.0)
+	trauma = maxf(trauma - delta * 1.5, 0.0)
+	_kick = lerpf(_kick, 0.0, clampf(delta * 14.0, 0.0, 1.0))
+	_shake_t += delta
+	var shake := trauma * trauma * Game.screen_shake
+	_camera.h_offset = _shake_noise.get_noise_2d(_shake_t * 60.0, 0.0) * 0.22 * shake
+	_camera.v_offset = _shake_noise.get_noise_2d(0.0, _shake_t * 60.0) * 0.22 * shake - _kick * Game.screen_shake
+	# A roll of the view never moves the aim: shots follow the camera's forward axis.
+	_camera.rotation.z = _shake_noise.get_noise_2d(_shake_t * 40.0, 50.0) * deg_to_rad(3.0) * shake
+
+
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
+		_airborne_speed = minf(_airborne_speed, velocity.y)
+	elif _airborne_speed < -6.0:
+		# A hard landing thumps the camera.
+		add_trauma(clampf(-_airborne_speed / 30.0, 0.1, 0.4))
+		Sfx.play("footstep_%d" % _foot, global_position, -3.0, 0.1)
+		_airborne_speed = 0.0
+	else:
+		_airborne_speed = 0.0
 	if dead:
 		velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
 		move_and_slide()
+		return
+	if is_rolling():
+		_roll(delta)
 		return
 	if is_on_floor() and Input.is_action_just_pressed("jump") and not crouching:
 		velocity.y = jump_velocity
@@ -266,10 +378,12 @@ func _physics_process(delta: float) -> void:
 	dir.y = 0.0
 	dir = dir.normalized() * minf(input.length(), 1.0)
 	var speed := walk_speed
+	_sprinting = false
 	if crouching:
 		speed = crouch_speed
 	elif Input.is_action_pressed("sprint") and not aiming and Game.carrying == "":
 		speed = sprint_speed
+		_sprinting = dir.length() > 0.3
 	if aiming:
 		speed = minf(speed, walk_speed * 0.7)
 	if Game.carrying != "":
@@ -287,6 +401,21 @@ func _physics_process(delta: float) -> void:
 	_footsteps(delta)
 
 
+func _roll(delta: float) -> void:
+	roll_t += delta
+	var t := clampf(roll_t / ROLL_TIME, 0.0, 1.0)
+	var speed := ROLL_SPEED * lerpf(1.0, 0.45, t * t)
+	if Game.carrying != "":
+		speed *= carry_speed_factor
+	velocity.x = _roll_dir.x * speed
+	velocity.z = _roll_dir.z * speed
+	move_and_slide()
+	if roll_t >= ROLL_TIME:
+		roll_t = -1.0
+		_roll_cool = ROLL_COOLDOWN
+		_combat_face = 0.0
+
+
 func _footsteps(delta: float) -> void:
 	var moved := Vector2(velocity.x, velocity.z).length() * delta
 	if not is_on_floor() or moved < 0.001:
@@ -295,7 +424,12 @@ func _footsteps(delta: float) -> void:
 	if _stride >= (1.1 if crouching else 1.6):
 		_stride = 0.0
 		_foot = 1 - _foot
-		Sfx.play("footstep_%d" % _foot, global_position, -14.0 if crouching else -9.0, 0.1)
+		var site = get_tree().get_first_node_in_group("crash_site")
+		if site and site.in_pool(global_position):
+			Vfx.splash(get_parent(), global_position + Vector3.UP * 0.05, 1.3 if _sprinting else 1.0)
+			Sfx.play("splash_%d" % _foot, global_position, -12.0 if crouching else -6.0, 0.12)
+		else:
+			Sfx.play("footstep_%d" % _foot, global_position, -14.0 if crouching else -9.0, 0.1)
 
 
 func _update_crouch(want: bool) -> void:

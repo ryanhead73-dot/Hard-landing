@@ -8,6 +8,7 @@ signal upgrades_changed
 signal objective_changed(text: String)
 signal message(text: String)
 signal settings_changed
+signal graphics_changed
 signal repairs_changed
 signal inventory_changed
 signal log_found(id: String)
@@ -50,6 +51,10 @@ var invert_y := false
 var master_volume := 0.8
 var music_volume := 0.7
 var difficulty := 1
+## Camera shake strength (0 turns it off).
+var screen_shake := 1.0
+## 0 = performance (no screen-space GI or volumetric fog), 1 = quality.
+var graphics := 1
 
 var scrap := 0
 ## The component on the player's back (a Campaign component id), or "".
@@ -93,6 +98,8 @@ func load_settings() -> void:
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
+		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
+		graphics = clampi(cfg.get_value("video", "graphics", graphics), 0, 1)
 	apply_settings()
 
 
@@ -113,6 +120,8 @@ func save_settings() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("game", "difficulty", difficulty)
+	cfg.set_value("game", "screen_shake", screen_shake)
+	cfg.set_value("video", "graphics", graphics)
 	cfg.save(SETTINGS_PATH)
 
 

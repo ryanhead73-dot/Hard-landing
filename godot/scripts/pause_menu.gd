@@ -54,6 +54,19 @@ func _ready() -> void:
 		Game.difficulty = i
 		Game.apply_settings())
 	box.add_child(_difficulty)
+	var shake := _slider(box, "Screen shake", 0.0, 1.0, 0.05, Game.screen_shake)
+	shake.value_changed.connect(func(v: float): Game.screen_shake = v)
+	var gfx_label := Label.new()
+	gfx_label.text = "Graphics"
+	box.add_child(gfx_label)
+	var gfx := OptionButton.new()
+	gfx.add_item("Performance")
+	gfx.add_item("Quality")
+	gfx.selected = Game.graphics
+	gfx.item_selected.connect(func(i: int):
+		Game.graphics = i
+		Game.graphics_changed.emit())
+	box.add_child(gfx)
 
 	var resume := Button.new()
 	resume.text = "Resume"
