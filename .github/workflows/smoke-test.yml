@@ -22,5 +22,11 @@ jobs:
           echo "GODOT=$RUNNER_TEMP/godot-bin" >> "$GITHUB_ENV"
       - name: Import project
         run: timeout 300 "$GODOT" --headless --path godot --import
-      - name: Run smoke test
-        run: timeout 300 "$GODOT" --headless --path godot res://tests/smoke_test.tscn
+      - name: Run headless tests
+        run: |
+          for scene in godot/tests/*_test.tscn; do
+            name=$(basename "$scene")
+            echo "::group::$name"
+            timeout 400 "$GODOT" --headless --path godot "res://tests/$name"
+            echo "::endgroup::"
+          done

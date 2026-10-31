@@ -41,6 +41,7 @@ var _shell: StandardMaterial3D
 
 func _ready() -> void:
 	add_to_group("scuttlers")
+	add_to_group("enemies")
 	collision_layer = Game.LAYER_ENEMY
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_PLAYER | Game.LAYER_ENEMY
 	floor_snap_length = 0.3
@@ -222,6 +223,7 @@ func _can_see_target() -> bool:
 func _die() -> void:
 	state = State.DEAD
 	remove_from_group("scuttlers")
+	remove_from_group("enemies")
 	collision_layer = 0
 	collision_mask = Game.LAYER_WORLD
 	died.emit(self)

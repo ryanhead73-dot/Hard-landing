@@ -24,6 +24,10 @@ const CRASH_DECK_Y := 1.0
 const LEVEL_DECK_Y := 1.4
 const CRASH_ROLL_DEG := 4.0
 const CRASH_PITCH_DEG := 3.0
+## Cargo ramp: hinged just under the deck at the aft wall. Open, it slopes down to the ground.
+const RAMP_HINGE_Y := -0.1
+const RAMP_LENGTH := 3.0
+const RAMP_OPEN_DEG := -118.0
 
 const PALETTE := {
 	"hull": Color("e9e1cc"),
@@ -85,6 +89,10 @@ var _lamps: Array[MeshInstance3D] = []
 var _screens: Array[MeshInstance3D] = []
 var _interior_probe: ReflectionProbe
 var _pose_tween: Tween
+var _ramp_hinge: Node3D
+var _ramp_tween: Tween
+## The wing's point-defence turret (live only while the wing is repaired).
+var turret: PointDefense
 
 
 func _ready() -> void:
@@ -116,6 +124,7 @@ func rebuild() -> void:
 	_build_repairs()
 	_apply_aux(is_repaired("aux_power"))
 	_apply_pose(is_repaired("landing_gear"), false)
+	_apply_ramp(is_repaired("landing_gear"), false)
 
 
 # --- Public API ---------------------------------------------------------------------------
@@ -254,10 +263,16 @@ func _build_exterior() -> void:
 	_box(ext, [25.0, 28.6], [1.4, 2.4], [8.4, 9.3], "metal", false)
 	_box(ext, [25.0, 28.6], [1.4, 2.4], [16.7, 17.6], "metal", false)
 	_box(ext, [11.0, 30.0], [3.2, 3.7], [12.4, 13.6], "hull", false)
-	# Aft ramp, jammed shut until the landing gear is fixed.
-	_box(ext, [30.1, 30.3], [0.0, 3.0], [10.7, 15.3], "metal", false)
+	# Aft ramp, jammed shut until the landing gear is fixed. It swings down on a hinge at deck level.
+	_ramp_hinge = Node3D.new()
+	_ramp_hinge.name = "CargoRamp"
+	_ramp_hinge.position = plan(30.2, RAMP_HINGE_Y, 13.0)
+	add_child(_ramp_hinge)
+	var door := _box(_ramp_hinge, [30.1, 30.3], [RAMP_HINGE_Y, RAMP_HINGE_Y + RAMP_LENGTH], [10.8, 15.2], "metal")
+	door.position -= _ramp_hinge.position
 	for i in 4:
-		_box(ext, [30.3, 30.33], [0.3 + i * 0.6, 0.5 + i * 0.6], [10.9, 15.1], "oxide", false)
+		var band := _box(_ramp_hinge, [30.3, 30.33], [0.3 + i * 0.6, 0.5 + i * 0.6], [10.9, 15.1], "oxide", false)
+		band.position -= _ramp_hinge.position
 
 
 func _build_lighting() -> void:
@@ -311,6 +326,7 @@ func _on_repair_state_changed(fixed: bool, id: String) -> void:
 			_apply_aux(fixed)
 		"landing_gear":
 			_apply_pose(fixed, true)
+			_apply_ramp(fixed, true)
 	repair_changed.emit(id, fixed)
 
 
@@ -340,6 +356,24 @@ func _apply_pose(level: bool, animate: bool) -> void:
 	_pose_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_pose_tween.tween_property(self, "rotation", target_rot, 3.0)
 	_pose_tween.tween_property(self, "position:y", target_y, 3.0)
+
+
+func ramp_open() -> bool:
+	return _ramp_hinge != null and absf(_ramp_hinge.rotation.z - deg_to_rad(RAMP_OPEN_DEG)) < 0.01
+
+
+func _apply_ramp(open: bool, animate: bool) -> void:
+	if _ramp_hinge == null:
+		return
+	var target := deg_to_rad(RAMP_OPEN_DEG) if open else 0.0
+	if _ramp_tween:
+		_ramp_tween.kill()
+	if not animate or not is_inside_tree():
+		_ramp_hinge.rotation.z = target
+		return
+	_ramp_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	_ramp_tween.tween_interval(1.0)
+	_ramp_tween.tween_property(_ramp_hinge, "rotation:z", target, 2.0)
 
 
 func _build_aux_power(damaged: Node3D, fixed: Node3D) -> void:
@@ -447,6 +481,12 @@ func _build_wing(damaged: Node3D, fixed: Node3D) -> void:
 	_wing(fixed, PORT_WING_TIP, "salvage")
 	_box(fixed, [15.4, 21.1], [3.0, 3.8], [3.4, 3.6], "metal_dark", false)
 	_box(fixed, [16.6, 20.0], [3.0, 3.8], [0.6, 1.1], "oxide", false)
+	# Point-defence turret on the wing root, salvaged from the dropship.
+	_cyl(fixed, Vector3(19.5, 4.2, 6.5), 0.45, 0.3, "y", "metal_dark")
+	turret = PointDefense.new()
+	turret.name = "PointDefense"
+	turret.position = plan(19.5, 4.6, 6.5)
+	fixed.add_child(turret)
 
 
 func _build_engine(damaged: Node3D, fixed: Node3D) -> void:

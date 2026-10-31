@@ -8,20 +8,25 @@ signal upgrades_changed
 signal objective_changed(text: String)
 signal message(text: String)
 signal settings_changed
+signal repairs_changed
 
 ## Physics layer bits shared by every script.
 const LAYER_WORLD := 1
 const LAYER_PLAYER := 2
 const LAYER_ENEMY := 4
 
-enum Stage { RECOVER_CELL, RETURN_CELL, FIND_MANIFOLD, RETURN_MANIFOLD, COOLED }
-
-const UPGRADE_ORDER: Array[String] = ["extended_mag", "plating", "heavy_rounds"]
-## Heavy builds overheat the fabricator until the cooling manifold is repaired.
+const UPGRADE_ORDER: Array[String] = ["extended_mag", "plating", "heavy_rounds", "rapid_cycler", "plating_2"]
+## Heavy builds overheat the fabricator until cooling is repaired; the top tier runs on engine bleed.
 const UPGRADES := {
-	"extended_mag": {"name": "Extended magazine", "cost": 30, "effect": "Magazine 24 to 36 rounds", "needs_cooling": false},
-	"plating": {"name": "Suit plating", "cost": 40, "effect": "Max health 100 to 140", "needs_cooling": true},
-	"heavy_rounds": {"name": "Heavy rounds", "cost": 45, "effect": "+30% damage", "needs_cooling": true},
+	"extended_mag": {"name": "Extended magazine", "cost": 30, "effect": "Magazine 24 to 36 rounds", "needs": ""},
+	"plating": {"name": "Suit plating", "cost": 40, "effect": "Max health +40", "needs": "cooling"},
+	"heavy_rounds": {"name": "Heavy rounds", "cost": 45, "effect": "+30% damage", "needs": "cooling"},
+	"rapid_cycler": {"name": "Rapid cycler", "cost": 60, "effect": "+25% fire rate", "needs": "engine"},
+	"plating_2": {"name": "Reinforced plating", "cost": 70, "effect": "Max health +40 more", "needs": "engine"},
+}
+const NEEDS_TEXT := {
+	"cooling": "the fabricator overheats on heavy builds until cooling is fixed",
+	"engine": "top-tier builds need engine bleed power",
 }
 
 const SETTINGS_PATH := "user://settings.cfg"
@@ -31,11 +36,12 @@ var invert_y := false
 var master_volume := 0.8
 
 var scrap := 0
+## The component on the player's back (a Campaign component id), or "".
 var carrying := ""
-var stage := Stage.RECOVER_CELL
 var upgrades: Dictionary = {}
-## Mirrors Kestrel's cooling repair, so the dev panel toggle unlocks heavy builds too.
-var cooling_repaired := false
+## Mirrors Kestrel's repair states (id -> true), so dev toggles drive the campaign too.
+var repaired: Dictionary = {}
+var launched := false
 
 
 func _ready() -> void:
@@ -67,9 +73,10 @@ func apply_settings() -> void:
 func reset() -> void:
 	scrap = 0
 	carrying = ""
-	stage = Stage.RECOVER_CELL
 	upgrades.clear()
-	cooling_repaired = false
+	repaired.clear()
+	launched = false
+	repairs_changed.emit()
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
@@ -94,13 +101,54 @@ func next_upgrade() -> String:
 	return ""
 
 
+func is_repaired(id: String) -> bool:
+	return repaired.get(id, false)
+
+
+func repairs_done() -> int:
+	return repaired.values().count(true)
+
+
+## Called when a Kestrel repair changes state (install, dev toggle or load).
+func set_repaired(id: String, value: bool) -> void:
+	if is_repaired(id) == value:
+		return
+	repaired[id] = value
+	# A dev toggle can fix the part you're carrying: drop it rather than strand it.
+	if value and carrying != "" and Campaign.by_component(carrying).get("id", "") == id:
+		carrying = ""
+		carrying_changed.emit(carrying)
+	repairs_changed.emit()
+	upgrades_changed.emit()
+	objective_changed.emit(objective_text())
+
+
 func cooling_online() -> bool:
-	return cooling_repaired
+	return is_repaired("cooling")
+
+
+## The repair the campaign is on: the first one Kestrel still has damaged, or "" when all are done.
+func current_repair() -> String:
+	for r in Campaign.REPAIRS:
+		if not is_repaired(r["id"]):
+			return r["id"]
+	return ""
+
+
+## "find", "return", "launch" (all repaired) or "done" (launched).
+func phase() -> String:
+	if launched:
+		return "done"
+	var id := current_repair()
+	if id == "":
+		return "launch"
+	return "return" if carrying == Campaign.get_repair(id)["component"] else "find"
 
 
 ## True when the fabricator can run this build at all, scrap aside.
 func can_fabricate(id: String) -> bool:
-	return not UPGRADES[id]["needs_cooling"] or cooling_online()
+	var needs: String = UPGRADES[id]["needs"]
+	return needs == "" or is_repaired(needs)
 
 
 func buy_upgrade(id: String) -> bool:
@@ -116,50 +164,35 @@ func buy_upgrade(id: String) -> bool:
 	return true
 
 
-func take_cell() -> void:
-	carrying = "aux_cell"
-	stage = Stage.RETURN_CELL
+func take_component(component: String) -> void:
+	carrying = component
 	carrying_changed.emit(carrying)
 	objective_changed.emit(objective_text())
-	message.emit("Aux power cell recovered. It's heavy, so you can't sprint while carrying it.")
-	Sfx.play("cell_pickup")
+	var r := Campaign.by_component(component)
+	message.emit("%s recovered. It's heavy, so you can't sprint while carrying it." % Campaign.sentence(r["component_name"]))
+	Sfx.play("cell_pickup" if component == "aux_cell" else "manifold_pickup")
 
 
-func install_cell() -> void:
+## Fits the carried component. The caller repairs Kestrel, which mirrors back via set_repaired().
+func install_component() -> void:
+	var r := Campaign.by_component(carrying)
 	carrying = ""
-	stage = Stage.FIND_MANIFOLD
 	carrying_changed.emit(carrying)
-	objective_changed.emit(objective_text())
-	message.emit("Auxiliary power restored. The fabricator is online, but it overheats on heavy builds. A coolant hauler went down in the hot springs: follow its strobe.")
+	message.emit(r.get("done", ""))
 	Sfx.play("power_up")
 
 
-func take_manifold() -> void:
-	carrying = "manifold"
-	stage = Stage.RETURN_MANIFOLD
-	carrying_changed.emit(carrying)
+func launch() -> void:
+	launched = true
 	objective_changed.emit(objective_text())
-	message.emit("Coolant manifold recovered. It's heavy, so you can't sprint while carrying it.")
-	Sfx.play("manifold_pickup")
-
-
-func install_manifold() -> void:
-	carrying = ""
-	stage = Stage.COOLED
-	carrying_changed.emit(carrying)
-	objective_changed.emit(objective_text())
-	message.emit("Cooling restored. The fabricator can run heavy builds now.")
-	Sfx.play("power_up")
 
 
 func objective_text() -> String:
-	match stage:
-		Stage.RECOVER_CELL:
-			return "Recover the aux power cell from the relay station"
-		Stage.RETURN_CELL:
-			return "Return to Kestrel and install the cell in the aux bay"
-		Stage.FIND_MANIFOLD:
-			return "Salvage a coolant manifold from the hauler wreck in the hot springs"
-		Stage.RETURN_MANIFOLD:
-			return "Return to Kestrel and fit the manifold at the workshop install bay"
-	return "Fabricate upgrades at the workshop bench using scrap"
+	match phase():
+		"find":
+			return Campaign.get_repair(current_repair())["find"]
+		"return":
+			return Campaign.get_repair(current_repair())["return"]
+		"launch":
+			return "Take the pilot's seat and launch"
+	return "Kestrel is away"

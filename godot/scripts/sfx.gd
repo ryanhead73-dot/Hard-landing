@@ -7,6 +7,7 @@ const SOUNDS: Array[String] = [
 	"scuttler_alert", "scuttler_lunge", "scuttler_hurt", "scuttler_death",
 	"player_hurt", "scrap_pickup", "cell_pickup", "power_up", "fabricate",
 	"beacon_ping", "footstep_0", "footstep_1", "steam_hiss", "steam_burst", "manifold_pickup",
+	"rock_impact", "arc_zap", "spore_burst", "loom_hum", "turret_shot",
 	"wind_loop", "ship_hum_loop",
 ]
 

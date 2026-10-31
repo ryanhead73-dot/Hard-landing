@@ -161,6 +161,19 @@ def main():
     ring = (sine(430, d) + 0.7 * sine(1170, d) + 0.4 * sine(2290, d)) * env(d, 0.001, 6)
     write("manifold_pickup", place(d, (0.0, lowpass(noise(0.15), 900) * env(0.15, 0.001, 20)), (0.0, ring * 0.6)))
 
+    # Milestone 1: the five new sites and Kestrel's turret.
+    d = 1.0
+    write("rock_impact", lowpass(noise(d), 400) * env(d, 0.001, 6) + 0.6 * sine(lambda tt: 70 - 30 * tt / d, d) * env(d, 0.001, 8))
+    d = 0.6
+    buzz = (np.sign(np.sin(2 * np.pi * 120 * t(d))) * 0.4 + highpass(noise(d), 3000)) * env(d, 0.001, 5)
+    write("arc_zap", buzz, peak=0.7)
+    d = 1.2
+    write("spore_burst", place(d, (0.0, lowpass(noise(0.1), 700) * env(0.1, 0.001, 30)), (0.02, bandpass(noise(1.1), 400, 2500) * env(1.1, 0.02, 3))), peak=0.7)
+    d = 1.4
+    write("loom_hum", (sine(lambda tt: 40 + 40 * tt / d, d) + 0.5 * sine(lambda tt: 120 + 120 * tt / d, d)) * np.minimum(t(d) / d, 1.0) ** 2 * np.minimum((d - t(d)) / 0.05, 1.0), peak=0.8)
+    d = 0.2
+    write("turret_shot", 0.5 * highpass(noise(d), 2000) * env(d, 0.0005, 50) + sine(lambda tt: 160 - 80 * tt / d, d) * env(d, 0.001, 25), peak=0.6)
+
 
 if __name__ == "__main__":
     main()

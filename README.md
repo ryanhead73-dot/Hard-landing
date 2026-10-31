@@ -2,24 +2,25 @@
 
 Third-person sci-fi shooter in Godot 4.7.2. You crash-land on a hostile planet aboard Kestrel, a salvage ship, and restore her one recovered component at a time.
 
-This repo holds the **vertical slice**: one weapon, one enemy and two expeditions, each recovering a component for a visible repair, all running in a greybox of Kestrel at the basalt-wetlands crash site.
+The whole repair campaign is playable: seven expeditions, each recovering one component for a visible repair with a benefit, ending with lift-off. The build plan for the rest of the game is in [AUTONOMOUS_PLAN.md](AUTONOMOUS_PLAN.md).
 
 ![Relay station approach and aiming at a scuttler](docs/station_approach.png)
 
-## The slice loop
+## The campaign
 
-1. **Start at Kestrel.** She's dead without power. Red emergency lights are on and the fabricator is offline.
-2. **Head out.** Follow the blinking red beacon (about 60 m) to the abandoned relay station. A waypoint marker shows the distance.
-3. **Fight.** Basalt scuttlers hide as rocks around the site. They rush you when they see you or hear a pack-mate get shot, and they crouch and glow before every bite. They drop scrap, and orange salvage crates hold more.
-4. **Recover the aux power cell** from the building. It rides on your back and slows you down, so you can't sprint. Taking it draws an ambush on the way home.
-5. **Install it in the aux bay**, just inside Kestrel's side door. The interior switches from red emergency light to warm amber, the screens wake up, and the fabricator comes online. It overheats on heavy builds, so only the extended magazine (30 scrap) can be made yet.
-6. **Follow the blue-white strobe** (about 75 m) to a coolant hauler that sank into the hot springs. Steam vents in the pool hiss and glow before they burst, and a burst scalds anything standing in it, scuttlers included.
-7. **Take the coolant manifold** from the back of the hauler's flooded hold. Prising it loose brings scuttlers up out of the pool.
-8. **Fit it at the workshop install bay.** The coolant leak in the workshop stops, and the fabricator can now make suit plating (40) and heavy rounds (45).
+Each repair is one expedition. Follow the site's beacon (only the site you need flashes bright, and only it pings), recover the component, carry it home on your back (no sprinting) and install it. Taking a component stirs up an ambush. Components found out of order say what Kestrel needs first.
 
-![Hauler wreck in the hot springs, vents mid-burst](docs/wreck_approach.png)
+| # | Repair | Site | Beacon | Twist | Benefit |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Aux power | Relay station | Red | Ambush on the way home | Lights, screens, fabricator online |
+| 2 | Cooling | Hauler wreck in the hot springs | Blue-white strobe | Steam vents burst on a cycle | Heavy fabricator builds |
+| 3 | Canopy | Survey skiff *Lark* on the basalt spires | Yellow | Climb three platforms of columns | Scanner marks crates and wildlife on the HUD |
+| 4 | Landing gear | Mining crawler in the quarry | Violet | Dark maintenance bay, rockfalls | Ship levels, cargo ramp opens, armoury locker resupplies |
+| 5 | Wing | Dropship *Ferro-9* in the moss field | Green | Spore fog, spore pods burst when approached or shot | Point-defence turret on the wing root |
+| 6 | Engine | Freighter *Long Patience* graveyard | White | Maze of hull plates, live arc conduits | Top fabricator tier (rapid cycler, reinforced plating) |
+| 7 | Navigation | The Loom spire | Teal | The spire sends out rings of force: jump them | Pilot's seat launches Kestrel |
 
-If you go down, you're hauled back to Kestrel with full health and keep what you carry.
+Scuttlers at each site stay asleep until you get near. If you go down, you're hauled back to Kestrel with full health and keep what you carry.
 
 ## Open it
 
@@ -40,7 +41,7 @@ If you go down, you're hauled back to Kestrel with full health and keep what you
 | F | Flashlight |
 | F1 | Dev panel |
 
-With the dev panel open: 1-7 toggle each repair, N toggles day and dusk, K gives 50 scrap, T jumps to the station, G jumps to the hauler wreck and H jumps home. The panel also shows the camera boom length and says SQUEEZED when a wall pushes the camera in.
+With the dev panel open: 1-7 toggle each repair (the campaign follows), N toggles day and dusk, K gives 50 scrap, T jumps to the current site's component and H jumps home. The panel also shows the camera boom length and says SQUEEZED when a wall pushes the camera in.
 
 ## What each repair changes
 
@@ -61,18 +62,19 @@ Replacement parts use a mismatched grey-green salvage finish on purpose, so the 
 - `godot/data/kestrel_layout.json` holds the single source of truth: room sizes, openings, stairs, fixtures and repair mount points, all in deck-plan metres. Godot and Blender both read it, so changing a room there changes both.
 - `godot/scripts/kestrel.gd` generates the hull and walls as one CSG solid, plus fixtures, lights and the seven repairables.
 - `godot/scripts/repairable.gd` is the damaged/repaired pattern. Each repair is a node at its mount point with a damaged child and a repaired child, and only one of them is visible and collidable. It also accepts the `<id>_damaged` / `<id>_repaired` names that Blender exports, so real modelled parts can drop in later.
-- `godot/scripts/game.gd` (autoload `Game`) holds the session state: scrap, what you carry, upgrades, the objective and shared physics layers.
+- `godot/scripts/game.gd` (autoload `Game`) holds the session state: scrap, what you carry, upgrades, repair states, the objective and shared physics layers.
+- `godot/scripts/campaign.gd` is the repair campaign as data: each repair's site, component, objective text and install prompts. The current repair is always the first one Kestrel still has damaged, so dev toggles drive the campaign too.
+- `godot/scripts/expedition_site.gd` is the base for every site: component, crates, resident pack, ambush points, beacon and save state. Each site script (`relay_station.gd`, `hauler_wreck.gd`, `spire_skiff.gd`, `quarry_crawler.gd`, `moss_dropship.gd`, `freighter_graveyard.gd`, `loom_spire.gd`) fills in its layout.
+- `godot/scripts/timed_hazard.gd` is the quiet / warning / active cycle shared by `rockfall.gd`, `arc_gap.gd` and `spore_pod.gd`. `loom_pulse.gd` is the expanding ring at the spire. `point_defense.gd` is the wing turret.
 - `godot/scripts/player.gd` and `weapon.gd` handle third-person movement and over-the-shoulder aim. The rifle is hitscan from the camera, so shots land on the crosshair, with tracers drawn from the muzzle. It has a 24-round magazine.
 - `godot/scripts/scuttler.gd` is the enemy: idle, chase, wind-up, lunge and recover states. Alerts spread through the pack, and it has a leash range. Short ray feelers steer it around walls, keeping to one side of an obstacle until the way ahead is clear.
 - `godot/scripts/sfx.gd` (autoload `Sfx`) plays one-shots and loops from `godot/audio/<id>.wav`. Every sound is a placeholder generated by `tools/make_sfx.py` (needs numpy); drop a recorded WAV with the same name into `godot/audio/` to replace it. Loop points live in the WAV, so looping files need loop points set in your audio editor or the import dock.
 - `godot/scripts/pause_menu.gd` is the Esc menu. Settings are saved to `user://settings.cfg`.
-- `godot/scripts/relay_station.gd` builds the first expedition site: the building, cover, cell cradle, salvage crates, mast beacon and spawn points.
-- `godot/scripts/hauler_wreck.gd` builds the second: the hot pool, the sunken hauler with its open cargo door and flooded hold, the manifold rack, crates, steam vents and the tail strobe.
 - `godot/scripts/steam_vent.gd` is the vent hazard: quiet, then a hiss and glowing crust as warning, then a burst that damages the player and scuttlers inside it.
 - `godot/scripts/hud.gd` draws the objective, waypoint, crosshair and hit markers, ammo, suit health, scrap, prompts and damage flash.
 - `godot/scripts/crash_site.gd` builds the basin: ridges, basalt columns, steaming pools, glowing moss, a plough berm and the crash furrow with debris. It uses a fixed seed, so the site looks the same every time.
 - `blender/kestrel_blockout.py` builds the same layout in Blender: a single boolean shell (`Shell-col`), floors, fixtures, the exterior, and one mount empty per repair with placeholder volumes for both states. Model the real parts inside those empties.
-- `godot/tests/smoke_test.tscn` plays the slice headless with 48 checks: audio loads, pause, ship routes, killing a scuttler, scrap pickup, a scuttler finding its way round a wall, taking a bite, the cell loop, crate search, fabricator, steam vents hurting the player and scuttlers, walking into the hauler's hold, the manifold loop and the upgrades it unlocks, death and respawn, and the repair states. Run it with `godot --headless --path godot res://tests/smoke_test.tscn`. GitHub Actions runs it on every pull request.
+- `godot/tests/` holds the headless tests. `smoke_test.tscn` plays the slice (audio, pause, ship routes, combat, the first two repair loops, fabricator, vents, death and respawn). `campaign_test.tscn` checks every site's layout and routes, every hazard, each repair loop in order with its benefit, and the launch. Run one with `godot --headless --path godot res://tests/smoke_test.tscn`; GitHub Actions runs every `*_test.tscn` on each pull request. `screenshots.tscn` renders review shots (see the script header).
 
 ## Known gaps
 
