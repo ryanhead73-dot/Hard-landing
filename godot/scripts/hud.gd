@@ -41,6 +41,13 @@ var _ending_text: Label
 var _log_toast: Label
 var _log_toast_time := 0.0
 
+var _task_back: ColorRect
+var _task_fill: ColorRect
+var _task_label: Label
+var _banner: Label
+var _banner_sub: Label
+var _banner_time := 0.0
+
 var _hit_time := 0.0
 var _hit_killed := false
 var _message_time := 0.0
@@ -129,6 +136,34 @@ func _ready() -> void:
 	_bar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_bar_label.visible = false
 
+	# Task bar: a hold in progress, or a machine working during a defend.
+	_task_back = ColorRect.new()
+	_task_back.color = Color(0, 0, 0, 0.6)
+	_anchor(_task_back, 0.5, 1.0, -170, -186, 170, -178)
+	_task_back.visible = false
+	add_child(_task_back)
+	_task_fill = ColorRect.new()
+	_task_fill.color = Color("ffb24d")
+	_task_fill.position = Vector2(1, 1)
+	_task_fill.size = Vector2(0, 6)
+	_task_back.add_child(_task_fill)
+	_task_label = _label(14, Vector2.ZERO)
+	_anchor(_task_label, 0.5, 1.0, -300, -208, 300, -188)
+	_task_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_task_label.add_theme_color_override("font_color", Color("ffd08a"))
+	_task_label.visible = false
+
+	# Stage banner: a short title card when a mission stage completes.
+	_banner = _label(30, Vector2.ZERO)
+	_anchor(_banner, 0.5, 0.0, -500, 190, 500, 232)
+	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner.add_theme_color_override("font_color", Color("ffd08a"))
+	_banner.visible = false
+	_banner_sub = _label(17, Vector2.ZERO)
+	_anchor(_banner_sub, 0.5, 0.0, -500, 232, 500, 256)
+	_banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner_sub.visible = false
+
 	_prompt = _label(21, Vector2.ZERO)
 	_anchor(_prompt, 0.5, 1.0, -400, -150, 400, -118)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -210,6 +245,40 @@ func _process(delta: float) -> void:
 		_help.modulate.a = clampf(_help_time / 10.0, 0.0, 0.6)
 	_scan.queue_redraw()
 	_update_bar()
+	if _banner_time > 0.0:
+		_banner_time -= delta
+		var a := clampf(_banner_time, 0.0, 1.0)
+		_banner.modulate.a = a
+		_banner_sub.modulate.a = a
+		_banner.visible = _banner_time > 0.0
+		_banner_sub.visible = _banner.visible
+
+
+## Progress of a hold or a working machine, 0..1, with its caption; a negative ratio hides it.
+func set_task(ratio: float, label := "") -> void:
+	var show := ratio >= 0.0
+	_task_back.visible = show
+	_task_label.visible = show
+	if show:
+		_task_fill.size.x = 338.0 * clampf(ratio, 0.0, 1.0)
+		_task_label.text = label
+
+
+func task_visible() -> bool:
+	return _task_back.visible
+
+
+## A title card across the upper screen for a few seconds.
+func show_banner(title: String, sub := "") -> void:
+	_banner.text = title
+	_banner_sub.text = sub
+	_banner_time = 3.5
+	_banner.visible = true
+	_banner_sub.visible = true
+
+
+func banner_text() -> String:
+	return _banner.text if _banner.visible else ""
 
 
 func set_objective(text: String) -> void:
@@ -297,8 +366,8 @@ func _update_bar() -> void:
 	var color := Color("e9e1cc")
 	if _boss and is_instance_valid(_boss) and not _boss.dead:
 		ratio = _boss.health / _boss.max_health
-		color = Color("3fd1b5")
-		_bar_label.text = "THE WARDEN"
+		color = Color("3fd1b5") if _boss is Warden else Color("ff7a3a")
+		_bar_label.text = _boss.display_name()
 	elif _hull_ratio >= 0.0:
 		ratio = _hull_ratio
 		color = Color("e9e1cc") if ratio > 0.35 else Color("e0603a")

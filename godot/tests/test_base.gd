@@ -17,6 +17,9 @@ func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
+	# Missions have their own suite; the others take components straight away.
+	main.missions.bypass = _bypass_missions()
+	main.missions.refresh(false)
 	kestrel = main.kestrel
 	player = main.player
 	await _run()
@@ -28,6 +31,10 @@ func _ready() -> void:
 
 func _name() -> String:
 	return "TEST"
+
+
+func _bypass_missions() -> bool:
+	return true
 
 
 func _run() -> void:

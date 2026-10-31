@@ -31,6 +31,7 @@ func _configure() -> void:
 	beacon_color = Color("b07aff")
 	beacon_period = 1.8
 	beacon_on = 0.9
+	mission = _mission()
 
 
 func rockfalls() -> Array[Node3D]:
@@ -119,3 +120,30 @@ func _build_component_visual(holder: Node3D) -> void:
 		holder.add_child(piston)
 	_mesh_box(Vector3(0.6, 0.1, 0.25), Vector3(0.0, 0.55, 0.0), seal, holder)
 	_mesh_box(Vector3(0.6, 0.1, 0.25), Vector3(0.0, -0.55, 0.0), seal, holder)
+
+## The quarry's mission: get the floodlights back on, then hold the crawler while its crane
+## lowers the strut pack out of the rafters.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "activate", "text": "Restart the quarry floodlights",
+			"devices": [
+				{"pos": Vector3(-5.0, 0.0, 2.0), "kind": "floodlight", "label": "Restart the floodlight", "hold": 1.0},
+				{"pos": Vector3(5.5, 0.0, 3.0), "kind": "floodlight", "label": "Restart the floodlight", "hold": 1.0},
+				{"pos": Vector3(2.4, BAY_FLOOR, -9.0), "kind": "floodlight", "label": "Restart the floodlight", "hold": 1.0},
+			],
+			"say": [[H, "It's black as pitch in that quarry, and the rams like the dark. The crew left floodlights on battery."]],
+		},
+		{
+			"type": "defend", "text": "Power the crawler's crane to lower the strut pack",
+			"running_text": "Defend the crawler while its crane lowers the struts",
+			"device": {"pos": Vector3(-2.4, BAY_FLOOR, -11.0), "kind": "crane", "label": "Power the crane", "yaw": PI * 0.5},
+			"bar": "CRANE LOWERING", "seconds": 40.0, "radius": 12.0, "wave_every": 11.0, "lift": 1.5,
+			"spawns": [Vector3(-11.0, 0.3, 8.0), Vector3(11.0, 0.3, 8.0), Vector3(0.0, 0.3, 13.0)],
+			"waves": [["scuttler", "scuttler", "spitter"], ["ram", "scuttler", "scuttler"], ["spitter", "scuttler", "ram", "scuttler"]],
+			"say": [[H, "Good. The strut pack's slung up in the crane. Power the console and it'll lower it, slowly."]],
+			"start_say": [[H, "Crane's moving. The noise is carrying up the quarry walls. Brace."]],
+			"done_say": [[H, "Pack's down. Take it before anything else wakes up."]],
+		},
+	]

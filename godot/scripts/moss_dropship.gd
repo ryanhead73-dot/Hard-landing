@@ -31,6 +31,7 @@ func _configure() -> void:
 	beacon_color = Color("50ff7a")
 	beacon_period = 1.0
 	beacon_on = 0.25
+	mission = _mission()
 
 
 func pods() -> Array[Node3D]:
@@ -91,7 +92,7 @@ func _keep_clear(p: Vector3) -> bool:
 		return true
 	if Rect2(-13.0, -16.0, 21.0, 14.0).has_point(Vector2(p.x, p.z)):
 		return true
-	for q in POD_POINTS + crate_pts + [component_stand]:
+	for q in POD_POINTS + crate_pts + [component_stand] + mission_points():
 		if Vector2(p.x - q.x, p.z - q.z).length() < 3.0:
 			return true
 	return false
@@ -139,3 +140,32 @@ func _build_component_visual(holder: Node3D) -> void:
 	_mesh_box(Vector3(1.4, 0.9, 0.08), Vector3.ZERO, _mat(Color("e9e1cc"), 0.8), holder)
 	_mesh_box(Vector3(1.42, 0.12, 0.1), Vector3(0.0, 0.3, 0.0), _mat(Color("c4622d"), 0.8), holder)
 	_mesh_box(Vector3(0.08, 0.9, 0.12), Vector3(-0.66, 0.0, 0.0), _mat(Color("3a3f43"), 0.5, 0.6), holder)
+
+## The moss field's mission: find the dropship by its transponders, deal with the bull ram
+## that guards it, then cut the wing-tip panel free.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "activate", "text": "Reset the Ferro-9's rescue transponders",
+			"devices": [
+				{"pos": Vector3(-13.0, 0.0, 7.0), "kind": "transponder", "label": "Reset the transponder", "hold": 1.5},
+				{"pos": Vector3(13.0, 0.0, -3.0), "kind": "transponder", "label": "Reset the transponder", "hold": 1.5},
+				{"pos": Vector3(-1.0, 0.0, -19.0), "kind": "transponder", "label": "Reset the transponder", "hold": 1.5},
+			],
+			"say": [[H, "I can't see a thing through those spores. The Ferro-9 dropped rescue transponders. Reset them and I can map the wreck."]],
+		},
+		{
+			"type": "elite", "kind": "ram", "name": "BULL RAM", "pos": Vector3(0.0, 0.3, -17.0),
+			"text": "Kill the bull ram guarding the dropship",
+			"say": [[H, "Mapped. And there's a heat signature the size of a shuttle next to it. That's a bull, Juno. Hit it from behind."]],
+		},
+		{
+			"type": "activate", "text": "Cut the wing-tip panel free",
+			"devices": [
+				{"pos": Vector3(-11.4, 0.0, -0.6), "kind": "clamp", "label": "Cut the panel mount", "hold": 2.5},
+				{"pos": Vector3(-6.6, 0.0, -0.6), "kind": "clamp", "label": "Cut the panel mount", "hold": 2.5},
+			],
+			"say": [[H, "The panel's still bolted to the dropship's wing. Two mounts. Cut them."]],
+		},
+	]

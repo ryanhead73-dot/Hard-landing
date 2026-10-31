@@ -34,6 +34,7 @@ func _configure() -> void:
 	beacon_color = Color("f4f4ff")
 	beacon_period = 2.6
 	beacon_on = 1.2
+	mission = _mission()
 
 
 func arcs() -> Array[Node3D]:
@@ -134,3 +135,30 @@ func _build_component_visual(holder: Node3D) -> void:
 	core.material_override = _mat(Color("9aa0a3"), 0.35, 0.8)
 	core.rotation.x = PI * 0.5
 	holder.add_child(core)
+
+## The graveyard's mission: find the chief engineer's keycard, put down the yard's guardian,
+## then hold the engine room while the coil housing unlocks.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "activate", "text": "Find the chief engineer's keycard in the hull maze",
+			"devices": [{"pos": Vector3(-12.5, 0.0, -12.0), "kind": "keycard", "label": "Take the keycard", "yaw": PI * 0.5}],
+			"say": [[H, "The Long Patience locked her engine room when she came down. Sixty years ago. Her chief engineer died at his post, out in the maze, with the card."]],
+		},
+		{
+			"type": "elite", "kind": "ram", "name": "YARD GUARDIAN", "pos": Vector3(0.0, 0.3, -12.0),
+			"text": "Kill the yard guardian",
+			"say": [[H, "Something heavy is moving between the ribs. It's been here as long as the wrecks. Don't let it pin you against a plate."]],
+		},
+		{
+			"type": "defend", "text": "Unlock the drive coil's housing",
+			"running_text": "Hold the engine room while the coil housing unlocks",
+			"device": {"pos": Vector3(1.6, ENGINE_FLOOR, -22.5), "kind": "console", "label": "Swipe the keycard", "yaw": -PI * 0.5},
+			"bar": "HOUSING UNLOCK", "seconds": 35.0, "radius": 10.0, "wave_every": 10.0, "lift": 0.0,
+			"waves": [["spitter", "scuttler", "scuttler"], ["ram", "scuttler", "spitter"], ["scuttler", "scuttler", "ram", "spitter"]],
+			"say": [[H, "Guardian's down. Swipe the card at the engine console. The housing will take its time."]],
+			"start_say": [[H, "Housing's cycling. Sixty-year-old seals, Juno. It's loud."]],
+			"done_say": [[H, "Housing open. The coil's yours."]],
+		},
+	]
