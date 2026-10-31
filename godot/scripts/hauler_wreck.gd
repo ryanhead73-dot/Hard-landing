@@ -21,6 +21,7 @@ func _configure() -> void:
 	component_stand = Vector3(0.0, 0.0, -13.3)
 	spawn_pts = [Vector3(-9.0, 0.3, 4.0), Vector3(9.0, 0.3, 2.0), Vector3(8.0, 0.3, -12.0), Vector3(-8.0, 0.3, -15.0)]
 	ambush_pts = [Vector3(-12.0, 0.3, 12.0), Vector3(12.0, 0.3, 14.0), Vector3(0.0, 0.3, 20.0)]
+	spawn_kinds = ["", "", "spitter", ""]
 	crate_pts = [Vector3(-1.9, 0.0, -10.6), Vector3(1.9, 0.0, -3.0), Vector3(-7.5, 0.0, -4.0)]
 	crate_scrap = CRATE_SCRAP
 	beacon_pos = Vector3(0.0, 9.6, 1.0)

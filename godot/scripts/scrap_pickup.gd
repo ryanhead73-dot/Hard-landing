@@ -1,7 +1,11 @@
 class_name ScrapPickup
 extends Node3D
-## A bit of salvage on the ground. Drifts toward the player when close and is collected on touch.
+## Something dropped on the ground: scrap, reserve ammo for a weapon (kind = weapon id) or a stim.
+## Drifts toward the player when close and is collected on touch.
 
+const COLORS := {"scrap": Color("ffb24d"), "scattergun": Color("e0603a"), "arc_lance": Color("7fd6ff"), "stim": Color("7dff9a")}
+
+@export var kind := "scrap"
 @export var amount := 5
 @export var magnet_range := 4.0
 @export var collect_range := 0.9
@@ -22,7 +26,7 @@ func _ready() -> void:
 	mat.albedo_color = Color("9aa0a3")
 	mat.metallic = 0.7
 	mat.emission_enabled = true
-	mat.emission = Color("ffb24d")
+	mat.emission = COLORS.get(kind, Color.WHITE)
 	mat.emission_energy_multiplier = 0.6
 	_mesh.material_override = mat
 	_mesh.position.y = 0.35
@@ -37,8 +41,32 @@ func _process(delta: float) -> void:
 		return
 	var to_target := target.global_position + Vector3.UP * 0.6 - global_position
 	var dist := to_target.length()
+	if not _wanted():
+		return
 	if dist < collect_range:
-		Game.add_scrap(amount)
+		_collect()
 		queue_free()
 	elif dist < magnet_range:
 		global_position += to_target.normalized() * minf(dist, 9.0 * delta)
+
+
+## Full pouches leave stims and ammo on the ground for later.
+func _wanted() -> bool:
+	match kind:
+		"scrap":
+			return true
+		"stim":
+			return Game.stims < Game.max_stims()
+	return Game.owns_weapon(kind) and Game.ammo_reserve(kind) < int(Weapon.SPECS[kind]["reserve_max"])
+
+
+func _collect() -> void:
+	match kind:
+		"scrap":
+			Game.add_scrap(amount)
+		"stim":
+			Game.add_stims(amount)
+			Sfx.play("scrap_pickup", null, -6.0)
+		_:
+			Game.add_ammo(kind, amount)
+			Sfx.play("scrap_pickup", null, -6.0)

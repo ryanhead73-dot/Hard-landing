@@ -174,6 +174,42 @@ def main():
     d = 0.2
     write("turret_shot", 0.5 * highpass(noise(d), 2000) * env(d, 0.0005, 50) + sine(lambda tt: 160 - 80 * tt / d, d) * env(d, 0.001, 25), peak=0.6)
 
+    # --- Milestone 2: weapons, wildlife, sieges -------------------------------------------
+    d = 0.7
+    blast = lowpass(noise(d), 2400) * env(d, 0.0005, 9)
+    boom = sine(lambda tt: 70 - 35 * tt / d, d) * env(d, 0.001, 10)
+    pump = place(0.2, (0.0, click(0.05, 1200)), (0.1, click(0.06, 900)))
+    write("scatter_shot", place(1.0, (0.0, 0.5 * highpass(noise(0.1), 3000) * env(0.1, 0.0005, 60)), (0.0, blast + 1.4 * boom), (0.45, pump)))
+    d = 0.9
+    charge = sine(lambda tt: 300 + 2400 * np.minimum(tt / 0.25, 1.0) ** 2, d) * env(d, 0.001, 4)
+    crackle = bandpass(noise(d), 1500, 6000) * env(d, 0.001, 7)
+    write("lance_shot", 0.5 * charge + crackle + 0.8 * sine(lambda tt: 55 - 20 * tt / d, d) * env(d, 0.001, 6), peak=0.8)
+    write("weapon_switch", place(0.35, (0.0, click(0.04, 1800)), (0.16, click(0.05, 1100))), peak=0.6)
+    d = 0.6
+    write("stim", place(0.8, (0.0, highpass(noise(0.12), 2500) * env(0.12, 0.002, 25)), (0.12, sine(lambda tt: 500 + 500 * tt / d, d) * env(d, 0.02, 5) * 0.4)), peak=0.6)
+    d = 0.5
+    write("acid_splash", bandpass(noise(d), 600, 3500) * env(d, 0.001, 9) * (0.6 + 0.4 * np.sin(2 * np.pi * 37 * t(d))), peak=0.7)
+    d = 0.8
+    gurgle = lowpass(noise(d), 900) * (0.5 + 0.5 * np.sin(2 * np.pi * 14 * t(d))) * np.minimum(t(d) / d, 1.0)
+    write("spitter_charge", gurgle, peak=0.6)
+    d = 0.35
+    write("spitter_spit", place(d, (0.0, bandpass(noise(d), 1200, 4000) * env(d, 0.002, 14)), (0.0, sine(lambda tt: 400 - 250 * tt / d, d) * env(d, 0.002, 18) * 0.5)), peak=0.7)
+    d = 0.4
+    write("ram_paw", lowpass(noise(d), 300) * env(d, 0.001, 12) + 0.7 * sine(55, d) * env(d, 0.001, 14), peak=0.8)
+    d = 1.4
+    bellow = (sine(lambda tt: 80 + 30 * np.sin(tt * 9), d) + 0.6 * sine(lambda tt: 160 + 60 * np.sin(tt * 9), d)) * np.minimum(t(d) / 0.2, 1.0) * np.minimum((d - t(d)) / 0.4, 1.0)
+    write("ram_charge", bellow + 0.3 * lowpass(noise(d), 500) * np.minimum(t(d) / 0.2, 1.0), peak=0.85)
+    d = 0.9
+    write("ram_stun", place(d, (0.0, lowpass(noise(0.4), 700) * env(0.4, 0.0005, 9)), (0.0, sine(lambda tt: 120 - 70 * tt / d, d) * env(d, 0.001, 5)), (0.15, sine(2300, 0.5) * env(0.5, 0.001, 9) * 0.25)), peak=0.9)
+    d = 2.4
+    roar = sum(a * sine(lambda tt, f=f: f * (1 + 0.04 * np.sin(tt * 23)) * (1 - 0.3 * tt / d), d) for a, f in ((1.0, 48), (0.7, 73), (0.5, 97), (0.3, 151)))
+    roar *= np.minimum(t(d) / 0.35, 1.0) * np.minimum((d - t(d)) / 0.8, 1.0)
+    write("warden_roar", roar + 0.4 * bandpass(noise(d), 200, 1200) * np.minimum(t(d) / 0.35, 1.0) * np.exp(-t(d)), peak=0.9)
+    d = 2.2
+    horn = (sine(196, d) + 0.6 * sine(392, d) + 0.35 * sine(588, d)) * np.minimum(t(d) / 0.15, 1.0) * np.minimum((d - t(d)) / 0.5, 1.0)
+    horn *= 0.75 + 0.25 * np.sign(np.sin(2 * np.pi * 2.0 * t(d)))
+    write("siege_horn", horn, peak=0.7)
+
 
 if __name__ == "__main__":
     main()

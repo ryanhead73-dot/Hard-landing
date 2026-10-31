@@ -27,8 +27,9 @@ var beacon_period := 1.6
 var beacon_on := 0.5
 ## How far from the site centre the resident pack wakes up.
 var wake_radius := 55.0
-## Scuttler variants per spawn point, by index; plain scuttlers otherwise (used from M2 on).
+## Enemy kind per spawn point and per ambush point, by index; scuttlers where unset.
 var spawn_kinds: Array = []
+var ambush_kinds: Array = []
 ## True when this is the site the player should head for: the beacon flashes bright.
 var active := false
 ## The resident pack has been spawned (once per game).
@@ -126,7 +127,11 @@ func search_crate(i: int) -> int:
 
 
 func spawn_kind(i: int) -> String:
-	return spawn_kinds[i] if i < spawn_kinds.size() else "scuttler"
+	return spawn_kinds[i] if i < spawn_kinds.size() and spawn_kinds[i] != "" else "scuttler"
+
+
+func ambush_kind(i: int) -> String:
+	return ambush_kinds[i] if i < ambush_kinds.size() and ambush_kinds[i] != "" else "scuttler"
 
 
 ## Saved per site: whether the component is gone and which crates were searched.

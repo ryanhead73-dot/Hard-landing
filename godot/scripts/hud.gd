@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev panel"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _waypoint: Label
@@ -22,6 +22,13 @@ var _repairs: Label
 var _scan: Control
 var _ending: ColorRect
 var _scan_marks: Array = []
+var _weapon: Label
+var _stims: Label
+var _bar_back: ColorRect
+var _bar_fill: ColorRect
+var _bar_label: Label
+var _boss: Enemy
+var _hull_ratio := -1.0
 
 var _hit_time := 0.0
 var _hit_killed := false
@@ -79,6 +86,27 @@ func _ready() -> void:
 	_ammo = _label(26, Vector2.ZERO)
 	_anchor(_ammo, 1.0, 1.0, -300, -64, -20, -24)
 	_ammo.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_weapon = _label(15, Vector2.ZERO)
+	_anchor(_weapon, 1.0, 1.0, -400, -124, -20, -100)
+	_weapon.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_weapon.modulate = Color(1, 1, 1, 0.8)
+	_stims = _label(15, Vector2.ZERO)
+	_anchor(_stims, 0.0, 1.0, 16, -98, 300, -76)
+
+	# Shared top bar: the Warden's health, or Kestrel's hull during a siege.
+	_bar_back = ColorRect.new()
+	_bar_back.color = Color(0, 0, 0, 0.6)
+	_anchor(_bar_back, 0.5, 0.0, -300, 150, 300, 164)
+	_bar_back.visible = false
+	add_child(_bar_back)
+	_bar_fill = ColorRect.new()
+	_bar_fill.position = Vector2(2, 2)
+	_bar_fill.size = Vector2(596, 10)
+	_bar_back.add_child(_bar_fill)
+	_bar_label = _label(15, Vector2.ZERO)
+	_anchor(_bar_label, 0.5, 0.0, -300, 126, 300, 148)
+	_bar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bar_label.visible = false
 
 	_prompt = _label(21, Vector2.ZERO)
 	_anchor(_prompt, 0.5, 1.0, -400, -150, 400, -118)
@@ -130,6 +158,7 @@ func _process(delta: float) -> void:
 		_message.modulate.a = clampf(_message_time, 0.0, 1.0)
 	_update_waypoint()
 	_scan.queue_redraw()
+	_update_bar()
 
 
 func set_objective(text: String) -> void:
@@ -165,6 +194,20 @@ func set_health(health: float, max_health: float) -> void:
 	_health_text.text = "SUIT %d / %d" % [roundi(health), roundi(max_health)]
 
 
+func set_weapon_info(weapon_name: String, reserve: int) -> void:
+	_weapon.text = "%s  ·  %s" % [weapon_name.to_upper(), "∞" if reserve < 0 else "%d reserve" % reserve]
+
+
+func set_stims(count: int, max_count: int) -> void:
+	_stims.text = "STIMS %d / %d  [Q]" % [count, max_count]
+	_stims.modulate = Color(1, 1, 1, 0.85 if count > 0 else 0.4)
+
+
+## Seconds since the last message appeared (5 means it has faded).
+func message_age() -> float:
+	return 5.0 - _message_time
+
+
 func set_scrap(amount: int) -> void:
 	_scrap.text = "SCRAP %d" % amount
 
@@ -181,6 +224,38 @@ func hitmarker(killed: bool) -> void:
 ## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
 func set_scan(marks: Array) -> void:
 	_scan_marks = marks
+
+
+## Shows a boss health bar until it dies.
+func show_boss(boss: Enemy) -> void:
+	_boss = boss
+
+
+## Kestrel's hull during a siege, 0..1, or a negative value to hide it.
+func set_hull(ratio: float, wave_text := "") -> void:
+	_hull_ratio = ratio
+	_bar_label.text = "KESTREL HULL  %s" % wave_text if ratio >= 0.0 else ""
+
+
+func bar_visible() -> bool:
+	return _bar_back.visible
+
+
+func _update_bar() -> void:
+	var ratio := -1.0
+	var color := Color("e9e1cc")
+	if _boss and is_instance_valid(_boss) and not _boss.dead:
+		ratio = _boss.health / _boss.max_health
+		color = Color("3fd1b5")
+		_bar_label.text = "THE WARDEN"
+	elif _hull_ratio >= 0.0:
+		ratio = _hull_ratio
+		color = Color("e9e1cc") if ratio > 0.35 else Color("e0603a")
+	_bar_back.visible = ratio >= 0.0
+	_bar_label.visible = ratio >= 0.0
+	if ratio >= 0.0:
+		_bar_fill.size.x = 596.0 * clampf(ratio, 0.0, 1.0)
+		_bar_fill.color = color
 
 
 func show_ending() -> void:

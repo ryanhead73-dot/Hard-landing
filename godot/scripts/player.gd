@@ -146,6 +146,7 @@ func aim_at(point: Vector3) -> void:
 func take_damage(amount: float, _from: Vector3 = Vector3.ZERO) -> bool:
 	if dead:
 		return false
+	amount *= Game.damage_taken_scale()
 	health = maxf(health - amount, 0.0)
 	_since_damage = 0.0
 	Sfx.play("player_hurt", null, -3.0)
@@ -159,13 +160,25 @@ func take_damage(amount: float, _from: Vector3 = Vector3.ZERO) -> bool:
 	return false
 
 
-func revive(at: Vector3) -> void:
+## Uses a stim if hurt and carrying one. Returns true if it healed.
+func use_stim() -> bool:
+	if dead or health >= max_health() or not Game.take_stim():
+		return false
+	health = minf(health + Game.STIM_HEAL, max_health())
+	health_changed.emit(health, max_health())
+	Sfx.play("stim", null, -4.0, 0.0)
+	return true
+
+
+## Back on your feet at `at`. A loaded game keeps its saved ammo, so it passes refill = false.
+func revive(at: Vector3, refill := true) -> void:
 	dead = false
 	health = max_health()
 	velocity = Vector3.ZERO
 	global_position = at
 	face(0.0)
-	weapon.refill()
+	if refill:
+		weapon.refill()
 	health_changed.emit(health, max_health())
 
 
@@ -184,16 +197,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		_flashlight.visible = not _flashlight.visible
 	elif event.is_action_pressed("reload") and not dead:
 		weapon.start_reload()
+	elif event.is_action_pressed("weapon_next") and not dead:
+		weapon.cycle(1)
+	elif event.is_action_pressed("weapon_prev") and not dead:
+		weapon.cycle(-1)
+
+
+## Keyboard actions are polled so they also respond to simulated presses (tests, remapping).
+func _poll_actions() -> void:
+	if dead or Game.dev_panel_open or get_tree().paused:
+		return
+	if Input.is_action_just_pressed("stim"):
+		use_stim()
+	for i in Weapon.ORDER.size():
+		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
+			weapon.equip(Weapon.ORDER[i])
 
 
 func _process(delta: float) -> void:
+	_poll_actions()
 	var t := clampf(delta * 12.0, 0.0, 1.0)
 	_camera.fov = lerpf(_camera.fov, aim_fov if aiming else fov, t)
 	_arm.spring_length = lerpf(_arm.spring_length, aim_boom_length if aiming else boom_length, t)
 	_arm.position.x = lerpf(_arm.position.x, aim_shoulder_offset if aiming else shoulder_offset, t)
 	_since_damage += delta
-	if not dead and _since_damage > regen_delay and health < max_health():
-		health = minf(health + regen_rate * delta, max_health())
+	var servo := Game.has_upgrade("regen_servo")
+	if not dead and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
+		health = minf(health + regen_rate * (1.5 if servo else 1.0) * delta, max_health())
 		health_changed.emit(health, max_health())
 
 

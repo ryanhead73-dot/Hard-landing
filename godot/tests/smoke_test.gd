@@ -153,7 +153,11 @@ func _run() -> void:
 	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
 	await _frames(10)
 	await _press("interact")
-	_check("fabricator builds the extended magazine", Game.has_upgrade("extended_mag") and player.weapon.mag_size() == 36, "scrap=%d" % Game.scrap)
+	_check("bench opens the fabricator and pauses", main.fabricator.is_open() and get_tree().paused)
+	main.fabricator.build("extended_mag")
+	main.fabricator.close()
+	await _frames(2)
+	_check("fabricator builds the extended magazine", Game.has_upgrade("extended_mag") and player.weapon.mag_size() == 36 and not get_tree().paused, "scrap=%d" % Game.scrap)
 
 	# --- Steam vents --------------------------------------------------------------------------
 	_clear_enemies()
@@ -185,9 +189,8 @@ func _run() -> void:
 	Game.add_scrap(40)
 	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
 	await _frames(10)
-	_check("heavy builds need cooling", _label().contains("overheats"), _label())
-	await _press("interact")
-	_check("fabricator refuses plating while overheating", not Game.has_upgrade("plating"))
+	_check("heavy builds need cooling", FabricatorMenu.blocker("plating").contains("cooling"), FabricatorMenu.blocker("plating"))
+	_check("fabricator refuses plating while overheating", not main.fabricator.build("plating") and not Game.has_upgrade("plating"))
 
 	# Walk in through the cargo door to the manifold rack.
 	var door: Vector3 = main.wreck.to_global(Vector3(0.0, 0.3, 6.0))
@@ -216,9 +219,7 @@ func _run() -> void:
 	_check("install bay accepts the manifold", _label().contains("Fit the coolant manifold"), _label())
 	await _press("interact")
 	_check("fitting the manifold repairs cooling", kestrel.is_repaired("cooling") and Game.current_repair() == "canopy" and Game.carrying == "")
-	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
-	await _frames(10)
-	await _press("interact")
+	main.fabricator.build("plating")
 	_check("cooling unlocks suit plating", Game.has_upgrade("plating") and player.max_health() == 140.0, "max=%.0f" % player.max_health())
 
 	# --- Death and respawn --------------------------------------------------------------------

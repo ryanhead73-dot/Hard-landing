@@ -358,6 +358,20 @@ func _apply_pose(level: bool, animate: bool) -> void:
 	_pose_tween.tween_property(self, "position:y", target_y, 3.0)
 
 
+## Ground-level points around the hull that besieging wildlife goes for (local space).
+func hull_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for p in [Vector2(14.0, 8.0), Vector2(22.0, 8.0), Vector2(16.0, 18.0), Vector2(22.0, 18.0), Vector2(31.5, 13.0), Vector2(2.0, 13.0), Vector2(8.0, 9.0), Vector2(8.0, 17.0)]:
+		out.append(plan(p.x, -0.9, p.y))
+	return out
+
+
+## Jumps the ship's pose and ramp to match the current gear state (used after loading a save).
+func snap_pose() -> void:
+	_apply_pose(is_repaired("landing_gear"), false)
+	_apply_ramp(is_repaired("landing_gear"), false)
+
+
 func ramp_open() -> bool:
 	return _ramp_hinge != null and absf(_ramp_hinge.rotation.z - deg_to_rad(RAMP_OPEN_DEG)) < 0.01
 

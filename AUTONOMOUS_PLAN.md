@@ -81,4 +81,4 @@ Characters are rigid-part rigs built in Blender (separate limb meshes under a bo
 
 ## Where things stand
 
-Progress is tracked in project memory and the project thread. Each milestone's PR links back to this plan.
+Progress: M1 merged in PR #6; M2 in the mechanics PR. Progress is tracked in project memory and the project thread. Each milestone's PR links back to this plan.

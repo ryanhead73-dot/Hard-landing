@@ -1,12 +1,15 @@
 class_name PauseMenu
 extends CanvasLayer
-## Esc pauses the game and opens settings: mouse sensitivity, invert Y and volume.
+## Esc pauses the game and opens settings: mouse sensitivity, invert Y, volume and difficulty.
 ## Settings are saved to user://settings.cfg when the menu closes.
+
+signal quit_to_title
 
 var _panel: PanelContainer
 var _sensitivity: HSlider
 var _invert: CheckBox
 var _volume: HSlider
+var _difficulty: OptionButton
 
 
 func _ready() -> void:
@@ -38,11 +41,28 @@ func _ready() -> void:
 	_invert.button_pressed = Game.invert_y
 	box.add_child(_invert)
 	_volume = _slider(box, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
+	var diff_label := Label.new()
+	diff_label.text = "Difficulty"
+	box.add_child(diff_label)
+	_difficulty = OptionButton.new()
+	for d in Game.DIFFICULTY_NAMES:
+		_difficulty.add_item(d)
+	_difficulty.selected = Game.difficulty
+	_difficulty.item_selected.connect(func(i: int):
+		Game.difficulty = i
+		Game.apply_settings())
+	box.add_child(_difficulty)
 
 	var resume := Button.new()
 	resume.text = "Resume"
 	resume.pressed.connect(close)
 	box.add_child(resume)
+	var title_button := Button.new()
+	title_button.text = "Save and quit to title"
+	title_button.pressed.connect(func():
+		close()
+		quit_to_title.emit())
+	box.add_child(title_button)
 	var quit := Button.new()
 	quit.text = "Quit to desktop"
 	quit.pressed.connect(func(): get_tree().quit())
@@ -55,6 +75,9 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Another panel (fabricator, inventory) owns the pause while it's open.
+	if get_tree().paused and not visible:
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if visible:
 			close()
