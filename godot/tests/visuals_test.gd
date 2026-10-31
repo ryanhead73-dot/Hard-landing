@@ -17,7 +17,9 @@ const MODELS := {
 	"aux_cell": [], "manifold": [], "glazing": [], "struts": [], "wing_panel": [], "drive_coil": [], "nav_core": [], "crate": [],
 	"prop_container": [], "prop_barrier": [], "prop_generator": [], "prop_pipes": [],
 	"prop_shard_0": [], "prop_shard_1": [], "prop_shard_2": [], "prop_gear": ["Wheel"], "prop_gear_broken": ["Wheel"],
-	"prop_mast": ["Dish"], "prop_mast_down": ["Dish"],
+	"prop_mast": ["Dish"], "prop_mast_down": ["Dish"], "prop_hull_plate": [],
+	"site_crawler": ["Boom", "Head"], "site_rib": [], "site_rib_broken": [], "site_engine": [],
+	"site_hauler": ["Fin"], "site_hauler_nose": [],
 }
 
 
@@ -37,6 +39,7 @@ func _run() -> void:
 	await _compass()
 	await _day_cycle()
 	_world()
+	_set_pieces()
 	finished = true
 
 
@@ -81,6 +84,31 @@ func _world() -> void:
 		if not hit.is_empty():
 			blocked.append("%s by %s at %s" % [id, (hit.collider as Node).get_parent().name, hit.position])
 	_check("the way to every site is clear of rocks", blocked.is_empty(), str(blocked))
+
+
+## The modelled wrecks stand on box colliders: check those line up with the walls you can see.
+func _set_pieces() -> void:
+	var space := main.get_world_3d().direct_space_state
+	var ray := func(site: Node3D, from: Vector3, to: Vector3) -> Variant:
+		var q := PhysicsRayQueryParameters3D.create(site.to_global(from), site.to_global(to), Game.LAYER_WORLD)
+		var hit := space.intersect_ray(q)
+		return null if hit.is_empty() else site.to_local(hit.position)
+	var quarry: Node3D = main.sites["landing_gear"]
+	var floor_hit: Variant = ray.call(quarry, Vector3(0.0, 3.0, -8.0), Vector3(0.0, -1.0, -8.0))
+	_check("the crawler's bay floor is solid", floor_hit != null and absf(floor_hit.y - QuarryCrawler.BAY_FLOOR) < 0.05, str(floor_hit))
+	var wall_hit: Variant = ray.call(quarry, Vector3(0.0, 2.5, -8.0), Vector3(6.0, 2.5, -8.0))
+	_check("the crawler's bay has walls", wall_hit != null and absf(wall_hit.x - 3.3) < 0.05, str(wall_hit))
+	_check("the crawler's rear door is open", ray.call(quarry, Vector3(0.0, 2.6, 4.0), Vector3(0.0, 2.6, -6.0)) == null)
+	var hauler: Node3D = main.sites["cooling"]
+	var port: Variant = ray.call(hauler, Vector3(0.0, 3.0, -6.0), Vector3(-6.0, 3.0, -6.0))
+	_check("the hauler's hold has walls", port != null and absf(port.x + 2.7) < 0.05, str(port))
+	_check("the hauler's cargo door is open", ray.call(hauler, Vector3(0.0, 2.5, 10.0), Vector3(0.0, 2.5, -5.0)) == null)
+	_check("the hauler's breach is open", ray.call(hauler, Vector3(6.0, 1.4, -10.5), Vector3(1.0, 1.4, -10.5)) == null)
+	var yard: Node3D = main.sites["engine"]
+	var roof: Variant = ray.call(yard, Vector3(0.0, 4.2, -24.0), Vector3(0.0, 12.0, -24.0))
+	_check("the engine section has a shell", roof != null and absf(roof.y - 8.0) < 0.15, str(roof))
+	var back: Variant = ray.call(yard, Vector3(0.0, 3.0, -20.0), Vector3(0.0, 3.0, -32.0))
+	_check("the engine section is closed at the back", back != null and absf(back.z + 29.6) < 0.05, str(back))
 
 
 func _models() -> void:

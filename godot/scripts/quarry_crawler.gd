@@ -46,16 +46,14 @@ func _build_site() -> void:
 
 
 func _build_quarry() -> void:
-	var face := _mat(Color("3c4448"), 0.9)
-	var terrace := _mat(Color("2c3236"), 0.9)
 	var gravel := _mat(Color("4a4f52"), 0.95)
 	_disc(Vector3(0.0, 0.0, -6.0), 22.0, 0.02, gravel)
-	# Back face and two side faces, each with a lower terrace step in front.
-	_static_box(Vector3(44.0, 9.0, 4.0), Vector3(0.0, 4.5, -26.0), face)
-	_static_box(Vector3(40.0, 3.0, 3.0), Vector3(0.0, 1.5, -22.5), terrace)
+	# Back face and two side faces cut into columnar basalt, each with a lower terrace in front.
+	_basalt_block(Vector3(44.0, 9.0, 4.0), Vector3(0.0, 4.5, -26.0), 1, 1.4)
+	_basalt_block(Vector3(40.0, 3.0, 3.0), Vector3(0.0, 1.5, -22.5), 2, 0.1)
 	for side in [-1.0, 1.0]:
-		_static_box(Vector3(4.0, 7.0, 28.0), Vector3(side * 21.0, 3.5, -10.0), face)
-		_static_box(Vector3(3.0, 2.5, 24.0), Vector3(side * 17.5, 1.25, -10.0), terrace)
+		_basalt_block(Vector3(4.0, 7.0, 28.0), Vector3(side * 21.0, 3.5, -10.0), 3 + int(side), 1.2)
+		_basalt_block(Vector3(3.0, 2.5, 24.0), Vector3(side * 17.5, 1.25, -10.0), 6 + int(side), 0.1)
 	# Spoil heaps and a conveyor gantry for cover on the floor.
 	for p in [Vector3(-7.0, 0.0, 10.0), Vector3(11.0, 0.0, 9.0), Vector3(-12.0, 0.0, -1.0)]:
 		var heap := _column(p, 2.2, 1.6, gravel, 7)
@@ -65,28 +63,26 @@ func _build_quarry() -> void:
 	_static_box(Vector3(1.4, 0.3, 11.0), Vector3(8.0, 3.1, -9.0), _mat(Color("8a4a2a"), 0.7, 0.4))
 
 
-## The crawler: tracks, a hollow body with a rear ramp, a cab and the drill boom.
+## The crawler is modelled in this site's coordinates (blender/build_sites.py): tracks, a hollow
+## body with a rear door and ramp, the cab and the drill boom. Collision is plain boxes under it.
 func _build_crawler() -> void:
-	var paint := _mat(Color("c9a43a"), 0.75)
 	var steel := _mat(Color("3a3f43"), 0.5, 0.6)
 	var inner := _mat(Color("2a2d30"), 0.9)
+	Rig.spawn("site_crawler", self)
 	for side in [-1.0, 1.0]:
-		_static_box(Vector3(1.6, 1.6, 15.0), Vector3(side * 4.4, 0.8, -8.0), steel)
-	var body := CSGCombiner3D.new()
-	body.name = "CrawlerBody"
-	body.use_collision = true
-	add_child(body)
-	_csg(body, Vector3(7.2, 4.0, 14.0), Vector3(0.0, 2.6, -8.0), paint)
-	_csg(body, Vector3(6.6, 3.2, 13.2), Vector3(0.0, BAY_FLOOR + 1.6, -8.0), inner, true)
-	_csg(body, Vector3(3.0, 3.2, 1.2), Vector3(0.0, 0.6 + 1.6, -1.2), inner, true)
+		_collider(Vector3(1.6, 1.6, 15.0), Vector3(side * 4.4, 0.8, -8.0))
+		_collider(Vector3(0.3, 4.0, 14.0), Vector3(side * 3.45, 2.6, -8.0))
+		_collider(Vector3(2.1, 4.0, 0.4), Vector3(side * 2.55, 2.6, -1.2))
+	_collider(Vector3(7.2, 0.3, 14.0), Vector3(0.0, 4.45, -8.0))
+	_collider(Vector3(7.2, 4.0, 0.4), Vector3(0.0, 2.6, -14.8))
+	_collider(Vector3(3.0, 0.8, 0.4), Vector3(0.0, 4.2, -1.2))
+	# Everything under the bay floor, down to the ground.
+	_collider(Vector3(7.2, BAY_FLOOR, 13.6), Vector3(0.0, BAY_FLOOR * 0.5, -8.2))
+	_collider(Vector3(6.0, 3.0, 4.0), Vector3(0.0, 6.1, -13.0))
+	_collider(Vector3(1.0, 1.0, 9.0), Vector3(0.0, 3.0, -19.0), Vector3(-0.25, 0.0, 0.0))
 	# Bay floor plate, and the ramp up from the quarry floor.
 	_static_box(Vector3(6.6, 0.1, 13.2), Vector3(0.0, BAY_FLOOR - 0.05, -8.0), inner)
 	_slab(Vector3(0.0, 0.0, 2.6), Vector3(0.0, BAY_FLOOR, -1.6), 2.8, 0.3, steel)
-	# Cab and drill boom out front.
-	_static_box(Vector3(6.0, 3.0, 4.0), Vector3(0.0, 6.1, -13.0), paint)
-	_mesh_box(Vector3(5.0, 1.0, 0.1), Vector3(0.0, 6.6, -10.95), _emissive(Color("1c2a30"), 0.2))
-	var boom := _static_box(Vector3(1.0, 1.0, 9.0), Vector3(0.0, 3.0, -19.0), steel)
-	boom.rotation.x = -0.25
 	# Dim red emergency lamp inside; the rest is up to the flashlight.
 	_light(Vector3(0.0, BAY_FLOOR + 2.8, -9.0), Color("ff3b2e"), 0.35, 5.0)
 	_mesh_box(Vector3(0.6, 0.08, 0.2), Vector3(0.0, BAY_FLOOR + 3.0, -9.0), _emissive(Color("ff3b2e"), 2.0))
