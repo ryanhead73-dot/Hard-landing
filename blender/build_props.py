@@ -227,6 +227,95 @@ def gear_broken():
     m.export("prop_gear_broken")
 
 
+def _dish(name, at, parent, radius=0.5, depth=0.16, rot=None, dented=False):
+    """A shallow parabolic dish facing +z (Godot), with a feed horn on three struts."""
+    hull = m.mat("plate", m.CREAM_WORN, 0.45)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    pv = m.pivot(name, at, parent)
+    if rot:
+        pv.rotation_euler = tuple(math.radians(a) for a in (rot[0], -rot[2], rot[1]))
+    me = bpy.data.meshes.new(name + "_bowl")
+    bm = bmesh.new()
+    rings, segs = 6, 28
+    grid = []
+    for r in range(rings + 1):
+        rr = radius * r / rings
+        row = []
+        for k in range(segs):
+            a = math.tau * k / segs
+            z = depth * (rr / radius) ** 2
+            if dented and 0.5 < a < 1.6 and r > 2:
+                z += 0.09 * (r - 2) / rings
+            row.append(bm.verts.new(m.g(math.cos(a) * rr, math.sin(a) * rr, -z)))
+        grid.append(row)
+    for r in range(rings):
+        for k in range(segs):
+            k2 = (k + 1) % segs
+            bm.faces.new((grid[r][k], grid[r][k2], grid[r + 1][k2], grid[r + 1][k]))
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    obj = bpy.data.objects.new(name + "_bowl", me)
+    m._finish(obj, name + "_bowl", (0, 0, 0), pv, hull, 0.0, None)
+    for p in obj.data.polygons:
+        p.use_smooth = True
+    mod = obj.modifiers.new("solid", "SOLIDIFY")
+    mod.thickness = 0.03
+    m.cyl(name + "_feed", 0.05, 0.12, (0, 0, 0.42), pv, dark, axis="z", verts=10)
+    for i in range(3):
+        a = math.tau * i / 3
+        m.cyl(name + "_strut%d" % i, 0.01, 0.5, (math.cos(a) * radius * 0.4, math.sin(a) * radius * 0.4, 0.2), pv, dark,
+              axis="z", verts=5, bevel=0.0, rot=(math.degrees(math.sin(a)) * -0.55, math.degrees(math.cos(a)) * 0.55, 0))
+    m.cyl(name + "_mount", 0.08, 0.12, (0, 0, -depth - 0.04), pv, dark, axis="z", verts=12)
+    return pv
+
+
+def _lattice(prefix, height, parent, steel):
+    """A three-legged lattice mast from y = 0 to `height`."""
+    legs = 3
+    r = 0.11
+    for i in range(legs):
+        a = math.tau * i / legs
+        m.cyl(prefix + "leg%d" % i, 0.022, height, (math.cos(a) * r, height * 0.5, math.sin(a) * r), parent, steel, verts=6, bevel=0.0)
+    bays = int(height / 0.3)
+    for b in range(bays):
+        y = 0.15 + b * 0.3
+        for i in range(legs):
+            a = math.tau * (i + 0.5) / legs
+            m.box(prefix + "rung%d_%d" % (b, i), (0.2, 0.02, 0.02), (math.cos(a) * r * 0.5, y, math.sin(a) * r * 0.5), parent, steel,
+                  bevel=0.0, rot=(0, -math.degrees(a) + 90, 0))
+
+
+def mast():
+    """The navigation mast standing on the spine: lattice, dish, whip antenna and lamp brackets."""
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    steel = m.mat("steel", m.STEEL, 0.35, 0.8)
+    band = m.mat("oxide", m.OXIDE, 0.55)
+    root = m.pivot("Mast")
+    m.pod("foot", (0.5, 0.12, 0.5), (0, 0.06, 0), root, band, n=4.0)
+    _lattice("", 2.0, root, steel)
+    m.pod("cap", (0.32, 0.1, 0.32), (0, 2.02, 0), root, dark, n=3.0)
+    _dish("Dish", (0, 1.5, 0.3), root)
+    m.cyl("whip", 0.012, 1.0, (0.05, 2.55, 0), root, dark, verts=6, bevel=0.0)
+    m.export("prop_mast")
+
+
+def mast_down():
+    """The same mast torn off its foot and lying along the spine, dish crumpled."""
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    steel = m.mat("steel", m.STEEL, 0.35, 0.8)
+    band = m.mat("oxide", m.OXIDE, 0.55)
+    root = m.pivot("MastDown")
+    m.pod("foot", (0.5, 0.12, 0.5), (0, 0.06, 0), root, band, n=4.0)
+    m.box("stub", (0.1, 0.25, 0.1), (0, 0.18, 0), root, steel, bevel=0.0, rot=(0, 0, 20))
+    fallen = m.pivot("Fallen", (0.2, 0.12, 0), root)
+    fallen.rotation_euler = (0, math.radians(-86), 0)  # tipped over towards +x
+    _lattice("f_", 2.0, fallen, steel)
+    _dish("Dish", (0.6, 0.12, 0.9), root, rot=(-80, 25, 0), dented=True)
+    m.export("prop_mast_down")
+
+
 BUILDERS = {
     "container": container,
     "barrier": barrier,
@@ -234,6 +323,8 @@ BUILDERS = {
     "pipes": pipes,
     "gear": gear,
     "gear_broken": gear_broken,
+    "mast": mast,
+    "mast_down": mast_down,
     "shard_0": lambda: shard("shard_0", 3, 2.6, 50, 2.2, band_at=0.4),
     "shard_1": lambda: shard("shard_1", 7, 1.6, 70, 1.4, ribbed=True),
     "shard_2": lambda: shard("shard_2", 11, 3.4, 35, 3.0, band_at=-0.8, ribbed=True),

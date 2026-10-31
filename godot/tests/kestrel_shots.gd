@@ -38,6 +38,7 @@ func _ready() -> void:
 		"k_front": [Vector3(-30, 6, 10), centre], "k_side": [Vector3(4, 5, 32), centre],
 		"k_aft": [Vector3(32, 7, -14), centre], "k_top": [Vector3(-14, 22, -18), centre],
 		"k_gear": [Vector3(6.0, 0.9, -8.0), Vector3(1.5, 0.6, -2.6)],
+		"k_mast": [Vector3(14.0, 7.5, -5.0), Vector3(10.0, 5.0, 0.0)],
 	}
 	for name in views:
 		cam.position = views[name][0]

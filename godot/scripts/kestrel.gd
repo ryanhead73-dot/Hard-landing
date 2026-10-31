@@ -544,10 +544,11 @@ func _build_engine(damaged: Node3D, fixed: Node3D) -> void:
 
 
 func _build_navigation(damaged: Node3D, fixed: Node3D) -> void:
-	_rot(_box(damaged, [26.5, 28.5], [3.7, 3.9], [12.9, 13.1], "metal", false), Vector3(0.0, 0.4, 0.0))
-	_cyl(damaged, Vector3(27.5, 3.75, 13.8), 0.5, 0.06, "y", "hull")
-	_box(fixed, [26.4, 26.6], [3.7, 5.7], [12.9, 13.1], "salvage", false)
-	_cyl(fixed, Vector3(26.5, 5.2, 13.4), 0.5, 0.08, "z", "hull")
+	# Modelled mast and dish (blender/build_props.py): torn down by the crash, then re-stepped.
+	var down := Rig.spawn("prop_mast_down", damaged)
+	down.position = plan(26.5, 3.65, 13.0)
+	down.rotation.y = 0.4
+	Rig.spawn("prop_mast", fixed).position = plan(26.5, 3.65, 13.0)
 	_sphere(fixed, Vector3(26.5, 5.78, 12.85), 0.08, "nav_red")
 	_sphere(fixed, Vector3(26.5, 5.78, 13.15), 0.08, "nav_green")
 	_sphere(fixed, Vector3(18.3, 3.4, 25.45), 0.1, "nav_green")

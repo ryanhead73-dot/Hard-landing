@@ -17,6 +17,7 @@ const MODELS := {
 	"aux_cell": [], "manifold": [], "glazing": [], "struts": [], "wing_panel": [], "drive_coil": [], "nav_core": [], "crate": [],
 	"prop_container": [], "prop_barrier": [], "prop_generator": [], "prop_pipes": [],
 	"prop_shard_0": [], "prop_shard_1": [], "prop_shard_2": [], "prop_gear": ["Wheel"], "prop_gear_broken": ["Wheel"],
+	"prop_mast": ["Dish"], "prop_mast_down": ["Dish"],
 }
 
 
