@@ -137,6 +137,7 @@ func _choose_attack(dist: float) -> void:
 
 
 func _slam() -> void:
+	_anim("slam")
 	Sfx.play("rock_impact", global_position, 6.0, 0.0)
 	var ring := LoomPulse.new()
 	ring.one_shot = true
@@ -176,6 +177,7 @@ func _charge_step() -> Vector3:
 
 func _volley() -> void:
 	state = State.RECOVER
+	_anim("attack")
 	_timer = 1.2
 	if not _target_alive():
 		return
@@ -239,6 +241,10 @@ func _die() -> void:
 	tween.tween_interval(6.0)
 	tween.tween_property(_visual, "position:y", -2.5, 2.0)
 	tween.tween_callback(queue_free)
+
+
+func anim_state() -> String:
+	return String(State.find_key(state)).to_lower()
 
 
 func _build_visual() -> void:

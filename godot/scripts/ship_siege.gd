@@ -184,7 +184,8 @@ func _spawn_wave(i: int) -> void:
 
 func _steer_enemies() -> void:
 	for e in _enemies:
-		var near_player := not player.dead and e.global_position.distance_to(player.global_position) < AGGRO_RANGE
+		# Wildlife can't follow Juno inside, so with her aboard they stay on the hull.
+		var near_player := not player.dead and e.global_position.distance_to(player.global_position) < AGGRO_RANGE and not kestrel.is_inside(player.global_position)
 		var want: Node3D = player if near_player else _nearest_point(e.global_position)
 		if e.target != want:
 			e.target = want

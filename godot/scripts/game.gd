@@ -71,6 +71,8 @@ var dev_panel_open := false
 var save_path := "user://save.json"
 ## A save to apply when the game scene starts (set by the title screen's Continue), or empty.
 var pending_load: Dictionary = {}
+## Set by the title screen for a new game: main plays the crash intro once.
+var intro_pending := false
 
 
 func _ready() -> void:

@@ -27,6 +27,7 @@ func _process(delta: float) -> void:
 
 func start(load_save: bool) -> void:
 	Game.pending_load = Game.read_save() if load_save else {}
+	Game.intro_pending = not load_save
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 

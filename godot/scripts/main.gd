@@ -39,6 +39,10 @@ const KEYS := {
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
 const CLIMB_TIME := 7.0
+## The crash intro: Kestrel's last approach, the impact, the slide, a beat of quiet.
+const INTRO_FALL := 3.4
+const INTRO_SLIDE := 1.6
+const INTRO_HOLD := 1.6
 const BUTTONS := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
@@ -67,6 +71,12 @@ var finale: Finale
 ## True once the ending card is up; interact then returns to the title.
 var ending_shown := false
 var _cine_cam: Camera3D
+## True while the crash intro plays (a new game from the title). Interact or Esc skips it.
+var intro_playing := false
+var _intro_tween: Tween
+var _intro_rest: Transform3D
+var _intro_smoke: Array = []
+var _shake := 0.0
 var dusk := false
 var dev_panel := false
 
@@ -162,6 +172,9 @@ func _ready() -> void:
 	if not Game.pending_load.is_empty():
 		load_state(Game.pending_load)
 		Game.pending_load = {}
+	elif Game.intro_pending:
+		Game.intro_pending = false
+		play_intro()
 	else:
 		voice.say(Story.OPENING)
 
@@ -169,6 +182,14 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if _cine_cam:
 		_cine_cam.look_at(kestrel.global_position + Vector3.UP * 2.0)
+		if _shake > 0.0:
+			_shake = maxf(_shake - _delta * 1.6, 0.0)
+			_cine_cam.h_offset = randf_range(-1.0, 1.0) * 0.6 * _shake
+			_cine_cam.v_offset = randf_range(-1.0, 1.0) * 0.6 * _shake
+	if intro_playing:
+		if Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("jump"):
+			end_intro()
+		return
 	if ending_shown:
 		if Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("ui_cancel"):
 			get_tree().change_scene_to_file("res://scenes/title.tscn")
@@ -445,6 +466,8 @@ func _take_component(id: String) -> void:
 func _install(id: String) -> void:
 	Game.install_component()
 	kestrel.set_repaired(id, true)
+	kestrel.play_repair(id)
+	player.anim.play("install")
 	voice.say(Story.INSTALLED.get(id, []))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
@@ -454,6 +477,7 @@ func _install(id: String) -> void:
 
 func _search_crate(site: Node3D, i: int) -> void:
 	var found: int = site.search_crate(i)
+	player.anim.play("interact")
 	Game.add_scrap(found)
 	Game.find_log(Story.log_at(Campaign.by_component(site.component_id)["id"], "crate:%d" % i))
 	var extras: PackedStringArray = []
@@ -509,6 +533,72 @@ func launch() -> void:
 	lift.parallel().tween_property(kestrel, "position", kestrel.position + Vector3.UP * 6.0 + nose * 160.0 + Vector3.UP * 90.0, CLIMB_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	lift.tween_callback(_show_ending)
 	Sfx.play("power_up")
+
+
+## New game: Kestrel comes down. She streaks in trailing smoke along the furrow, hits, throws up
+## a wall of dust and steam, ploughs to a stop where she lies for the rest of the game, and the
+## camera hands over to Juno inside. Interact, jump or Esc skips.
+func play_intro() -> void:
+	intro_playing = true
+	hud.enter_cinematic()
+	player.visible = false
+	player.set_physics_process(false)
+	_intro_rest = kestrel.transform
+	var nose := -kestrel.global_basis.x
+	var side := kestrel.global_basis.z
+	var rest := _intro_rest.origin
+	var touch := rest - nose * 16.0
+	_cine_cam = Camera3D.new()
+	_cine_cam.fov = 58.0
+	add_child(_cine_cam)
+	_cine_cam.global_position = rest + nose * 26.0 + side * 30.0 + Vector3.UP * 5.0
+	_cine_cam.current = true
+	kestrel.position = touch - nose * 150.0 + Vector3.UP * 60.0
+	kestrel.rotation.z = kestrel.rotation.z - 0.25
+	kestrel.set_engine_power(0.5)
+	for x in [8.0, 30.0]:
+		_intro_smoke.append(Vfx.smoke(kestrel, kestrel.plan(x, 2.5, 13.0)))
+	_intro_tween = create_tween()
+	_intro_tween.tween_property(kestrel, "position", touch, INTRO_FALL).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_intro_tween.parallel().tween_property(kestrel, "rotation:z", _intro_rest.basis.get_euler().z, INTRO_FALL)
+	_intro_tween.tween_callback(_intro_impact)
+	_intro_tween.tween_property(kestrel, "position", rest, INTRO_SLIDE).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	_intro_tween.tween_interval(INTRO_HOLD)
+	_intro_tween.tween_callback(end_intro)
+	Sfx.play("loom_hum", null, -4.0, 0.0)
+
+
+func _intro_impact() -> void:
+	_shake = 1.0
+	kestrel.set_engine_power(0.0)
+	Vfx.dust(self, Vector3(kestrel.global_position.x, 0.5, kestrel.global_position.z), 1.6)
+	Sfx.play("rock_impact", null, 6.0, 0.0)
+
+
+## Ends the intro (or skips it): Kestrel at her crash site, Juno in control, the opening lines.
+func end_intro() -> void:
+	if not intro_playing:
+		return
+	intro_playing = false
+	if _intro_tween:
+		_intro_tween.kill()
+	kestrel.transform = _intro_rest
+	kestrel.set_engine_power(0.0)
+	for s in _intro_smoke:
+		if is_instance_valid(s):
+			s.emitting = false
+			get_tree().create_timer(3.0).timeout.connect(s.queue_free)
+	_intro_smoke.clear()
+	_shake = 0.0
+	if _cine_cam:
+		_cine_cam.queue_free()
+		_cine_cam = null
+	player.visible = true
+	player.set_physics_process(true)
+	player.revive(SPAWN, false)
+	player.camera().current = true
+	hud.exit_cinematic()
+	voice.say(Story.OPENING)
 
 
 ## The top bar's caption during an assault: the wave count, or the spool in the finale.

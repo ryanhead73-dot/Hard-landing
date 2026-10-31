@@ -16,6 +16,9 @@ var _cooldown := 0.0
 var _retarget := 0.0
 var _head: Node3D
 var _tracer_mat: StandardMaterial3D
+var _barrels: Array[Node3D] = []
+var _scan := 0.0
+var _kick := 0.0
 
 
 func _ready() -> void:
@@ -41,6 +44,7 @@ func _ready() -> void:
 		barrel.rotation.x = PI * 0.5
 		barrel.position = Vector3(x, 0.05, -0.6)
 		_head.add_child(barrel)
+		_barrels.append(barrel)
 	_tracer_mat = StandardMaterial3D.new()
 	_tracer_mat.albedo_color = Color("ffd08a")
 	_tracer_mat.emission_enabled = true
@@ -57,7 +61,15 @@ func _physics_process(delta: float) -> void:
 	if _retarget <= 0.0 or not _valid(target):
 		_retarget = 0.4
 		target = _find_target()
+	# Barrels run back out after each shot.
+	_kick = maxf(_kick - delta * 6.0, 0.0)
+	for b in _barrels:
+		b.position.z = -0.6 + 0.18 * _kick
 	if target == null:
+		# Idle: the head sweeps slowly back and forth, watching the basin.
+		_scan += delta
+		var sweep := Basis(Vector3.UP, sin(_scan * 0.5) * 1.1) * Basis(Vector3.RIGHT, 0.08)
+		_head.basis = _head.basis.slerp(sweep, clampf(delta * 2.0, 0.0, 1.0)).orthonormalized()
 		return
 	var aim := target.global_position + Vector3.UP * 0.5
 	var want := _head.global_transform.looking_at(aim, Vector3.UP).basis
@@ -89,6 +101,7 @@ func _can_see(e: Node3D) -> bool:
 
 func _fire(aim: Vector3) -> void:
 	_cooldown = fire_interval
+	_kick = 1.0
 	target.take_damage(damage, aim, (aim - global_position).normalized())
 	fired_at.emit(target)
 	Sfx.play("turret_shot", global_position, -6.0, 0.08)

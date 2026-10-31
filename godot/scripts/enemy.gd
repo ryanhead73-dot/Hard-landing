@@ -36,6 +36,7 @@ var _flash_mats: Array[StandardMaterial3D] = []
 var _flash_meshes: Array[MeshInstance3D] = []
 ## The Blender model (see Rig), under the subclass's visual root.
 var _rig: Node3D
+var anim: CreatureAnimator
 static var _flash_overlay: StandardMaterial3D
 
 
@@ -69,6 +70,8 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 	health -= amount * _damage_scale(point, dir)
 	_on_hurt(dir)
 	_flash()
+	if health > 0.0:
+		_anim("hurt")
 	if health <= 0.0:
 		_die()
 		return true
@@ -218,7 +221,21 @@ func _flash_rig(root: Node) -> void:
 func _load_rig(model: String, parent: Node3D) -> Node3D:
 	_rig = Rig.spawn(model, parent)
 	_flash_rig(_rig)
+	anim = CreatureAnimator.new()
+	anim.name = "Animator"
+	add_child(anim)
+	anim.setup(self, _rig, model)
 	return _rig
+
+
+## The state name the animator poses for ("idle", "windup", "charge", "open", "dead"...).
+func anim_state() -> String:
+	return "dead" if dead else "idle"
+
+
+func _anim(shot: String) -> void:
+	if anim:
+		anim.trigger(shot)
 
 
 func _flash() -> void:

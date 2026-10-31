@@ -136,6 +136,19 @@ func plan(x: float, y: float, z: float) -> Vector3:
 	return Vector3(x - _length * 0.5, y, z - _centre_z)
 
 
+## True when a world position is inside one of Kestrel's rooms.
+func is_inside(world: Vector3) -> bool:
+	if layout.is_empty():
+		return false
+	var l := to_local(world)
+	var x := l.x + _length * 0.5
+	var z := l.z + _centre_z
+	for r in layout["rooms"]:
+		if x >= r["x"][0] and x <= r["x"][1] and z >= r["z"][0] and z <= r["z"][1] and l.y >= float(r["floor"]) - 0.6 and l.y <= float(r["ceiling"]):
+			return true
+	return false
+
+
 func is_repaired(id: String) -> bool:
 	return repairs.has(id) and (repairs[id] as Repairable).repaired
 
@@ -143,6 +156,11 @@ func is_repaired(id: String) -> bool:
 func set_repaired(id: String, value: bool) -> void:
 	if repairs.has(id):
 		(repairs[id] as Repairable).repaired = value
+
+
+func play_repair(id: String) -> void:
+	if repairs.has(id):
+		(repairs[id] as Repairable).play_repair()
 
 
 func toggle_repair(id: String) -> void:

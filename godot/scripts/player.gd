@@ -43,6 +43,7 @@ var _flashlight: SpotLight3D
 var _packs: Dictionary = {}
 ## Juno's model (see Rig): Hips, Spine, Chest, Head, ArmL/R, ForearmL/R, LegL/R, ShinL/R.
 var rig: Node3D
+var anim: JunoAnimator
 var _since_damage := 99.0
 var _combat_face := 0.0
 var _plating_seen := 0
@@ -103,7 +104,17 @@ func _ready() -> void:
 	weapon.position = Vector3(0.28, 1.22, -0.32)
 	weapon.camera = _camera
 	weapon.shooter = self
-	_body.add_child(weapon)
+	# The weapon rides on Juno's chest so it follows her aim, lean and recoil with her hands.
+	var chest := Rig.joint(rig, "Chest")
+	if chest:
+		weapon.position -= _body.to_local(chest.global_position)
+		chest.add_child(weapon)
+	else:
+		_body.add_child(weapon)
+	anim = JunoAnimator.new()
+	anim.name = "Animator"
+	add_child(anim)
+	anim.setup(self, rig)
 
 	Game.carrying_changed.connect(_on_carrying_changed)
 	Game.upgrades_changed.connect(_on_upgrades_changed)
@@ -169,6 +180,7 @@ func use_stim() -> bool:
 	health = minf(health + Game.STIM_HEAL, max_health())
 	health_changed.emit(health, max_health())
 	Sfx.play("stim", null, -4.0, 0.0)
+	anim.play("stim")
 	return true
 
 
@@ -296,7 +308,6 @@ func _update_crouch(want: bool) -> void:
 	var h := crouch_height if crouching else stand_height
 	_capsule.height = h
 	_shape.position.y = h * 0.5
-	_body.scale.y = h / stand_height
 	_pitch.position.y = h - 0.1
 
 

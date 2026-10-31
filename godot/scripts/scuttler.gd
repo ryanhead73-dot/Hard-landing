@@ -116,6 +116,7 @@ func _chase(delta: float) -> Vector3:
 
 func _lunge() -> void:
 	state = State.RECOVER
+	_anim("attack")
 	_timer = recover_time
 	if not _target_alive():
 		return
@@ -148,6 +149,10 @@ func _animate(delta: float) -> void:
 		crouch = -0.18 * (1.0 - _timer / windup_time)
 	_visual.position.y = absf(sin(_gait)) * 0.06 * minf(moving, 1.0) + crouch
 	_glow_mat.emission_energy_multiplier = 4.0 if state == State.WINDUP else (2.0 if state != State.IDLE else 0.8)
+
+
+func anim_state() -> String:
+	return String(State.find_key(state)).to_lower()
 
 
 func _build_visual() -> void:

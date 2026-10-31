@@ -6,6 +6,7 @@ extends CanvasLayer
 const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · L logs · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
+var _hidden_for_cinematic: Array = []
 var _waypoint: Label
 var _crosshair: Control
 var _ammo: Label
@@ -320,10 +321,21 @@ func show_ending(text := "") -> void:
 
 ## Cutscene mode for the launch: everything but the subtitles and the ending card steps aside.
 func enter_cinematic() -> void:
+	_hidden_for_cinematic.clear()
 	for c in get_children():
-		if c is CanvasItem and c != _voice and c != _ending:
+		if c is CanvasItem and c != _voice and c != _ending and (c as CanvasItem).visible:
 			(c as CanvasItem).visible = false
+			_hidden_for_cinematic.append(c)
 	set_process(false)
+
+
+## Brings back what enter_cinematic() hid (after the intro).
+func exit_cinematic() -> void:
+	for c in _hidden_for_cinematic:
+		if is_instance_valid(c):
+			(c as CanvasItem).visible = true
+	_hidden_for_cinematic.clear()
+	set_process(true)
 
 
 func ending_text() -> String:

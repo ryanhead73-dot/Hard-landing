@@ -145,6 +145,7 @@ func _check_wall() -> void:
 
 
 func _end_charge(hit_wall: bool) -> void:
+	_anim("attack")
 	state = State.STUNNED if hit_wall else State.RECOVER
 	_timer = stun_time if hit_wall else 0.8
 	velocity = -_charge_dir * (3.0 if hit_wall else 0.0)
@@ -194,6 +195,10 @@ func _die() -> void:
 	tween.tween_interval(3.0)
 	tween.tween_property(_visual, "position:y", -1.5, 1.2)
 	tween.tween_callback(queue_free)
+
+
+func anim_state() -> String:
+	return String(State.find_key(state)).to_lower()
 
 
 func _build_visual() -> void:
