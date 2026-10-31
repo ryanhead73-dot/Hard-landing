@@ -8,6 +8,8 @@ const SOUNDS: Array[String] = [
 	"player_hurt", "scrap_pickup", "cell_pickup", "power_up", "fabricate",
 	"beacon_ping", "footstep_0", "footstep_1", "steam_hiss", "steam_burst", "manifold_pickup",
 	"rock_impact", "arc_zap", "spore_burst", "loom_hum", "turret_shot",
+	"scatter_shot", "lance_shot", "weapon_switch", "stim", "acid_splash", "spitter_charge", "spitter_spit",
+	"ram_paw", "ram_charge", "ram_stun", "warden_roar", "siege_horn",
 	"wind_loop", "ship_hum_loop",
 ]
 

@@ -41,7 +41,7 @@ func _run() -> void:
 	_check("every repair done", Game.repairs_done() == 7 and Game.phase() == "launch")
 	player.revive(main.install_point("launch") + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("pilot's seat offers launch", _label().contains("Launch"), _label())
+	_check("pilot's seat offers launch", _label().contains("[E] Launch"), _label())
 	await _press("interact")
 	_check("Kestrel launches", Game.launched and Game.phase() == "done" and main.hud.ending_visible())
 	finished = true
@@ -194,6 +194,7 @@ func _check_pack_wakes() -> void:
 	await get_tree().create_timer(1.2).timeout
 	_check("resident pack wakes when you near the site", site.pack_spawned and _enemy_count() >= site.spawn_pts.size(), "enemies=%d" % _enemy_count())
 	main.spawn_packs = false
+	main.siege.enabled = false  # sieges have their own tests in mechanics_test
 	_clear_enemies()
 	player.revive(main.SPAWN)
 	await _frames(5)
@@ -260,9 +261,12 @@ func _check_benefit(id: String) -> void:
 			player.take_damage(30.0)
 			player.weapon.in_mag = 2
 			await _frames(10)
-			_check("landing gear: armoury locker unjammed", _label().contains("Resupply"), _label())
+			_check("landing gear: armoury locker unjammed", _label().contains("armoury locker"), _label())
 			await _press("interact")
+			_check("landing gear: armoury hands over the scattergun", Game.owns_weapon("scattergun") and player.weapon.current == "scattergun")
 			_check("landing gear: resupply refills ammo and suit", player.weapon.in_mag == player.weapon.mag_size() and player.health == player.max_health())
+			await _frames(5)
+			_check("landing gear: locker then offers resupply", _label().contains("Resupply"), _label())
 		"wing":
 			player.revive(kestrel.to_global(kestrel.plan(18.0, 0.1, 13.0)))
 			await _frames(5)

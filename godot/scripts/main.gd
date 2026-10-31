@@ -15,6 +15,9 @@ const INSTALL_HEIGHT_SLACK := 0.7
 ## How far the scanner (canopy repair) picks up crates and wildlife.
 const SCAN_CRATES := 70.0
 const SCAN_ENEMIES := 45.0
+## Reserve rounds in a crate bundle and in an enemy's ammo drop, per weapon.
+const AMMO_BUNDLE := {"scattergun": 12, "arc_lance": 4}
+const AMMO_DROP := {"scattergun": 6, "arc_lance": 2}
 const KEYS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -26,10 +29,17 @@ const KEYS := {
 	"interact": [KEY_E],
 	"flashlight": [KEY_F],
 	"reload": [KEY_R],
+	"stim": [KEY_Q],
+	"weapon_1": [KEY_1],
+	"weapon_2": [KEY_2],
+	"weapon_3": [KEY_3],
+	"inventory": [KEY_TAB, KEY_I],
 }
 const BUTTONS := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
+	"weapon_next": [MOUSE_BUTTON_WHEEL_DOWN],
+	"weapon_prev": [MOUSE_BUTTON_WHEEL_UP],
 }
 
 @onready var kestrel: Kestrel = $Kestrel
@@ -44,6 +54,9 @@ var spawn_packs := true
 
 var player: Player
 var hud: Hud
+var fabricator: FabricatorMenu
+var inventory: InventoryPanel
+var siege: ShipSiege
 var dusk := false
 var dev_panel := false
 
@@ -70,18 +83,41 @@ func _ready() -> void:
 	player.health_changed.connect(hud.set_health)
 	player.damaged.connect(func(_amount): hud.flash_damage())
 	player.died.connect(_on_player_died)
-	player.weapon.ammo_changed.connect(hud.set_ammo)
+	player.weapon.ammo_changed.connect(_on_ammo_changed)
 	player.weapon.hit_confirmed.connect(hud.hitmarker)
 	Game.scrap_changed.connect(hud.set_scrap)
 	Game.objective_changed.connect(hud.set_objective)
 	Game.message.connect(hud.show_message)
 	hud.set_health(player.health, player.max_health())
-	hud.set_ammo(player.weapon.in_mag, player.weapon.mag_size(), false)
+	_on_ammo_changed(player.weapon.in_mag, player.weapon.mag_size(), false)
+	Game.inventory_changed.connect(func(): hud.set_stims(Game.stims, Game.max_stims()))
+	Game.upgrades_changed.connect(func(): hud.set_stims(Game.stims, Game.max_stims()))
+	hud.set_stims(Game.stims, Game.max_stims())
 	hud.set_scrap(Game.scrap)
 	hud.set_objective(Game.objective_text())
 	hud.show_message("Kestrel is dead without power. Follow the red beacon to the relay station and find a power cell.")
 
-	add_child(PauseMenu.new())
+	var pause := PauseMenu.new()
+	pause.quit_to_title.connect(func():
+		save_game()
+		get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	add_child(pause)
+	fabricator = FabricatorMenu.new()
+	add_child(fabricator)
+	inventory = InventoryPanel.new()
+	inventory.player = player
+	add_child(inventory)
+	siege = ShipSiege.new()
+	siege.kestrel = kestrel
+	siege.player = player
+	siege.spawner = spawn_enemy
+	add_child(siege)
+	siege.hull_changed.connect(func(hull: float, max_hull: float):
+		hud.set_hull(hull / max_hull if hull >= 0.0 else -1.0, "WAVE %d / %d" % [siege.wave + 1, ShipSiege.SIEGES[maxi(siege.active, 0)].size()]))
+	siege.wave_started.connect(func(w: int, total: int):
+		hud.set_hull(siege.hull / ShipSiege.MAX_HULL, "WAVE %d / %d" % [w + 1, total])
+		if w == 0:
+			hud.show_message("HOB: Contacts on the rim, closing on the hull. Keep them off her."))
 	Sfx.loop("wind_loop", null, -14.0)
 	for r in Campaign.REPAIRS:
 		var site: ExpeditionSite = get_node(String(r["site"]))
@@ -97,6 +133,9 @@ func _ready() -> void:
 		spawn_scuttler(p)
 	_update_active_site()
 	_set_dusk(false)
+	if not Game.pending_load.is_empty():
+		load_state(Game.pending_load)
+		Game.pending_load = {}
 
 
 func _process(_delta: float) -> void:
@@ -104,6 +143,8 @@ func _process(_delta: float) -> void:
 	hud.set_prompt(_interaction.get("label", ""))
 	if _interaction.has("action") and Input.is_action_just_pressed("interact") and not player.dead:
 		(_interaction["action"] as Callable).call()
+	elif Input.is_action_just_pressed("inventory") and not player.dead:
+		inventory.open()
 	hud.set_waypoint(_waypoint())
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta
@@ -122,6 +163,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := (event as InputEventKey).physical_keycode
 	if key == KEY_F1:
 		dev_panel = not dev_panel
+		Game.dev_panel_open = dev_panel
 		hud.set_dev(dev_panel, _dev_text())
 	elif not dev_panel:
 		return
@@ -140,13 +182,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func spawn_scuttler(at: Vector3) -> Scuttler:
-	var s := Scuttler.new()
-	s.target = player
-	s.home = at
-	add_child(s)
-	s.global_position = at
-	s.died.connect(_on_scuttler_died)
-	return s
+	return spawn_enemy("scuttler", at) as Scuttler
 
 
 # --- Campaign ----------------------------------------------------------------------------
@@ -185,11 +221,31 @@ func _wake_packs() -> void:
 		var points := site.spawn_points()
 		for i in points.size():
 			spawn_enemy(site.spawn_kind(i), points[i])
+			# Hard brings a second scuttler to every other spawn point.
+			if Game.difficulty == 2 and i % 2 == 0:
+				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile of the given kind. Only scuttlers exist so far.
-func spawn_enemy(_kind: String, at: Vector3) -> Node3D:
-	return spawn_scuttler(at)
+## Spawns a hostile: "scuttler", "spitter", "ram" or "warden".
+func spawn_enemy(kind: String, at: Vector3) -> Enemy:
+	var e: Enemy
+	match kind:
+		"spitter":
+			e = Spitter.new()
+		"ram":
+			e = Ram.new()
+		"warden":
+			var w := Warden.new()
+			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)
+			e = w
+		_:
+			e = Scuttler.new()
+	e.target = player
+	e.home = at
+	add_child(e)
+	e.global_position = at
+	e.died.connect(_on_enemy_died)
+	return e
 
 
 ## What the cockpit scanner shows once the canopy is sealed: [{pos, kind}].
@@ -207,6 +263,66 @@ func scanner_marks() -> Array:
 		if e.global_position.distance_to(pos) < SCAN_ENEMIES:
 			marks.append({"pos": e.global_position, "kind": "enemy"})
 	return marks
+
+
+# --- Saving --------------------------------------------------------------------------------
+
+## Everything needed to pick the campaign back up at Kestrel.
+func save_state() -> Dictionary:
+	var data := Game.session_state()
+	var site_states := {}
+	for id in sites:
+		site_states[id] = (sites[id] as ExpeditionSite).get_state()
+	data["sites"] = site_states
+	# A siege in progress comes back as one waiting to happen.
+	data["siege_pending"] = siege.active if siege.is_active() else siege.pending
+	data["weapon"] = player.weapon.current
+	return data
+
+
+func save_game() -> bool:
+	if Game.launched:
+		return false
+	return Game.write_save(save_state())
+
+
+func load_state(data: Dictionary) -> void:
+	Game.apply_session(data)
+	var repaired: Dictionary = data.get("repaired", {})
+	for id in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(id, repaired.get(id, false))
+	kestrel.snap_pose()
+	var site_states: Dictionary = data.get("sites", {})
+	for id in sites:
+		if site_states.has(id):
+			(sites[id] as ExpeditionSite).set_state(site_states[id])
+	var pending := int(data.get("siege_pending", -1))
+	if pending >= 0:
+		siege.arm(pending)
+	player.weapon.equip(String(data.get("weapon", "rifle")))
+	player.revive(SPAWN, false)
+	_update_active_site()
+	Game.objective_changed.emit(Game.objective_text())
+	hud.show_message("Back aboard Kestrel. %s." % Game.objective_text())
+	_settle_spawn()
+
+
+## The repaired parts move Kestrel's colliders, and the physics server only catches up on the
+## next step; until then the player would be shoved out of where the old shapes were.
+func _settle_spawn() -> void:
+	await get_tree().physics_frame
+	if is_instance_valid(player) and not player.dead:
+		player.global_position = SPAWN
+		player.velocity = Vector3.ZERO
+
+
+## The bunk: full health, a save, and a moment's quiet.
+func rest() -> void:
+	player.health = player.max_health()
+	player.health_changed.emit(player.health, player.max_health())
+	if save_game():
+		hud.show_message("You sleep a few hours in the bunk. Progress saved.")
+	Sfx.play("power_up", null, -10.0, 0.0)
 
 
 # --- Interactions -------------------------------------------------------------------------
@@ -241,24 +357,24 @@ func _find_interaction() -> Dictionary:
 			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
 		return {"label": r["bay_label"]}
 	if current == "" and _near_install("launch"):
+		if siege.is_active():
+			return {"label": "Launch: clear them off the hull first"}
 		return {"label": "[E] Launch Kestrel", "action": launch}
+	if _near_install("bunk"):
+		if siege.is_active():
+			return {"label": "Bunk: no time to rest with them on the hull"}
+		return {"label": "[E] Rest in the bunk and save", "action": rest}
 	if _near_install("armoury"):
 		if not Game.is_repaired("landing_gear"):
 			return {"label": "Armoury locker: jammed shut while the hull is twisted"}
+		if not Game.owns_weapon("scattergun"):
+			return {"label": "[E] Open the armoury locker", "action": _resupply}
 		return {"label": "[E] Resupply: reload and patch the suit", "action": _resupply}
 	var bench := kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
 	if pos.distance_to(bench) < INTERACT_RANGE + 0.6:
 		if not Game.is_repaired("aux_power"):
 			return {"label": "Fabricator offline: no power"}
-		var id := Game.next_upgrade()
-		if id == "":
-			return {"label": "Fabricator: every upgrade built"}
-		var info: Dictionary = Game.UPGRADES[id]
-		if not Game.can_fabricate(id):
-			return {"label": "%s: %s" % [info["name"], Game.NEEDS_TEXT[info["needs"]]]}
-		if Game.scrap < int(info["cost"]):
-			return {"label": "%s needs %d scrap (%s)" % [info["name"], info["cost"], info["effect"]]}
-		return {"label": "[E] Fabricate %s, %d scrap (%s)" % [info["name"], info["cost"], info["effect"]], "action": Game.buy_upgrade.bind(id)}
+		return {"label": "[E] Use the fabricator (%d scrap)" % Game.scrap, "action": fabricator.open}
 	return {}
 
 
@@ -267,8 +383,14 @@ func _take_component(id: String) -> void:
 	site.take_component()
 	Game.take_component(site.component_id)
 	# Taking it stirs the wildlife: an ambush at the site, and on the way home for the first one.
-	for p in site.ambush_points():
-		spawn_enemy("scuttler", p).alert(false)
+	var ambush := site.ambush_points()
+	for i in ambush.size():
+		spawn_enemy(site.ambush_kind(i), ambush[i]).alert(false)
+	if id == "navigation":
+		# The Warden rises out of the glass behind the spire.
+		var w := spawn_enemy("warden", (site as LoomSpire).warden_point()) as Warden
+		w.alert(false)
+		hud.show_boss(w)
 	if id == "aux_power":
 		var home := kestrel.global_position
 		var from := site.global_position
@@ -281,25 +403,43 @@ func _take_component(id: String) -> void:
 func _install(id: String) -> void:
 	Game.install_component()
 	kestrel.set_repaired(id, true)
+	# A working ship runs hot, and the heat draws the wildlife in.
+	if ShipSiege.ARMED_BY.has(id):
+		siege.arm(ShipSiege.ARMED_BY[id])
+	save_game()
 
 
 func _search_crate(site: Node3D, i: int) -> void:
 	var found: int = site.search_crate(i)
 	Game.add_scrap(found)
-	hud.show_message("Found %d scrap." % found)
+	var extras: PackedStringArray = []
+	var limited := Game.ammo_weapons()
+	if not limited.is_empty() and randf() < 0.45:
+		var w: String = limited.pick_random()
+		var got := Game.add_ammo(w, AMMO_BUNDLE[w])
+		if got > 0:
+			extras.append("%d %s rounds" % [got, Weapon.SPECS[w]["name"].to_lower()])
+	if randf() < 0.3 and Game.add_stims(1) > 0:
+		extras.append("a stim")
+	hud.show_message("Found %d scrap%s." % [found, "" if extras.is_empty() else ", " + " and ".join(extras)])
 
 
 func _resupply() -> void:
+	if not Game.owns_weapon("scattergun"):
+		Game.give_weapon("scattergun")
+		player.weapon.equip("scattergun")
+		hud.show_message("The armoury held a scattergun and a box of shells. Press 1 and 2 to switch weapons.")
 	player.weapon.refill()
 	player.health = player.max_health()
 	player.health_changed.emit(player.health, player.max_health())
-	hud.show_message("Resupplied: magazine full, suit patched.")
+	if Game.owns_weapon("scattergun") and hud.message_age() > 0.5:
+		hud.show_message("Resupplied: every weapon full, suit patched.")
 	Sfx.play("rifle_reload", null, -2.0, 0.0)
 
 
 ## Lifts off. The full departure sequence lives in a later milestone; this ends the run.
 func launch() -> void:
-	if Game.current_repair() != "" or Game.launched:
+	if Game.current_repair() != "" or Game.launched or siege.is_active():
 		return
 	Game.launch()
 	hud.show_ending()
@@ -322,21 +462,38 @@ func _waypoint():
 			return install_point("launch")
 		"done":
 			return null
-	var id := Game.next_upgrade()
-	if id != "" and Game.can_fabricate(id) and Game.scrap >= int(Game.UPGRADES[id]["cost"]):
+	if Game.is_repaired("aux_power") and Game.listed_upgrades().any(func(id): return FabricatorMenu.blocker(id) == ""):
 		return kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
 	return null
 
 
 # --- Events -------------------------------------------------------------------------------
 
-func _on_scuttler_died(s: Scuttler) -> void:
-	for i in randi_range(1, 2):
-		var scrap := ScrapPickup.new()
-		scrap.amount = randi_range(4, 5)
-		scrap.target = player
-		add_child(scrap)
-		scrap.global_position = s.global_position + Vector3(randf_range(-0.6, 0.6), 0.0, randf_range(-0.6, 0.6))
+func _on_ammo_changed(in_mag: int, mag_size: int, reloading: bool) -> void:
+	var w := player.weapon
+	hud.set_ammo(in_mag, mag_size, reloading)
+	hud.set_weapon_info(w.spec()["name"], Game.ammo_reserve(w.current))
+
+
+func _on_enemy_died(e: Enemy) -> void:
+	for i in randi_range(e.drops.x, e.drops.y):
+		_drop("scrap", randi_range(4, 5), e.global_position)
+	var limited := Game.ammo_weapons()
+	if not limited.is_empty() and randf() < 0.25:
+		var w: String = limited.pick_random()
+		_drop(w, AMMO_DROP[w], e.global_position)
+	if randf() < 0.08:
+		_drop("stim", 1, e.global_position)
+
+
+func _drop(kind: String, amount: int, at: Vector3) -> ScrapPickup:
+	var p := ScrapPickup.new()
+	p.kind = kind
+	p.amount = amount
+	p.target = player
+	add_child(p)
+	p.global_position = at + Vector3(randf_range(-0.6, 0.6), 0.0, randf_range(-0.6, 0.6))
+	return p
 
 
 ## Aux power brings the ship to life: a hum you can hear from the workshop.
@@ -357,7 +514,7 @@ func _on_repair_changed(id: String, repaired: bool) -> void:
 
 func _on_player_died() -> void:
 	hud.set_dead(true)
-	for s in get_tree().get_nodes_in_group("scuttlers"):
+	for s in get_tree().get_nodes_in_group("enemies"):
 		s.calm()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	player.revive(SPAWN)

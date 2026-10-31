@@ -13,6 +13,8 @@ signal pulsed
 @export var ring_height := 0.7
 @export var damage := 18.0
 @export var knockback := 7.0
+## Fires once (a Warden slam) and frees itself when the ring is done.
+@export var one_shot := false
 
 var radius := -1.0
 var target: Node3D
@@ -48,13 +50,13 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_timer -= delta
-	if not _warned and _timer <= warning_time:
+	if not one_shot and not _warned and _timer <= warning_time:
 		_warned = true
 		Sfx.play("loom_hum", global_position + Vector3.UP * 4.0, 0.0, 0.0)
 	if glow:
 		var t := clampf(1.0 - _timer / warning_time, 0.0, 1.0) if _warned else 0.0
 		glow.emission_energy_multiplier = 1.5 + 6.0 * t
-	if _timer <= 0.0:
+	if _timer <= 0.0 and not one_shot:
 		fire()
 	if radius < 0.0:
 		return
@@ -67,6 +69,8 @@ func _physics_process(delta: float) -> void:
 	if radius >= max_radius:
 		radius = -1.0
 		_ring.visible = false
+		if one_shot:
+			queue_free()
 
 
 ## Sends a pulse now and restarts the cycle.

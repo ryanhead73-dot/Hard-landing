@@ -24,12 +24,19 @@ func _configure() -> void:
 		Vector3(-14.0, 0.3, 12.0), Vector3(14.0, 0.3, 12.0), Vector3(0.0, 0.3, 18.0),
 		Vector3(-17.0, 0.3, 0.0), Vector3(17.0, 0.3, 0.0),
 	]
+	spawn_kinds = ["", "", "spitter", "spitter", "ram", "", "", ""]
+	ambush_kinds = ["", "", "spitter", "", ""]
 	crate_pts = [Vector3(-6.0, 0.0, 4.0), Vector3(7.0, 0.0, 1.0), Vector3(-9.0, 0.0, -12.0)]
 	crate_scrap = 16
 	beacon_pos = SPIRE + Vector3(0.0, 26.5, 0.0)
 	beacon_color = Color("3fd1b5")
 	beacon_period = 3.0
 	beacon_on = 1.0
+
+
+## Where the Warden surfaces: behind the spire.
+func warden_point() -> Vector3:
+	return to_global(SPIRE + Vector3(0.0, 0.5, -9.0))
 
 
 func _build_site() -> void:

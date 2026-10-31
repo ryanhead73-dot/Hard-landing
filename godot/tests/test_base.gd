@@ -10,6 +10,10 @@ var finished := false
 
 
 func _ready() -> void:
+	# Never touch a real save or depend on the player's difficulty setting.
+	Game.save_path = "user://test_save.json"
+	Game.delete_save()
+	Game.difficulty = 1
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
@@ -39,6 +43,8 @@ func _clear_enemies() -> void:
 		s.remove_from_group("scuttlers")
 		s.remove_from_group("enemies")
 		s.queue_free()
+	for a in get_tree().get_nodes_in_group("acid"):
+		a.queue_free()
 
 
 func _enemy_count() -> int:
