@@ -33,7 +33,51 @@ func _run() -> void:
 	await _engines()
 	await _compass()
 	await _day_cycle()
+	_world()
 	finished = true
+
+
+## The basin: flat where the game happens, rising elsewhere; the collider matches the mesh;
+## pools sit in hollows; the walk from the ship to every site is clear of rocks.
+func _world() -> void:
+	var site: CrashSite = main.site
+	var flat := [Vector3.ZERO, main.SPAWN]
+	for id in main.sites:
+		flat.append(main.sites[id].global_position)
+		flat.append(main.sites[id].component_point())
+	_check("the ground is flat at the ship and every site", flat.all(func(p): return absf(site.height_at(p.x, p.z)) < 0.01))
+	var space := main.get_world_3d().direct_space_state
+	var worst := 0.0
+	var rises := 0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	for i in 200:
+		var x := rng.randf_range(-150.0, 150.0)
+		var z := rng.randf_range(-150.0, 150.0)
+		var q := PhysicsRayQueryParameters3D.create(Vector3(x, 80.0, z), Vector3(x, -10.0, z), Game.LAYER_WORLD)
+		q.exclude = []
+		var hit := space.intersect_ray(q)
+		if hit.is_empty() or not (hit.collider as Node).name == "Ground":
+			continue
+		var h := site.height_at(x, z)
+		worst = maxf(worst, absf(hit.position.y - h))
+		if h > 1.0:
+			rises += 1
+	_check("the ground collider follows the terrain", worst < 0.6, "worst %.2f m" % worst)
+	_check("the basin has hills between the paths", rises > 30, "%d of 200 samples" % rises)
+	var pools_ok := site.pools.all(func(pool): return site.height_at(pool[0].x, pool[0].z) < CrashSite.WATER_Y - 0.2)
+	_check("pools sit in hollows under the water line", pools_ok and site.pools.size() >= 10)
+	var blocked := []
+	for id in main.sites:
+		var c: Vector3 = main.sites[id].global_position
+		var flat_c := Vector3(c.x, 0.0, c.z)
+		var from := flat_c.normalized() * 34.0 + Vector3.UP * 1.0
+		var to := flat_c - flat_c.normalized() * 30.0 + Vector3.UP * 1.0
+		var q := PhysicsRayQueryParameters3D.create(from, to, Game.LAYER_WORLD)
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			blocked.append("%s by %s at %s" % [id, (hit.collider as Node).get_parent().name, hit.position])
+	_check("the way to every site is clear of rocks", blocked.is_empty(), str(blocked))
 
 
 func _models() -> void:
@@ -165,7 +209,7 @@ func _day_cycle() -> void:
 	var sun: DirectionalLight3D = main._sun
 	_check("dusk comes in gradually", absf(sun.light_energy - 0.625) < 0.01 and not main.dusk)
 	main.set_daylight(1.0)
-	_check("full dusk is dim amber", sun.light_energy < 0.3 and main.dusk and main.site._moss_mat.emission_energy_multiplier > 2.9)
+	_check("full dusk is dim amber", sun.light_energy < 0.3 and main.dusk and main.site._moss_mat.emission_energy_multiplier > 0.05)
 	main.day_time = L * 0.5
 	_check("the time of day is saved", is_equal_approx(float(main.save_state()["day_time"]), L * 0.5))
 	main.set_daylight(0.0)

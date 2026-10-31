@@ -265,6 +265,9 @@ func _csg(parent: Node, size: Vector3, pos: Vector3, mat: Material, subtract := 
 
 func _disc(pos: Vector3, radius: float, height: float, mat: Material) -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
+	# The basin's own ground now reads better than a painted disc under a whole site.
+	if radius >= 15.0 and mat is StandardMaterial3D and not (mat as StandardMaterial3D).emission_enabled:
+		return mesh
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = radius
 	cyl.bottom_radius = radius
@@ -318,7 +321,9 @@ func _column(pos: Vector3, radius: float, height: float, mat: Material, sides :=
 	cyl.radial_segments = sides
 	cyl.rings = 1
 	mesh.mesh = cyl
-	mesh.material_override = mat
+	# Dark stone columns share the world's basalt.
+	var dark := mat is StandardMaterial3D and (mat as StandardMaterial3D).albedo_color.get_luminance() < 0.2
+	mesh.material_override = WorldProps.rock_material() if dark else mat
 	var shape := CollisionShape3D.new()
 	var cyl_shape := CylinderShape3D.new()
 	cyl_shape.radius = radius
