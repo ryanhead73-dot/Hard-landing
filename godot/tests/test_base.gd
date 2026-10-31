@@ -57,7 +57,11 @@ func _place(pos: Vector3, yaw: float) -> void:
 	player.face(yaw)
 
 
+## Presses an action for a couple of frames. It starts on a physics frame: resuming from a
+## SceneTreeTimer happens after this frame's _process calls, and a press made there would be
+## stale ("just pressed" in a frame that has already been processed) by the next one.
 func _press(action: String) -> void:
+	await get_tree().physics_frame
 	Input.action_press(action)
 	await _frames(2)
 	Input.action_release(action)

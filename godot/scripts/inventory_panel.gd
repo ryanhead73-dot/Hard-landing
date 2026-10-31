@@ -27,6 +27,8 @@ func _refresh() -> void:
 	var built: Array = Game.UPGRADE_ORDER.filter(func(id): return Game.has_upgrade(id))
 	_row("UPGRADES", Color("ffd08a"), 14)
 	_row(", ".join(built.map(func(id): return Game.UPGRADES[id]["name"])) if not built.is_empty() else "None yet. The fabricator is on the workshop bench.")
+	_row("LOGS", Color("ffd08a"), 14)
+	_row("%d of %d recovered  [L] to read" % [Game.logs.filter(func(id): return id != Story.ORBIT_LOG["id"]).size(), Story.LOGS.size()])
 	_row("KESTREL  %d / %d" % [Game.repairs_done(), Campaign.REPAIRS.size()], Color("ffd08a"), 14)
 	for r in Campaign.REPAIRS:
 		_row("%s %s" % ["■" if Game.is_repaired(r["id"]) else "□", Kestrel.REPAIR_NAMES[r["id"]]])

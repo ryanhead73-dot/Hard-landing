@@ -41,8 +41,14 @@ func _run() -> void:
 	_check("every repair done", Game.repairs_done() == 7 and Game.phase() == "launch")
 	player.revive(main.install_point("launch") + Vector3.UP * 0.2)
 	await _frames(10)
+	_check("pilot's seat offers the engine spool", _label().contains("engine spool"), _label())
+	await _press("interact")
+	# The full finale is covered by story_test; here, skip to a full spool.
+	main.finale.spool = Finale.SPOOL_TIME
+	await _frames(3)
 	_check("pilot's seat offers launch", _label().contains("[E] Launch"), _label())
 	await _press("interact")
+	await get_tree().create_timer(main.LIFT_TIME + main.CLIMB_TIME + 2.0).timeout
 	_check("Kestrel launches", Game.launched and Game.phase() == "done" and main.hud.ending_visible())
 	finished = true
 
@@ -286,4 +292,4 @@ func _check_benefit(id: String) -> void:
 		"engine":
 			_check("engine: top fabricator tier unlocks", Game.can_fabricate("rapid_cycler") and Game.can_fabricate("plating_2"))
 		"navigation":
-			_check("navigation: departure is ready", Game.phase() == "launch" and Game.objective_text().contains("launch"))
+			_check("navigation: departure is ready", Game.phase() == "launch" and Game.objective_text().contains("engine spool"))

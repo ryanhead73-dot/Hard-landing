@@ -2,7 +2,7 @@ extends Node3D
 ## Game flow: sky and sun, player, HUD, enemies, interactions and dev controls.
 ## The campaign (see Campaign) restores Kestrel one repair at a time: follow the active site's
 ## beacon, recover its component, carry it home and install it. Each repair turns on a benefit.
-## When all seven are done, the pilot's seat launches Kestrel.
+## When all seven are done, the pilot's seat starts the engine spool (Finale), and then launches.
 
 const SPAWN := Vector3(-3.0, 0.5, 15.0)
 const INTERACT_RANGE := 1.8
@@ -34,7 +34,11 @@ const KEYS := {
 	"weapon_2": [KEY_2],
 	"weapon_3": [KEY_3],
 	"inventory": [KEY_TAB, KEY_I],
+	"logs": [KEY_L],
 }
+## The launch cinematic: lift, climb out, then the ending card.
+const LIFT_TIME := 3.0
+const CLIMB_TIME := 7.0
 const BUTTONS := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
@@ -57,6 +61,12 @@ var hud: Hud
 var fabricator: FabricatorMenu
 var inventory: InventoryPanel
 var siege: ShipSiege
+var voice: Voice
+var logs_panel: LogPanel
+var finale: Finale
+## True once the ending card is up; interact then returns to the title.
+var ending_shown := false
+var _cine_cam: Camera3D
 var dusk := false
 var dev_panel := false
 
@@ -107,17 +117,32 @@ func _ready() -> void:
 	inventory = InventoryPanel.new()
 	inventory.player = player
 	add_child(inventory)
+	logs_panel = LogPanel.new()
+	add_child(logs_panel)
+	voice = Voice.new()
+	voice.hud = hud
+	add_child(voice)
+	Game.log_found.connect(func(id: String): hud.show_log_toast(Story.get_log(id)["title"]))
 	siege = ShipSiege.new()
 	siege.kestrel = kestrel
 	siege.player = player
 	siege.spawner = spawn_enemy
 	add_child(siege)
+	finale = Finale.new()
+	finale.siege = siege
+	finale.voice = voice
+	finale.hud = hud
+	add_child(finale)
 	siege.hull_changed.connect(func(hull: float, max_hull: float):
-		hud.set_hull(hull / max_hull if hull >= 0.0 else -1.0, "WAVE %d / %d" % [siege.wave + 1, ShipSiege.SIEGES[maxi(siege.active, 0)].size()]))
-	siege.wave_started.connect(func(w: int, total: int):
-		hud.set_hull(siege.hull / ShipSiege.MAX_HULL, "WAVE %d / %d" % [w + 1, total])
-		if w == 0:
-			hud.show_message("HOB: Contacts on the rim, closing on the hull. Keep them off her."))
+		hud.set_hull(hull / max_hull if hull >= 0.0 else -1.0, _siege_label(siege.wave)))
+	siege.wave_started.connect(func(w: int, _total: int):
+		hud.set_hull(siege.hull / ShipSiege.MAX_HULL, _siege_label(w)))
+	siege.started.connect(func(index: int):
+		if index < Story.SIEGE.size():
+			voice.interrupt(Story.SIEGE[index]))
+	siege.ended.connect(func(success: bool):
+		if siege.last_ended != ShipSiege.FINALE:
+			voice.interrupt([Story.SIEGE_HELD if success else Story.SIEGE_LOST]))
 	Sfx.loop("wind_loop", null, -14.0)
 	for r in Campaign.REPAIRS:
 		var site: ExpeditionSite = get_node(String(r["site"]))
@@ -136,15 +161,25 @@ func _ready() -> void:
 	if not Game.pending_load.is_empty():
 		load_state(Game.pending_load)
 		Game.pending_load = {}
+	else:
+		voice.say(Story.OPENING)
 
 
 func _process(_delta: float) -> void:
+	if _cine_cam:
+		_cine_cam.look_at(kestrel.global_position + Vector3.UP * 2.0)
+	if ending_shown:
+		if Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("ui_cancel"):
+			get_tree().change_scene_to_file("res://scenes/title.tscn")
+		return
 	_interaction = _find_interaction()
 	hud.set_prompt(_interaction.get("label", ""))
 	if _interaction.has("action") and Input.is_action_just_pressed("interact") and not player.dead:
 		(_interaction["action"] as Callable).call()
-	elif Input.is_action_just_pressed("inventory") and not player.dead:
+	elif Input.is_action_just_pressed("inventory") and not player.dead and not Game.launched:
 		inventory.open()
+	elif Input.is_action_just_pressed("logs") and not player.dead and not Game.launched:
+		logs_panel.open_latest()
 	hud.set_waypoint(_waypoint())
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta
@@ -357,9 +392,14 @@ func _find_interaction() -> Dictionary:
 			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
 		return {"label": r["bay_label"]}
 	if current == "" and _near_install("launch"):
+		match finale.state:
+			Finale.State.READY:
+				return {"label": "[E] Launch Kestrel", "action": launch}
+			Finale.State.SPOOLING:
+				return {"label": "Pilot's seat: engine spooling, %d%%" % int(finale.progress() * 100.0)}
 		if siege.is_active():
-			return {"label": "Launch: clear them off the hull first"}
-		return {"label": "[E] Launch Kestrel", "action": launch}
+			return {"label": "Pilot's seat: clear them off the hull first"}
+		return {"label": "[E] Start the engine spool (90 seconds, and they will come)", "action": finale.start}
 	if _near_install("bunk"):
 		if siege.is_active():
 			return {"label": "Bunk: no time to rest with them on the hull"}
@@ -382,6 +422,7 @@ func _take_component(id: String) -> void:
 	var site: ExpeditionSite = sites[id]
 	site.take_component()
 	Game.take_component(site.component_id)
+	Game.find_log(Story.log_at(id, "component"))
 	# Taking it stirs the wildlife: an ambush at the site, and on the way home for the first one.
 	var ambush := site.ambush_points()
 	for i in ambush.size():
@@ -403,6 +444,7 @@ func _take_component(id: String) -> void:
 func _install(id: String) -> void:
 	Game.install_component()
 	kestrel.set_repaired(id, true)
+	voice.say(Story.INSTALLED.get(id, []))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -412,6 +454,7 @@ func _install(id: String) -> void:
 func _search_crate(site: Node3D, i: int) -> void:
 	var found: int = site.search_crate(i)
 	Game.add_scrap(found)
+	Game.find_log(Story.log_at(Campaign.by_component(site.component_id)["id"], "crate:%d" % i))
 	var extras: PackedStringArray = []
 	var limited := Game.ammo_weapons()
 	if not limited.is_empty() and randf() < 0.45:
@@ -437,19 +480,64 @@ func _resupply() -> void:
 	Sfx.play("rifle_reload", null, -2.0, 0.0)
 
 
-## Lifts off. The full departure sequence lives in a later milestone; this ends the run.
+## Lifts off once the spool is full: a cinematic camera watches Kestrel rise, the Loom pulse
+## roll out underneath and miss, and the climb into the steam. Then the ending card.
 func launch() -> void:
-	if Game.current_repair() != "" or Game.launched or siege.is_active():
+	if Game.current_repair() != "" or Game.launched or finale.state != Finale.State.READY:
 		return
+	finale.begin_launch()
 	Game.launch()
-	hud.show_ending()
+	voice.interrupt(Story.LAUNCH)
+	hud.enter_cinematic()
 	for e in get_tree().get_nodes_in_group("enemies"):
 		e.calm()
 	player.visible = false
 	player.set_physics_process(false)
-	var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(kestrel, "position:y", kestrel.position.y + 80.0, 8.0)
+	var nose := -kestrel.global_basis.x
+	var side := kestrel.global_basis.z
+	_cine_cam = Camera3D.new()
+	_cine_cam.fov = 62.0
+	add_child(_cine_cam)
+	_cine_cam.global_position = kestrel.global_position + side * 34.0 + nose * 14.0 + Vector3.UP * 3.0
+	_cine_cam.current = true
+	var lift := create_tween()
+	lift.tween_property(kestrel, "position:y", kestrel.position.y + 6.0, LIFT_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	lift.tween_callback(_loom_misses)
+	lift.tween_property(kestrel, "rotation:z", -0.3, 1.2).set_trans(Tween.TRANS_SINE)
+	lift.parallel().tween_property(kestrel, "position", kestrel.position + Vector3.UP * 6.0 + nose * 160.0 + Vector3.UP * 90.0, CLIMB_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	lift.tween_callback(_show_ending)
 	Sfx.play("power_up")
+
+
+## The top bar's caption during an assault: the wave count, or the spool in the finale.
+func _siege_label(wave_index: int) -> String:
+	if siege.active == ShipSiege.FINALE:
+		return finale.bar_text()
+	return "WAVE %d / %d" % [wave_index + 1, siege.waves_in(maxi(siege.active, 0))]
+
+
+## The Loom's beat arrives a moment after lift-off and rolls under her.
+func _loom_misses() -> void:
+	var pulse := LoomPulse.new()
+	pulse.one_shot = true
+	pulse.damage = 0.0
+	pulse.knockback = 0.0
+	pulse.speed = 40.0
+	pulse.max_radius = 150.0
+	pulse.ring_height = 2.0
+	add_child(pulse)
+	pulse.global_position = Vector3(kestrel.global_position.x, 0.2, kestrel.global_position.z)
+	pulse.fire()
+	Sfx.play("loom_hum", null, 0.0, 0.0)
+
+
+func _show_ending() -> void:
+	Game.find_log(Story.ORBIT_LOG["id"])
+	var text := "\n\n".join(Story.ENDING)
+	text += "\n\n\"%s\"" % Story.ORBIT_LOG["text"]
+	text += "\n\nHARD LANDING\n\nPress E to return to the title"
+	hud.show_ending(text)
+	ending_shown = true
 
 
 func _waypoint():

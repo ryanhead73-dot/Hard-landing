@@ -66,7 +66,7 @@ func _physics_process(delta: float) -> void:
 		_fire(aim)
 
 
-func _valid(t: Node3D) -> bool:
+func _valid(t) -> bool:
 	return t != null and is_instance_valid(t) and t.is_in_group("enemies") and t.global_position.distance_to(global_position) < turret_range
 
 

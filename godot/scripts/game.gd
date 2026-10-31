@@ -10,6 +10,7 @@ signal message(text: String)
 signal settings_changed
 signal repairs_changed
 signal inventory_changed
+signal log_found(id: String)
 
 ## Physics layer bits shared by every script.
 const LAYER_WORLD := 1
@@ -56,6 +57,10 @@ var upgrades: Dictionary = {}
 ## Mirrors Kestrel's repair states (id -> true), so dev toggles drive the campaign too.
 var repaired: Dictionary = {}
 var launched := false
+## Set by the finale while it runs (the launch phase has steps of its own).
+var launch_objective := ""
+## Story logs found, in the order they were found.
+var logs: Array[String] = []
 ## Owned weapons, and ammo per weapon: id -> [in magazine, reserve] (reserve -1 is unlimited).
 var weapons: Array[String] = ["rifle"]
 var ammo: Dictionary = {}
@@ -105,6 +110,8 @@ func reset() -> void:
 	weapons = ["rifle"]
 	ammo = {"rifle": [Weapon.SPECS["rifle"]["mag"], -1]}
 	stims = 1
+	logs.clear()
+	launch_objective = ""
 	inventory_changed.emit()
 	repairs_changed.emit()
 	scrap_changed.emit(scrap)
@@ -144,6 +151,7 @@ func session_state() -> Dictionary:
 		"weapons": weapons.duplicate(),
 		"ammo": ammo.duplicate(true),
 		"stims": stims,
+		"logs": logs.duplicate(),
 	}
 
 
@@ -164,6 +172,7 @@ func apply_session(data: Dictionary) -> void:
 		var pair: Array = saved_ammo.get(w, [Weapon.SPECS[w]["mag"], Weapon.SPECS[w]["reserve_max"]])
 		ammo[w] = [int(pair[0]), int(pair[1])]
 	stims = int(data.get("stims", 1))
+	logs.assign(data.get("logs", []).filter(func(id): return not Story.get_log(String(id)).is_empty()))
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
@@ -383,6 +392,20 @@ func install_component() -> void:
 	Sfx.play("power_up")
 
 
+## Records a story log. Returns true if it's new.
+func find_log(id: String) -> bool:
+	if id == "" or id in logs or Story.get_log(id).is_empty():
+		return false
+	logs.append(id)
+	log_found.emit(id)
+	inventory_changed.emit()
+	return true
+
+
+func has_log(id: String) -> bool:
+	return id in logs
+
+
 func launch() -> void:
 	launched = true
 	objective_changed.emit(objective_text())
@@ -395,5 +418,5 @@ func objective_text() -> String:
 		"return":
 			return Campaign.get_repair(current_repair())["return"]
 		"launch":
-			return "Take the pilot's seat and launch"
+			return launch_objective if launch_objective != "" else "Start the engine spool from the pilot's seat"
 	return "Kestrel is away"
