@@ -32,6 +32,7 @@ func _run() -> void:
 	await _crates()
 	await _engines()
 	await _compass()
+	await _day_cycle()
 	finished = true
 
 
@@ -152,3 +153,19 @@ func _compass() -> void:
 	await _frames(3)
 	var east: float = main.hud.compass_heading()
 	_check("compass reads north and east", (north < 5.0 or north > 355.0) and absf(east - 90.0) < 5.0, "north=%.0f east=%.0f" % [north, east])
+
+
+func _day_cycle() -> void:
+	var L: float = main.DAY_LENGTH
+	_check("the day starts in daylight and reaches full dusk", main.daylight_at(0.0) == 0.0 and main.daylight_at(L * 0.675) > 0.99 and main.daylight_at(L * 0.99) < 0.05)
+	var t0: float = main.day_time
+	await get_tree().create_timer(0.6).timeout
+	_check("the day moves on", main.day_time > t0)
+	main.set_daylight(0.5)
+	var sun: DirectionalLight3D = main._sun
+	_check("dusk comes in gradually", absf(sun.light_energy - 0.625) < 0.01 and not main.dusk)
+	main.set_daylight(1.0)
+	_check("full dusk is dim amber", sun.light_energy < 0.3 and main.dusk and main.site._moss_mat.emission_energy_multiplier > 2.9)
+	main.day_time = L * 0.5
+	_check("the time of day is saved", is_equal_approx(float(main.save_state()["day_time"]), L * 0.5))
+	main.set_daylight(0.0)

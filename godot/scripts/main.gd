@@ -39,6 +39,8 @@ const KEYS := {
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
 const CLIMB_TIME := 7.0
+## A full day: noon, through dusk and back. Mostly day, with a long amber dusk in the middle.
+const DAY_LENGTH := 1200.0
 ## The crash intro: Kestrel's last approach, the impact, the slide, a beat of quiet.
 const INTRO_FALL := 3.4
 const INTRO_SLIDE := 1.6
@@ -80,6 +82,11 @@ var _intro_rest: Transform3D
 var _intro_smoke: Array = []
 var _shake := 0.0
 var dusk := false
+## 0 = full day, 1 = full dusk. The basin drifts between them over DAY_LENGTH seconds.
+var daylight := 0.0
+## Seconds into the day cycle (saved).
+var day_time := 0.0
+var day_cycle := true
 var dev_panel := false
 
 var _env: Environment
@@ -88,6 +95,7 @@ var _sun: DirectionalLight3D
 var _interaction: Dictionary = {}
 var _ship_hum: Node
 var _pack_check := 0.0
+var _daylight_check := 0.0
 
 
 func _ready() -> void:
@@ -191,6 +199,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if day_cycle:
+		day_time = fmod(day_time + _delta, DAY_LENGTH)
+		_daylight_check -= _delta
+		if _daylight_check <= 0.0:
+			_daylight_check = 0.5
+			set_daylight(daylight_at(day_time))
 	if _cine_cam:
 		_cine_cam.look_at(kestrel.global_position + Vector3.UP * 2.0)
 		if _shake > 0.0:
@@ -238,6 +252,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key >= KEY_1 and key <= KEY_7:
 		kestrel.toggle_repair(Kestrel.REPAIR_ORDER[key - KEY_1])
 	elif key == KEY_N:
+		day_cycle = false
 		_set_dusk(not dusk)
 	elif key == KEY_K:
 		Game.add_scrap(50)
@@ -345,7 +360,17 @@ func save_state() -> Dictionary:
 	# A siege in progress comes back as one waiting to happen.
 	data["siege_pending"] = siege.active if siege.is_active() else siege.pending
 	data["weapon"] = player.weapon.current
+	data["day_time"] = day_time
 	return data
+
+
+## How far into dusk the basin is at `t` seconds into the cycle: day for the first third, then a
+## slow fall into dusk and back out.
+static func daylight_at(t: float) -> float:
+	var x := fposmod(t, DAY_LENGTH) / DAY_LENGTH
+	if x < 0.35:
+		return 0.0
+	return smoothstep(0.0, 1.0, sin((x - 0.35) / 0.65 * PI))
 
 
 func save_game() -> bool:
@@ -368,6 +393,8 @@ func load_state(data: Dictionary) -> void:
 	if pending >= 0:
 		siege.arm(pending)
 	player.weapon.equip(String(data.get("weapon", "rifle")))
+	day_time = float(data.get("day_time", 0.0))
+	set_daylight(daylight_at(day_time))
 	player.revive(SPAWN, false)
 	_update_active_site()
 	Game.objective_changed.emit(Game.objective_text())
@@ -783,28 +810,25 @@ func _build_environment() -> void:
 
 
 ## Day keeps the basalt readable (bright sky, low sun). Dusk shows the amber interior as home.
+## Dev toggle (N): jumps to full day or full dusk and stops the cycle there.
 func _set_dusk(value: bool) -> void:
-	dusk = value
-	if dusk:
-		_sky.sky_top_color = Color("1d2733")
-		_sky.sky_horizon_color = Color("5b4a52")
-		_sky.ground_horizon_color = Color("2a2a30")
-		_sky.ground_bottom_color = Color("0e1012")
-		_sun.rotation_degrees = Vector3(-8.0, 60.0, 0.0)
-		_sun.light_color = Color("ff9a6a")
-		_sun.light_energy = 0.25
-		_env.ambient_light_energy = 0.3
-		_env.fog_light_color = Color("3a3540")
-		_env.fog_density = 0.004
-	else:
-		_sky.sky_top_color = Color("7d8a8f")
-		_sky.sky_horizon_color = Color("b7bfbd")
-		_sky.ground_horizon_color = Color("3c4448")
-		_sky.ground_bottom_color = Color("1b1d1f")
-		_sun.rotation_degrees = Vector3(-38.0, 35.0, 0.0)
-		_sun.light_color = Color("fff3e0")
-		_sun.light_energy = 1.0
-		_env.ambient_light_energy = 0.4
-		_env.fog_light_color = Color("8f9a9c")
-		_env.fog_density = 0.002
-	site.set_dusk(dusk)
+	set_daylight(1.0 if value else 0.0)
+
+
+## Blends the basin between day (0) and dusk (1): sky, sun angle and colour, ambient light, fog,
+## and the moss glow, which comes up as the light goes.
+func set_daylight(amount: float) -> void:
+	daylight = clampf(amount, 0.0, 1.0)
+	dusk = daylight > 0.5
+	var k := daylight
+	_sky.sky_top_color = Color("7d8a8f").lerp(Color("1d2733"), k)
+	_sky.sky_horizon_color = Color("b7bfbd").lerp(Color("5b4a52"), k)
+	_sky.ground_horizon_color = Color("3c4448").lerp(Color("2a2a30"), k)
+	_sky.ground_bottom_color = Color("1b1d1f").lerp(Color("0e1012"), k)
+	_sun.rotation_degrees = Vector3(-38.0, 35.0, 0.0).lerp(Vector3(-8.0, 60.0, 0.0), k)
+	_sun.light_color = Color("fff3e0").lerp(Color("ff9a6a"), k)
+	_sun.light_energy = lerpf(1.0, 0.25, k)
+	_env.ambient_light_energy = lerpf(0.4, 0.3, k)
+	_env.fog_light_color = Color("8f9a9c").lerp(Color("3a3540"), k)
+	_env.fog_density = lerpf(0.002, 0.004, k)
+	site.set_glow(k)

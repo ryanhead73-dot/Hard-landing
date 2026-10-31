@@ -58,7 +58,7 @@ A new game opens with Kestrel's crash (E, Space or Esc skips it).
 | F | Flashlight |
 | F1 | Dev panel |
 
-With the dev panel open: 1-7 toggle each repair (the campaign follows), N toggles day and dusk, K gives 50 scrap, T jumps to the current site's component and H jumps home. The panel also shows the camera boom length and says SQUEEZED when a wall pushes the camera in.
+The basin drifts from day into a long amber dusk and back over a 20 minute cycle, and the moss glows brighter as the light goes. With the dev panel open: 1-7 toggle each repair (the campaign follows), N jumps between day and dusk (and stops the cycle), K gives 50 scrap, T jumps to the current site's component and H jumps home. The panel also shows the camera boom length and says SQUEEZED when a wall pushes the camera in.
 
 ## What each repair changes
 
