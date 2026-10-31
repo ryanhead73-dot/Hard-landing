@@ -41,6 +41,8 @@ var _capsule: CapsuleShape3D
 var _flashlight: SpotLight3D
 ## Carried components on the back, by Campaign component id.
 var _packs: Dictionary = {}
+## Juno's model (see Rig): Hips, Spine, Chest, Head, ArmL/R, ForearmL/R, LegL/R, ShinL/R.
+var rig: Node3D
 var _since_damage := 99.0
 var _combat_face := 0.0
 var _plating_seen := 0
@@ -302,44 +304,18 @@ func _build_body() -> void:
 	_body = Node3D.new()
 	_body.name = "Body"
 	add_child(_body)
-	var suit := StandardMaterial3D.new()
-	suit.albedo_color = Color("4a5a66")
-	var torso := MeshInstance3D.new()
-	var capsule_mesh := CapsuleMesh.new()
-	capsule_mesh.radius = radius
-	capsule_mesh.height = stand_height
-	torso.mesh = capsule_mesh
-	torso.material_override = suit
-	torso.position.y = stand_height * 0.5
-	_body.add_child(torso)
-	var glow := StandardMaterial3D.new()
-	glow.albedo_color = Color("f2a93b")
-	glow.emission_enabled = true
-	glow.emission = Color("f2a93b")
-	var visor := MeshInstance3D.new()
-	var visor_mesh := BoxMesh.new()
-	visor_mesh.size = Vector3(0.4, 0.12, 0.12)
-	visor.mesh = visor_mesh
-	visor.material_override = glow
-	visor.position = Vector3(0.0, 1.58, -0.3)
-	_body.add_child(visor)
-	# Whatever component is being carried rides on the back.
+	rig = Rig.spawn("juno", _body)
+	# Whatever component is being carried rides on the life-support pack.
+	var mount := Rig.joint(rig, "PackMount")
 	for id in Campaign.PACKS:
+		var holder := Node3D.new()
+		holder.name = "Pack_%s" % id
 		var spec: Array = Campaign.PACKS[id]
-		var pack := MeshInstance3D.new()
-		pack.name = "Pack_%s" % id
-		var box := BoxMesh.new()
-		box.size = spec[0]
-		pack.mesh = box
-		var mat := glow.duplicate() as StandardMaterial3D
-		mat.albedo_color = spec[1]
-		mat.emission = spec[1]
-		mat.emission_energy_multiplier = spec[2]
-		pack.material_override = mat
-		pack.position = Vector3(0.0, 1.2, 0.3 + spec[0].z * 0.5)
-		pack.visible = false
-		_body.add_child(pack)
-		_packs[id] = pack
+		holder.position = Vector3(0.0, 0.0, 0.12 + spec[0].z * 0.5)
+		(mount if mount else _body).add_child(holder)
+		Rig.spawn(id, holder)
+		holder.visible = false
+		_packs[id] = holder
 
 
 func _on_carrying_changed(item: String) -> void:

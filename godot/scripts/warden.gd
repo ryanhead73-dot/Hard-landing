@@ -40,6 +40,7 @@ func _init() -> void:
 
 
 func _setup() -> void:
+	death_puff = 3.0
 	add_to_group("bosses")
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -243,54 +244,6 @@ func _die() -> void:
 func _build_visual() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	_shell = StandardMaterial3D.new()
-	_shell.albedo_color = Color("16181a")
-	_shell.roughness = 0.7
-	_flashes(_shell)
-	_core = _glow(Color("3fd1b5"), 1.0)
-	var carapace := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 1.8
-	sphere.height = 2.4
-	sphere.radial_segments = 9
-	sphere.rings = 5
-	carapace.mesh = sphere
-	carapace.material_override = _shell
-	carapace.position.y = 1.6
-	carapace.scale = Vector3(1.0, 1.0, 1.35)
-	_visual.add_child(carapace)
-	var core := MeshInstance3D.new()
-	var core_mesh := SphereMesh.new()
-	core_mesh.radius = 0.6
-	core_mesh.height = 1.2
-	core.mesh = core_mesh
-	core.material_override = _core
-	core.position = Vector3(0.0, 2.6, 0.8)
-	_visual.add_child(core)
-	for i in 7:
-		var spine := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.18, 0.7, 0.18)
-		spine.mesh = box
-		spine.material_override = _core
-		spine.position = Vector3(0.0, 2.9, -1.6 + i * 0.5)
-		spine.rotation.x = -0.4
-		_visual.add_child(spine)
-	for side in [-1.0, 1.0]:
-		for j in 3:
-			var leg := MeshInstance3D.new()
-			var leg_mesh := BoxMesh.new()
-			leg_mesh.size = Vector3(1.6, 0.2, 0.2)
-			leg.mesh = leg_mesh
-			leg.material_override = _shell
-			leg.position = Vector3(1.6 * side, 0.7, -1.0 + j * 1.0)
-			leg.rotation.z = 0.6 * side
-			_visual.add_child(leg)
-		var eye := MeshInstance3D.new()
-		var eye_mesh := SphereMesh.new()
-		eye_mesh.radius = 0.16
-		eye_mesh.height = 0.32
-		eye.mesh = eye_mesh
-		eye.material_override = _core
-		eye.position = Vector3(0.5 * side, 1.7, -2.3)
-		_visual.add_child(eye)
+	_load_rig("warden", _visual)
+	_core = Rig.own_material(_rig, "warden_core")
+	_shell = Rig.own_material(_rig, "warden_shell")

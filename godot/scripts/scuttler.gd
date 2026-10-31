@@ -153,46 +153,6 @@ func _animate(delta: float) -> void:
 func _build_visual() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	_shell = StandardMaterial3D.new()
-	_shell.albedo_color = Color("1e2124")
-	_shell.roughness = 0.9
-	_flashes(_shell)
-	_glow_mat = _glow(Color("3fd1b5"), 0.8)
-	var carapace := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.6
-	sphere.height = 0.8
-	sphere.radial_segments = 7
-	sphere.rings = 4
-	carapace.mesh = sphere
-	carapace.material_override = _shell
-	carapace.position.y = 0.55
-	carapace.scale = Vector3(1.0, 1.0, 1.3)
-	_visual.add_child(carapace)
-	for i in 4:
-		var spine := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.08, 0.25, 0.08)
-		spine.mesh = box
-		spine.material_override = _glow_mat
-		spine.position = Vector3(0.0, 0.92, -0.35 + i * 0.25)
-		spine.rotation.x = -0.4
-		_visual.add_child(spine)
-	for side in [-1.0, 1.0]:
-		var eye := MeshInstance3D.new()
-		var eye_mesh := SphereMesh.new()
-		eye_mesh.radius = 0.06
-		eye_mesh.height = 0.12
-		eye.mesh = eye_mesh
-		eye.material_override = _glow_mat
-		eye.position = Vector3(0.18 * side, 0.6, -0.75)
-		_visual.add_child(eye)
-		for j in 3:
-			var leg := MeshInstance3D.new()
-			var leg_mesh := BoxMesh.new()
-			leg_mesh.size = Vector3(0.6, 0.07, 0.07)
-			leg.mesh = leg_mesh
-			leg.material_override = _shell
-			leg.position = Vector3(0.55 * side, 0.3, -0.35 + j * 0.35)
-			leg.rotation.z = 0.5 * side
-			_visual.add_child(leg)
+	_load_rig("scuttler", _visual)
+	_glow_mat = Rig.own_material(_rig, "moss_glow")
+	_shell = Rig.own_material(_rig, "scuttler_shell")

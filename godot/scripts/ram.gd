@@ -35,6 +35,7 @@ func _init() -> void:
 
 
 func _setup() -> void:
+	death_puff = 1.6
 	_wander = home
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -198,44 +199,6 @@ func _die() -> void:
 func _build_visual() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	_hide = StandardMaterial3D.new()
-	_hide.albedo_color = Color("202326")
-	_hide.roughness = 0.9
-	_flashes(_hide)
-	var plate := StandardMaterial3D.new()
-	plate.albedo_color = Color("4a5257")
-	plate.roughness = 0.6
-	plate.metallic = 0.2
-	_crest = _glow(Color("3fd1b5"), 0.6)
-	var body := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(1.4, 1.1, 2.2)
-	body.mesh = box
-	body.material_override = _hide
-	body.position.y = 0.95
-	_visual.add_child(body)
-	var head := MeshInstance3D.new()
-	var head_mesh := BoxMesh.new()
-	head_mesh.size = Vector3(1.6, 1.2, 0.5)
-	head.mesh = head_mesh
-	head.material_override = plate
-	head.position = Vector3(0.0, 0.85, -1.25)
-	head.rotation.x = 0.25
-	_visual.add_child(head)
-	for x in [-0.4, 0.0, 0.4]:
-		var vent := MeshInstance3D.new()
-		var vent_mesh := BoxMesh.new()
-		vent_mesh.size = Vector3(0.18, 0.12, 1.4)
-		vent.mesh = vent_mesh
-		vent.material_override = _crest
-		vent.position = Vector3(x, 1.55, 0.2)
-		_visual.add_child(vent)
-	for side in [-1.0, 1.0]:
-		for z in [-0.7, 0.7]:
-			var leg := MeshInstance3D.new()
-			var leg_mesh := BoxMesh.new()
-			leg_mesh.size = Vector3(0.3, 0.7, 0.3)
-			leg.mesh = leg_mesh
-			leg.material_override = _hide
-			leg.position = Vector3(0.55 * side, 0.35, z)
-			_visual.add_child(leg)
+	_load_rig("ram", _visual)
+	_crest = Rig.own_material(_rig, "moss_glow")
+	_hide = Rig.own_material(_rig, "ram_hide")

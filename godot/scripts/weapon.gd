@@ -42,6 +42,7 @@ var in_mag: int:
 var _cooldown := 0.0
 var _reload_left := 0.0
 var _muzzle: Node3D
+var _star: MeshInstance3D
 var _flash: OmniLight3D
 var _tracer_mat: StandardMaterial3D
 var _beam_mat: StandardMaterial3D
@@ -49,7 +50,6 @@ var _models: Dictionary = {}
 
 
 func _ready() -> void:
-	_build_models()
 	_muzzle = Node3D.new()
 	_muzzle.position = Vector3(0.0, 0.01, -0.48)
 	add_child(_muzzle)
@@ -59,6 +59,9 @@ func _ready() -> void:
 	_flash.omni_range = 4.0
 	_flash.visible = false
 	_muzzle.add_child(_flash)
+	_star = Vfx.muzzle_star(Color("ffc070"))
+	_muzzle.add_child(_star)
+	_build_models()
 	_tracer_mat = _glow_mat(Color("ffd08a"), Color("ffb24d"), 4.0)
 	_beam_mat = _glow_mat(Color("bfeeff"), Color("7fd6ff"), 7.0)
 	Game.upgrades_changed.connect(_on_upgrades_changed)
@@ -249,23 +252,13 @@ func _on_upgrades_changed() -> void:
 # --- Visuals ------------------------------------------------------------------------------
 
 func _build_models() -> void:
-	var metal := _plain(Color("24282b"), 0.6, 0.45)
-	var stripe := _plain(Color("c4622d"), 0.0, 0.8)
-	var steel := _plain(Color("9aa0a3"), 0.8, 0.35)
-	var rifle := _model("rifle")
-	_part(rifle, Vector3(0.08, 0.11, 0.72), Vector3(0.0, 0.0, -0.1), metal)
-	_part(rifle, Vector3(0.06, 0.16, 0.12), Vector3(0.0, -0.11, 0.06), metal)
-	_part(rifle, Vector3(0.085, 0.03, 0.3), Vector3(0.0, 0.06, -0.12), stripe)
-	var scatter := _model("scattergun")
-	_part(scatter, Vector3(0.12, 0.13, 0.55), Vector3(0.0, 0.0, -0.05), metal)
-	_part(scatter, Vector3(0.1, 0.06, 0.4), Vector3(0.0, -0.08, -0.2), steel)
-	_part(scatter, Vector3(0.07, 0.17, 0.12), Vector3(0.0, -0.12, 0.12), metal)
-	_part(scatter, Vector3(0.125, 0.035, 0.2), Vector3(0.0, 0.08, 0.0), stripe)
-	var lance := _model("arc_lance")
-	_part(lance, Vector3(0.1, 0.12, 0.85), Vector3(0.0, 0.0, -0.15), steel)
-	_part(lance, Vector3(0.06, 0.16, 0.12), Vector3(0.0, -0.12, 0.08), metal)
-	for z in [-0.35, -0.2, -0.05]:
-		_part(lance, Vector3(0.14, 0.14, 0.04), Vector3(0.0, 0.0, z), _glow_mat(Color("bfeeff"), Color("7fd6ff"), 2.0))
+	for id in ORDER:
+		var holder := _model(id)
+		var rig := Rig.spawn(id, holder)
+		# Line each model's muzzle up with the shared muzzle point, so tracers leave the barrel.
+		var tip := Rig.joint(rig, "Muzzle")
+		if tip:
+			rig.position = _muzzle.position - rig.to_local(tip.global_position)
 
 
 func _model(id: String) -> Node3D:
@@ -281,24 +274,6 @@ func _show_model() -> void:
 		_models[id].visible = id == current
 
 
-func _part(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> void:
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
-	mesh.material_override = mat
-	mesh.position = pos
-	parent.add_child(mesh)
-
-
-func _plain(color: Color, metallic: float, roughness: float) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.metallic = metallic
-	m.roughness = roughness
-	return m
-
-
 func _glow_mat(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = albedo
@@ -312,9 +287,13 @@ func _glow_mat(albedo: Color, emission: Color, energy: float) -> StandardMateria
 func _show_flash() -> void:
 	_flash.light_color = Color("9fd8ff") if current == "arc_lance" else Color("ffc070")
 	_flash.visible = true
+	_star.visible = true
+	_star.rotation.z = randf() * TAU
+	_star.scale = Vector3.ONE * (1.6 if current == "scattergun" else 1.0)
 	await get_tree().create_timer(0.04).timeout
 	if is_instance_valid(_flash):
 		_flash.visible = false
+		_star.visible = false
 
 
 func _tracer(from: Vector3, to: Vector3) -> void:

@@ -67,6 +67,7 @@ func _physics_process(delta: float) -> void:
 	if not _said_late and spool >= SPOOL_TIME - 10.0:
 		_said_late = true
 		voice.say_line(Story.FINALE_LATE)
+	siege.kestrel.set_engine_power(0.15 + 0.45 * progress())
 	if spool >= SPOOL_TIME:
 		spool = SPOOL_TIME
 		_set_state(State.READY)
@@ -80,6 +81,7 @@ func _on_siege_ended(success: bool) -> void:
 	if state != State.SPOOLING or success:
 		return
 	spool = 0.0
+	siege.kestrel.set_engine_power(0.0)
 	_set_state(State.IDLE)
 	voice.interrupt([Story.FINALE_FAILED])
 

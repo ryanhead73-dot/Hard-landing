@@ -164,43 +164,6 @@ func _die() -> void:
 func _build_visual() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	_body_mat = StandardMaterial3D.new()
-	_body_mat.albedo_color = Color("2a2f2c")
-	_body_mat.roughness = 0.85
-	_flashes(_body_mat)
-	_sac = _glow(Color("b4e05a"), 1.0)
-	var body := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.4
-	capsule.height = 1.4
-	body.mesh = capsule
-	body.material_override = _body_mat
-	body.position.y = 0.9
-	body.rotation.x = -0.35
-	_visual.add_child(body)
-	var sac := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.3
-	sphere.height = 0.5
-	sac.mesh = sphere
-	sac.material_override = _sac
-	sac.position = Vector3(0.0, 1.35, 0.15)
-	_visual.add_child(sac)
-	for side in [-1.0, 1.0]:
-		for j in 2:
-			var leg := MeshInstance3D.new()
-			var leg_mesh := BoxMesh.new()
-			leg_mesh.size = Vector3(0.07, 0.9, 0.07)
-			leg.mesh = leg_mesh
-			leg.material_override = _body_mat
-			leg.position = Vector3(0.35 * side, 0.4, -0.2 + j * 0.4)
-			leg.rotation.z = -0.35 * side
-			_visual.add_child(leg)
-	var mouth := MeshInstance3D.new()
-	var mouth_mesh := SphereMesh.new()
-	mouth_mesh.radius = 0.1
-	mouth_mesh.height = 0.2
-	mouth.mesh = mouth_mesh
-	mouth.material_override = _sac
-	mouth.position = Vector3(0.0, 1.45, -0.5)
-	_visual.add_child(mouth)
+	_load_rig("spitter", _visual)
+	_sac = Rig.own_material(_rig, "acid_sac")
+	_body_mat = Rig.own_material(_rig, "spitter_hide")

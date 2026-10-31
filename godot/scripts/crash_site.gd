@@ -245,6 +245,11 @@ func _mat(color: Color, roughness: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = roughness
+	# Stone gets basalt columns; the cream and oxide debris gets hull panelling.
+	if color.get_luminance() < 0.5 and color.s < 0.4:
+		Surfaces.apply_basalt(m)
+	else:
+		Surfaces.apply_hull(m, 3.0)
 	return m
 
 
