@@ -17,6 +17,7 @@ var siege: ShipSiege
 var voice: Voice
 var hud: Hud
 
+var _spool_sound: AudioStreamPlayer3D
 var _said_half := false
 var _said_late := false
 
@@ -68,6 +69,8 @@ func _physics_process(delta: float) -> void:
 		_said_late = true
 		voice.say_line(Story.FINALE_LATE)
 	siege.kestrel.set_engine_power(0.15 + 0.45 * progress())
+	if _spool_sound:
+		_spool_sound.pitch_scale = 0.6 + 0.8 * progress()
 	if spool >= SPOOL_TIME:
 		spool = SPOOL_TIME
 		_set_state(State.READY)
@@ -96,6 +99,16 @@ const OBJECTIVES := {
 
 func _set_state(s: State) -> void:
 	state = s
+	# The spool whine rises with the spool, holds while she's ready, and gives way to the launch.
+	if s == State.SPOOLING and _spool_sound == null:
+		_spool_sound = Sfx.loop("spool_loop", siege.kestrel, 2.0) as AudioStreamPlayer3D
+		if _spool_sound:
+			_spool_sound.max_distance = 120.0
+			_spool_sound.unit_size = 14.0
+			_spool_sound.pitch_scale = 0.6
+	elif (s == State.IDLE or s == State.LAUNCHING) and _spool_sound:
+		_spool_sound.queue_free()
+		_spool_sound = null
 	Game.launch_objective = OBJECTIVES[s]
 	Game.objective_changed.emit(Game.objective_text())
 	state_changed.emit(s)

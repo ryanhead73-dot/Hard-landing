@@ -138,7 +138,7 @@ func _choose_attack(dist: float) -> void:
 
 func _slam() -> void:
 	_anim("slam")
-	Sfx.play("rock_impact", global_position, 6.0, 0.0)
+	Sfx.play("warden_slam", global_position, 6.0, 0.0)
 	var ring := LoomPulse.new()
 	ring.one_shot = true
 	ring.period = 999.0

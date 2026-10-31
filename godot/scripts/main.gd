@@ -68,6 +68,8 @@ var siege: ShipSiege
 var voice: Voice
 var logs_panel: LogPanel
 var finale: Finale
+var music: MusicDirector
+var ambience: Ambience
 ## True once the ending card is up; interact then returns to the title.
 var ending_shown := false
 var _cine_cam: Camera3D
@@ -133,7 +135,9 @@ func _ready() -> void:
 	voice = Voice.new()
 	voice.hud = hud
 	add_child(voice)
-	Game.log_found.connect(func(id: String): hud.show_log_toast(Story.get_log(id)["title"]))
+	Game.log_found.connect(func(id: String):
+		hud.show_log_toast(Story.get_log(id)["title"])
+		Sfx.play("log_chime", null, -6.0, 0.0))
 	siege = ShipSiege.new()
 	siege.kestrel = kestrel
 	siege.player = player
@@ -154,7 +158,14 @@ func _ready() -> void:
 	siege.ended.connect(func(success: bool):
 		if siege.last_ended != ShipSiege.FINALE:
 			voice.interrupt([Story.SIEGE_HELD if success else Story.SIEGE_LOST]))
-	Sfx.loop("wind_loop", null, -14.0)
+	music = MusicDirector.new()
+	music.name = "Music"
+	add_child(music)
+	music.setup(self)
+	ambience = Ambience.new()
+	ambience.name = "Ambience"
+	add_child(ambience)
+	ambience.setup(self)
 	for r in Campaign.REPAIRS:
 		var site: ExpeditionSite = get_node(String(r["site"]))
 		sites[r["id"]] = site
@@ -467,6 +478,7 @@ func _install(id: String) -> void:
 	Game.install_component()
 	kestrel.set_repaired(id, true)
 	kestrel.play_repair(id)
+	Sfx.play("repair_clunk", (kestrel.repairs[id] as Node3D).global_position, 2.0, 0.0)
 	player.anim.play("install")
 	voice.say(Story.INSTALLED.get(id, []))
 	# A working ship runs hot, and the heat draws the wildlife in.
@@ -532,7 +544,7 @@ func launch() -> void:
 	lift.tween_property(kestrel, "rotation:z", -0.3, 1.2).set_trans(Tween.TRANS_SINE)
 	lift.parallel().tween_property(kestrel, "position", kestrel.position + Vector3.UP * 6.0 + nose * 160.0 + Vector3.UP * 90.0, CLIMB_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	lift.tween_callback(_show_ending)
-	Sfx.play("power_up")
+	Sfx.play("launch_roar", null, 2.0, 0.0)
 
 
 ## New game: Kestrel comes down. She streaks in trailing smoke along the furrow, hits, throws up
@@ -572,7 +584,7 @@ func _intro_impact() -> void:
 	_shake = 1.0
 	kestrel.set_engine_power(0.0)
 	Vfx.dust(self, Vector3(kestrel.global_position.x, 0.5, kestrel.global_position.z), 1.6)
-	Sfx.play("rock_impact", null, 6.0, 0.0)
+	Sfx.play("crash_impact", null, 4.0, 0.0)
 
 
 ## Ends the intro (or skips it): Kestrel at her crash site, Juno in control, the opening lines.

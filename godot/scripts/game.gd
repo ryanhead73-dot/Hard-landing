@@ -48,6 +48,7 @@ const SAVE_VERSION := 1
 var mouse_sensitivity := 0.0025
 var invert_y := false
 var master_volume := 0.8
+var music_volume := 0.7
 var difficulty := 1
 
 var scrap := 0
@@ -85,8 +86,19 @@ func load_settings() -> void:
 		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
+		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 	apply_settings()
+
+
+## Music and Ambience buses, both feeding Master, so music has its own volume setting.
+static func ensure_buses() -> void:
+	for bus_name in ["Music", "Ambience"]:
+		if AudioServer.get_bus_index(bus_name) == -1:
+			AudioServer.add_bus()
+			var i := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(i, bus_name)
+			AudioServer.set_bus_send(i, "Master")
 
 
 func save_settings() -> void:
@@ -94,12 +106,15 @@ func save_settings() -> void:
 	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("controls", "invert_y", invert_y)
 	cfg.set_value("audio", "master_volume", master_volume)
+	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.save(SETTINGS_PATH)
 
 
 func apply_settings() -> void:
+	ensure_buses()
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
 	settings_changed.emit()
 
 

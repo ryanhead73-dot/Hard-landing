@@ -14,7 +14,8 @@ func _ready() -> void:
 	Game.reset()
 	_build_scene()
 	_build_menu()
-	Sfx.loop("wind_loop", null, -14.0)
+	Sfx.loop_flat("wind_loop", self, -14.0, "Ambience")
+	Sfx.loop_flat("music_calm", self, -10.0, "Music")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
@@ -116,6 +117,7 @@ func _button(parent: Node, text: String, action: Callable) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(260, 44)
 	b.add_theme_font_size_override("font_size", 20)
+	b.pressed.connect(func(): Sfx.play("ui_click", null, -4.0, 0.0))
 	b.pressed.connect(action)
 	parent.add_child(b)
 	return b

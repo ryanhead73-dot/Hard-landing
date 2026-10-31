@@ -81,4 +81,4 @@ Characters are rigid-part rigs built in Blender (separate limb meshes under a bo
 
 ## Where things stand
 
-Progress: M1 merged in PR #6; M2 merged in PR #7; M3 merged in PR #8; M4 merged in PR #9; M5 in the animation PR (procedural animation in code rather than AnimationPlayer clips, since the rigs are rigid parts). M4 deferred: Kestrel's hull and the repair parts stay generated CSG (now panelled and textured) rather than Blender meshes, and there is no day/dusk cycle yet; revisit after M6. Progress is tracked in project memory and the project thread. Each milestone's PR links back to this plan.
+Progress: M1 merged in PR #6; M2 merged in PR #7; M3 merged in PR #8; M4 merged in PR #9; M5 merged in PR #10 (procedural animation in code rather than AnimationPlayer clips, since the rigs are rigid parts); M6 in the audio and build PR. M4 deferred: Kestrel's hull and the repair parts stay generated CSG (now panelled and textured) rather than Blender meshes, and there is no day/dusk cycle yet; revisit after M6. Progress is tracked in project memory and the project thread. Each milestone's PR links back to this plan.

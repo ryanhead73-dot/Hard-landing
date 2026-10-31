@@ -9,6 +9,7 @@ var _panel: PanelContainer
 var _sensitivity: HSlider
 var _invert: CheckBox
 var _volume: HSlider
+var _music: HSlider
 var _difficulty: OptionButton
 
 
@@ -41,6 +42,7 @@ func _ready() -> void:
 	_invert.button_pressed = Game.invert_y
 	box.add_child(_invert)
 	_volume = _slider(box, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
+	_music = _slider(box, "Music", 0.0, 1.0, 0.05, Game.music_volume)
 	var diff_label := Label.new()
 	diff_label.text = "Difficulty"
 	box.add_child(diff_label)
@@ -71,6 +73,9 @@ func _ready() -> void:
 	_sensitivity.value_changed.connect(_on_sensitivity)
 	_invert.toggled.connect(_on_invert)
 	_volume.value_changed.connect(_on_volume)
+	_music.value_changed.connect(func(v: float):
+		Game.music_volume = v
+		Game.apply_settings())
 	visible = false
 
 
