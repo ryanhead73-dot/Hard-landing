@@ -87,6 +87,7 @@ func _ready() -> void:
 	player.name = "Player"
 	add_child(player)
 	player.revive(SPAWN)
+	Vfx.motes(player)
 
 	hud = Hud.new()
 	add_child(hud)
@@ -500,6 +501,7 @@ func launch() -> void:
 	add_child(_cine_cam)
 	_cine_cam.global_position = kestrel.global_position + side * 34.0 + nose * 14.0 + Vector3.UP * 3.0
 	_cine_cam.current = true
+	kestrel.set_engine_power(1.0)
 	var lift := create_tween()
 	lift.tween_property(kestrel, "position:y", kestrel.position.y + 6.0, LIFT_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	lift.tween_callback(_loom_misses)
@@ -657,6 +659,15 @@ func _build_environment() -> void:
 	_env.glow_enabled = true
 	_env.glow_intensity = 0.6
 	_env.fog_enabled = true
+	# Steam hangs low over the wetlands: fog thickens toward the ground.
+	_env.fog_height = 3.0
+	_env.fog_height_density = 0.04
+	_env.fog_sun_scatter = 0.15
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.08
+	_env.adjustment_saturation = 1.1
+	_env.glow_bloom = 0.05
+	_env.glow_hdr_threshold = 0.9
 	# Volumetric fog stays at zero density globally; it lets local FogVolumes (spore fog) render.
 	_env.volumetric_fog_enabled = true
 	_env.volumetric_fog_density = 0.0

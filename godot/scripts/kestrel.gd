@@ -82,6 +82,9 @@ var interact_points: Dictionary = {}
 
 var _length := 33.0
 var _centre_z := 13.0
+## Current exhaust power (see set_engine_power).
+var engine_power := 0.0
+var _exhausts: Array[CPUParticles3D] = []
 var _mats: Dictionary = {}
 var _aux_lights: Array[OmniLight3D] = []
 var _emergency_lights: Array[OmniLight3D] = []
@@ -611,6 +614,19 @@ func _wing(parent: Node, outline: Array, mat_id: String) -> CSGPolygon3D:
 	return poly
 
 
+## Exhaust from both nacelles: 0 is off, 1 is full lift-off thrust.
+func set_engine_power(power: float) -> void:
+	if _exhausts.is_empty():
+		for zc in [18.4, 7.6]:
+			_exhausts.append(Vfx.exhaust(self, plan(33.7, 1.9, zc), Vector3.RIGHT))
+	for e in _exhausts:
+		e.emitting = power > 0.01
+		e.initial_velocity_min = 3.0 + 12.0 * power
+		e.initial_velocity_max = 5.0 + 18.0 * power
+		e.scale_amount_max = 0.4 + 1.2 * power
+	engine_power = power
+
+
 func _engine(parent: Node, zc: float, mat_id: String, length: float) -> void:
 	var xc := 33.5 - length * 0.5
 	_cyl(parent, Vector3(xc, 1.9, zc), 1.0, length, "x", mat_id)
@@ -692,5 +708,9 @@ func _mat(id: String) -> StandardMaterial3D:
 			m.albedo_color = PALETTE.get(id, Color.MAGENTA)
 			m.roughness = 0.85 if id in ["hull", "panel", "fabric", "crate", "oxide"] else 0.5
 			m.metallic = 0.6 if id in ["metal", "metal_dark", "bare_metal", "salvage"] else 0.0
+			if id in ["hull", "oxide", "salvage", "bare_metal"]:
+				Surfaces.apply_hull(m, 4.0, false)
+			else:
+				Surfaces.apply_grime(m, 3.0, false)
 	_mats[id] = m
 	return m

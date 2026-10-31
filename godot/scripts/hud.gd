@@ -29,6 +29,12 @@ var _bar_fill: ColorRect
 var _bar_label: Label
 var _boss: Enemy
 var _hull_ratio := -1.0
+var _help: Label
+var _help_time := 150.0
+var _compass: Control
+const COMPASS_HALF_WIDTH := 260.0
+## Degrees either side of the heading that the compass strip shows.
+const COMPASS_SPAN := 75.0
 var _voice: RichTextLabel
 var _ending_text: Label
 var _log_toast: Label
@@ -41,9 +47,19 @@ var _waypoint_target = null
 
 
 func _ready() -> void:
-	var help := _label(13, Vector2(16, 10))
-	help.text = HELP_TEXT
-	help.modulate = Color(1, 1, 1, 0.75)
+	# Controls reminder, bottom centre and quiet; it fades after the first couple of minutes.
+	_help = _label(13, Vector2.ZERO)
+	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
+	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_help.text = HELP_TEXT
+	_help.modulate = Color(1, 1, 1, 0.6)
+
+	# Compass strip across the top: headings, and the waypoint as an amber diamond.
+	_compass = Control.new()
+	_anchor(_compass, 0.5, 0.0, -COMPASS_HALF_WIDTH, 6, COMPASS_HALF_WIDTH, 30)
+	_compass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_compass.draw.connect(_draw_compass)
+	add_child(_compass)
 
 	_objective = _label(19, Vector2.ZERO)
 	_anchor(_objective, 0.5, 0.0, -400, 34, 400, 64)
@@ -187,6 +203,10 @@ func _process(delta: float) -> void:
 		_message_time -= delta
 		_message.modulate.a = clampf(_message_time, 0.0, 1.0)
 	_update_waypoint()
+	_compass.queue_redraw()
+	if _help_time > 0.0:
+		_help_time -= delta
+		_help.modulate.a = clampf(_help_time / 10.0, 0.0, 0.6)
 	_scan.queue_redraw()
 	_update_bar()
 
@@ -381,6 +401,44 @@ func _update_waypoint() -> void:
 	_waypoint.text = "◆ %d m" % roundi(dist)
 	_waypoint.position = pos - Vector2(20, 10)
 	_waypoint.visible = dist > 6.0
+
+
+## The camera's heading in degrees: 0 is north (-Z), 90 east (+X).
+func compass_heading() -> float:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return 0.0
+	var f := -cam.global_basis.z
+	return fposmod(rad_to_deg(atan2(f.x, -f.z)), 360.0)
+
+
+func _draw_compass() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var heading := compass_heading()
+	var w := COMPASS_HALF_WIDTH
+	_compass.draw_rect(Rect2(0, 0, w * 2.0, 24), Color(0.04, 0.05, 0.06, 0.45))
+	_compass.draw_line(Vector2(w, 0), Vector2(w, 24), Color("ffd08a", 0.9), 1.5)
+	var font := ThemeDB.fallback_font
+	for deg in range(0, 360, 15):
+		var off := wrapf(deg - heading, -180.0, 180.0)
+		if absf(off) > COMPASS_SPAN:
+			continue
+		var x := w + off / COMPASS_SPAN * w
+		var fade := 1.0 - absf(off) / COMPASS_SPAN
+		if deg % 90 == 0:
+			var letter: String = ["N", "E", "S", "W"][deg / 90]
+			_compass.draw_string(font, Vector2(x - 5, 18), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("e9e1cc", fade))
+		else:
+			_compass.draw_line(Vector2(x, 14 if deg % 45 else 10), Vector2(x, 22), Color("e9e1cc", 0.6 * fade), 1.0)
+	if _waypoint_target is Vector3:
+		var d: Vector3 = _waypoint_target - cam.global_position
+		var bearing := fposmod(rad_to_deg(atan2(d.x, -d.z)), 360.0)
+		var off := clampf(wrapf(bearing - heading, -180.0, 180.0), -COMPASS_SPAN, COMPASS_SPAN)
+		var x := w + off / COMPASS_SPAN * w
+		var c := Color("ffb24d")
+		_compass.draw_colored_polygon(PackedVector2Array([Vector2(x, 2), Vector2(x + 5, 7), Vector2(x, 12), Vector2(x - 5, 7)]), c)
 
 
 func _draw_crosshair() -> void:

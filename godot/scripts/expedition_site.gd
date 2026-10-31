@@ -122,7 +122,11 @@ func search_crate(i: int) -> int:
 	if _crate_searched[i]:
 		return 0
 	_crate_searched[i] = true
-	(_crates[i].get_child(0) as MeshInstance3D).material_override = _mat(Color("24282b"))
+	# A searched crate's lid goes dark.
+	var lid: StandardMaterial3D = _crates[i].get_meta("lid", null)
+	if lid:
+		lid.emission_enabled = false
+		lid.albedo_color = Color("24282b")
 	return crate_scrap
 
 
@@ -170,15 +174,9 @@ func _build_component() -> void:
 	add_child(_component_light)
 
 
-## Override for a bespoke component model. Default: the carried pack's shape and glow.
+## Override for a bespoke component model. Default: the component's own model.
 func _build_component_visual(holder: Node3D) -> void:
-	var pack: Array = Campaign.PACKS.get(component_id, [Vector3.ONE * 0.5, Color.WHITE, 1.0])
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = pack[0]
-	mesh.mesh = box
-	mesh.material_override = _emissive(pack[1], pack[2])
-	holder.add_child(mesh)
+	Rig.spawn(component_id, holder)
 
 
 func _build_crates() -> void:
@@ -186,15 +184,17 @@ func _build_crates() -> void:
 		var holder := Node3D.new()
 		holder.position = p
 		add_child(holder)
-		var lid := MeshInstance3D.new()
-		var lid_mesh := BoxMesh.new()
-		lid_mesh.size = Vector3(1.45, 0.08, 0.95)
-		lid.mesh = lid_mesh
-		lid.material_override = _emissive(Color("f2a93b"), 0.8)
-		lid.position = Vector3(0.0, 0.84, 0.0)
-		holder.add_child(lid)
-		var body := _static_box(Vector3(1.4, 0.8, 0.9), p + Vector3(0.0, 0.4, 0.0), _mat(CRATE_COLOR, 0.8))
+		var crate := Rig.spawn("crate", holder)
+		holder.set_meta("lid", Rig.own_material(crate, "lid_glow"))
+		var body := StaticBody3D.new()
 		body.name = "SalvageCrate"
+		body.position = p + Vector3(0.0, 0.4, 0.0)
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(1.4, 0.8, 0.9)
+		shape.shape = box
+		body.add_child(shape)
+		add_child(body)
 		_crates.append(holder)
 		_crate_searched.append(false)
 
@@ -348,6 +348,10 @@ func _mat(color: Color, roughness := 0.8, metallic := 0.0) -> StandardMaterial3D
 	m.albedo_color = color
 	m.roughness = roughness
 	m.metallic = metallic
+	if color.get_luminance() < 0.18:
+		Surfaces.apply_basalt(m, 5.0)
+	else:
+		Surfaces.apply_hull(m, 3.0)
 	_mats[key] = m
 	return m
 

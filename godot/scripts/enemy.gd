@@ -16,6 +16,8 @@ const STEER_INTERVAL := 0.2
 @export var sight_range := 24.0
 @export var leash_range := 70.0
 @export var alert_radius := 14.0
+## Size of the teal puff it gives off when it dies.
+@export var death_puff := 1.0
 ## Scrap dropped on death: [min pieces, max pieces].
 @export var drops := Vector2i(1, 2)
 
@@ -31,6 +33,10 @@ var _steer := Vector3.ZERO
 var _steer_timer := 0.0
 var _steer_side := 0.0
 var _flash_mats: Array[StandardMaterial3D] = []
+var _flash_meshes: Array[MeshInstance3D] = []
+## The Blender model (see Rig), under the subclass's visual root.
+var _rig: Node3D
+static var _flash_overlay: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -115,6 +121,8 @@ func _die() -> void:
 	remove_from_group("enemies")
 	collision_layer = 0
 	collision_mask = Game.LAYER_WORLD
+	if is_inside_tree():
+		Vfx.death(get_parent(), global_position, death_puff)
 	died.emit(self)
 
 
@@ -201,15 +209,38 @@ func _flashes(mat: StandardMaterial3D) -> void:
 	_flash_mats.append(mat)
 
 
+## Every mesh of a rig flashes when hit (an additive overlay, so the rig's own materials stay).
+func _flash_rig(root: Node) -> void:
+	_flash_meshes.append_array(Rig.meshes(root))
+
+
+## Loads a creature's model under `parent` and registers it for hit flashes.
+func _load_rig(model: String, parent: Node3D) -> Node3D:
+	_rig = Rig.spawn(model, parent)
+	_flash_rig(_rig)
+	return _rig
+
+
 func _flash() -> void:
+	if _flash_overlay == null:
+		_flash_overlay = StandardMaterial3D.new()
+		_flash_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_flash_overlay.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_flash_overlay.albedo_color = Color(1.0, 0.8, 0.6, 0.55)
 	for m in _flash_mats:
 		m.emission_enabled = true
 		m.emission = Color("ffd0a0")
 		m.emission_energy_multiplier = 1.5
+	for mesh in _flash_meshes:
+		mesh.material_overlay = _flash_overlay
 	await get_tree().create_timer(0.07).timeout
 	if is_instance_valid(self):
 		for m in _flash_mats:
 			m.emission_enabled = false
+		for mesh in _flash_meshes:
+			if is_instance_valid(mesh):
+				mesh.material_overlay = null
 
 
 static func _glow(color: Color, energy: float) -> StandardMaterial3D:

@@ -54,6 +54,7 @@ func _physics_process(delta: float) -> void:
 func _burst(at: Vector3) -> void:
 	set_physics_process(false)
 	Sfx.play("acid_splash", at, -2.0, 0.1)
+	Vfx.acid(get_parent(), at)
 	for body in get_tree().get_nodes_in_group("player"):
 		if body.global_position.distance_to(at) < splash_radius + 0.4:
 			body.take_damage(splash_damage, at)
