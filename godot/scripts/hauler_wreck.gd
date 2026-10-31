@@ -28,6 +28,7 @@ func _configure() -> void:
 	beacon_color = Color("bfe8ff")
 	beacon_period = 2.2
 	beacon_on = 0.12
+	mission = _mission()
 
 
 func _build_site() -> void:
@@ -132,6 +133,15 @@ func _build_component_visual(holder: Node3D) -> void:
 		holder.add_child(cap)
 
 
+## Each spring valve shuts two of the vents.
+func on_device_done(stage: int, index: int, _animate: bool) -> void:
+	if stage != 0:
+		return
+	for v in [index * 2, index * 2 + 1]:
+		if v < _vents.size():
+			(_vents[v] as SteamVent).shut()
+
+
 func _build_vents() -> void:
 	if Engine.is_editor_hint():
 		for p in VENT_POINTS:
@@ -143,3 +153,33 @@ func _build_vents() -> void:
 		vent.offset = i * 0.55
 		add_child(vent)
 		_vents.append(vent)
+
+## The hauler's mission: shut the spring valves to quiet the vents, cut the manifold's clamps,
+## and deal with the matriarch nesting on the wreck.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "activate", "text": "Close the spring valves to quiet the steam vents",
+			"devices": [
+				{"pos": Vector3(-11.5, 0.0, 6.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": PI * 0.5},
+				{"pos": Vector3(11.5, 0.0, 8.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": -PI * 0.5},
+				{"pos": Vector3(3.5, 0.0, 17.5), "kind": "valve", "label": "Close the valve", "hold": 1.2},
+			],
+			"say": [[H, "The Brightwater's coolant lines run straight through those springs. Every vent is a burst pipe."], [H, "There are shut-off valves round the rim. Close them and the pool should calm down."]],
+		},
+		{
+			"type": "activate", "text": "Cut the manifold free of its clamps",
+			"devices": [
+				{"pos": Vector3(-1.7, 0.0, -13.9), "kind": "clamp", "label": "Cut the clamp", "hold": 2.5, "yaw": PI * 0.5},
+				{"pos": Vector3(1.7, 0.0, -13.9), "kind": "clamp", "label": "Cut the clamp", "hold": 2.5, "yaw": -PI * 0.5},
+			],
+			"say": [[H, "Vents are down. The manifold's racked at the back of the hold, clamped in. You'll have to cut it loose."]],
+		},
+		{
+			"type": "elite", "kind": "spitter", "name": "SPITTER MATRIARCH", "pos": Vector3(0.0, 0.3, 15.0),
+			"text": "Kill the spitter matriarch",
+			"say": [[H, "Juno, something big just climbed out of the spring. I think you've cut into her nest."]],
+			"done_say": [[H, "She's down. The manifold's yours."]],
+		},
+	]

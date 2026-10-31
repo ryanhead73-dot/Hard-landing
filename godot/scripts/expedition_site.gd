@@ -30,6 +30,8 @@ var wake_radius := 55.0
 ## Enemy kind per spawn point and per ambush point, by index; scuttlers where unset.
 var spawn_kinds: Array = []
 var ambush_kinds: Array = []
+## The mission worked before the component can be taken: stage dictionaries (see MissionRunner).
+var mission: Array = []
 ## True when this is the site the player should head for: the beacon flashes bright.
 var active := false
 ## The resident pack has been spawned (once per game).
@@ -153,6 +155,34 @@ func set_state(state: Dictionary) -> void:
 		if searched[i]:
 			search_crate(i)
 	pack_spawned = state.get("pack_spawned", false)
+
+
+## Where every mission device stands (local), so layouts can keep those spots clear.
+func mission_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for st in mission:
+		for d in st.get("devices", []):
+			out.append(d["pos"])
+		if st.has("device"):
+			out.append(st["device"]["pos"])
+	return out
+
+
+## Mission hooks. Override to show a stage's effect on the site (vents shut, lights on).
+## `animate` is false when snapping to a loaded save.
+func on_stage_done(_stage: int, _animate: bool) -> void:
+	pass
+
+
+func on_device_done(_stage: int, _index: int, _animate: bool) -> void:
+	pass
+
+
+## Raises the component above its stand (a crane or cradle bringing it down during a defend).
+func set_component_lift(height: float) -> void:
+	if _component:
+		_component.position = component_pos + Vector3.UP * height
+		_component_light.position = component_pos + Vector3(0.0, 0.8 + height, 0.6)
 
 
 # --- Building -----------------------------------------------------------------------------

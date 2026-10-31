@@ -38,6 +38,7 @@ func _configure() -> void:
 	beacon_color = Color("ffd23a")
 	beacon_period = 1.3
 	beacon_on = 0.35
+	mission = _mission()
 
 
 ## Where to walk, in order, to climb from the foot of the route to the panel (local space).
@@ -120,3 +121,24 @@ func _build_component_visual(holder: Node3D) -> void:
 	_mesh_box(Vector3(1.0, 0.8, 0.06), Vector3.ZERO, glass, holder)
 	_mesh_box(Vector3(1.08, 0.06, 0.1), Vector3(0.0, 0.42, 0.0), _mat(Color("7d8c84"), 0.5, 0.6), holder)
 	_mesh_box(Vector3(1.08, 0.06, 0.1), Vector3(0.0, -0.42, 0.0), _mat(Color("7d8c84"), 0.5, 0.6), holder)
+
+## The skiff's mission: climb to the Lark, then lock her winch anchors before she slides off the
+## brink, so the glazing can come out of its cradle.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "reach", "pos": component_stand, "radius": 4.0,
+			"text": "Climb the basalt spires to the skiff Lark",
+			"say": [[H, "The Lark's right on the edge up there. Climb the slabs, and please don't test gravity."]],
+		},
+		{
+			"type": "activate", "text": "Lock the Lark's winch anchors before she slides",
+			"devices": [
+				{"pos": Vector3(3.2, TOP, -13.2), "kind": "winch", "label": "Lock the winch anchor", "hold": 2.0, "yaw": 0.6},
+				{"pos": Vector3(-3.4, TOP, -10.2), "kind": "winch", "label": "Lock the winch anchor", "hold": 2.0, "yaw": 0.6},
+			],
+			"say": [[H, "She's creaking. If that skiff goes over, the glazing goes with her. Lock both winch anchors first."]],
+			"done_say": [[H, "Anchors hold. Lift the pane out gently."]],
+		},
+	]

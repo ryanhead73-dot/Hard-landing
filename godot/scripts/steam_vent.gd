@@ -48,6 +48,22 @@ func _physics_process(delta: float) -> void:
 			body.take_damage(damage_per_second * TICK, global_position)
 
 
+## Turns the vent off for good (its valve was closed): a lazy wisp, no more bursts.
+func shut() -> void:
+	set_physics_process(false)
+	phase = Phase.QUIET
+	if _plume:
+		_plume.amount = 4
+		_plume.initial_velocity_min = 0.3
+		_plume.initial_velocity_max = 0.6
+		_plume.scale_amount_max = 0.4
+		_crust.emission_energy_multiplier = 0.05
+
+
+func is_shut() -> bool:
+	return not is_physics_processing()
+
+
 ## Skips straight to a burst. Used by tests and could be used by scripted moments.
 func force_burst() -> void:
 	phase = Phase.WARNING

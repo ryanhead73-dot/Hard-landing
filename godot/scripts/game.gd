@@ -72,6 +72,11 @@ var dev_panel_open := false
 var save_path := "user://save.json"
 ## A save to apply when the game scene starts (set by the title screen's Continue), or empty.
 var pending_load: Dictionary = {}
+## Mission progress: repair id -> stage index, and the devices worked in the current stage.
+var mission_stage: Dictionary = {}
+var mission_done: Array = []
+## The current mission stage's objective line (set by MissionRunner), or "".
+var mission_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
 var intro_pending := false
 
@@ -129,6 +134,9 @@ func reset() -> void:
 	stims = 1
 	logs.clear()
 	launch_objective = ""
+	mission_stage.clear()
+	mission_done.clear()
+	mission_objective = ""
 	inventory_changed.emit()
 	repairs_changed.emit()
 	scrap_changed.emit(scrap)
@@ -169,6 +177,8 @@ func session_state() -> Dictionary:
 		"ammo": ammo.duplicate(true),
 		"stims": stims,
 		"logs": logs.duplicate(),
+		"mission_stage": mission_stage.duplicate(),
+		"mission_done": mission_done.duplicate(),
 	}
 
 
@@ -189,6 +199,13 @@ func apply_session(data: Dictionary) -> void:
 		var pair: Array = saved_ammo.get(w, [Weapon.SPECS[w]["mag"], Weapon.SPECS[w]["reserve_max"]])
 		ammo[w] = [int(pair[0]), int(pair[1])]
 	stims = int(data.get("stims", 1))
+	mission_stage.clear()
+	var stages: Dictionary = data.get("mission_stage", {})
+	for id in stages:
+		mission_stage[String(id)] = int(stages[id])
+	mission_done.clear()
+	for i in data.get("mission_done", []):
+		mission_done.append(int(i))
 	logs.assign(data.get("logs", []).filter(func(id): return not Story.get_log(String(id)).is_empty()))
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
@@ -431,6 +448,8 @@ func launch() -> void:
 func objective_text() -> String:
 	match phase():
 		"find":
+			if mission_objective != "":
+				return mission_objective
 			return Campaign.get_repair(current_repair())["find"]
 		"return":
 			return Campaign.get_repair(current_repair())["return"]

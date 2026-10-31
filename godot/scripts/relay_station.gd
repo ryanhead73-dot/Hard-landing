@@ -8,6 +8,8 @@ extends ExpeditionSite
 const CELL_POSITION := Vector3(0.0, 1.35, -7.6)
 const CRATE_SCRAP := 10
 
+var _station_lights: Array[OmniLight3D] = []
+
 
 func _configure() -> void:
 	component_id = "aux_cell"
@@ -22,9 +24,11 @@ func _configure() -> void:
 	beacon_pos = Vector3(6.0, 16.3, -8.0)
 	beacon_color = Color("ff4030")
 	beacon_period = 1.6
+	mission = _mission()
 
 
 func _build_site() -> void:
+	_station_lights.clear()
 	_build_pad_and_building()
 	_build_cover()
 	_build_mast()
@@ -74,6 +78,40 @@ func _build_cover() -> void:
 		crate.rotation.y = p.x
 
 
+## The backup generator comes back: the station's lamps light, and the mast blinks.
+func on_stage_done(stage: int, _animate: bool) -> void:
+	if stage == 0 and _station_lights.is_empty():
+		for p in [Vector3(-2.5, 3.4, -5.0), Vector3(2.5, 3.4, -7.0)]:
+			_station_lights.append(_light(p, Color("ffd9a0"), 1.4, 8.0))
+		_station_lights.append(_light(Vector3(6.0, 15.0, -8.0), Color("ff4030"), 1.0, 10.0))
+
+
 func _build_mast() -> void:
 	_static_box(Vector3(0.3, 16.0, 0.3), Vector3(6.0, 8.0, -8.0), _mat(Color("3a3f43"), 0.5))
 	_static_box(Vector3(2.0, 0.1, 0.1), Vector3(6.0, 14.0, -8.0), _mat(Color("3a3f43"), 0.5))
+
+## The relay's mission: restart the backup generator, then hold the station while the charging
+## cradle lets go of the cell.
+func _mission() -> Array:
+	var J := Story.JUNO
+	return [
+		{
+			"type": "activate", "text": "Restart the relay's backup generator: throw the breakers",
+			"devices": [
+				{"pos": Vector3(-12.0, 0.1, 0.5), "kind": "breaker", "label": "Throw the breaker", "yaw": PI * 0.5},
+				{"pos": Vector3(11.5, 0.1, 3.5), "kind": "breaker", "label": "Throw the breaker", "yaw": -PI * 0.5},
+				{"pos": Vector3(-4.5, 0.1, -10.8), "kind": "breaker", "label": "Throw the breaker", "yaw": PI},
+			],
+			"say": [[J, "Station's as dead as Kestrel. The backup generator's tripped."], [J, "Three breakers on the outside walls. Then the cradle should give up the cell."]],
+		},
+		{
+			"type": "defend", "text": "Release the power cell from its charging cradle",
+			"running_text": "Hold the station while the cradle releases the cell",
+			"device": {"pos": Vector3(2.4, 0.1, -8.0), "kind": "cradle", "label": "Start the cradle release", "yaw": PI},
+			"bar": "CRADLE RELEASE", "seconds": 35.0, "radius": 11.0, "wave_every": 10.0, "lift": 0.0,
+			"waves": [["scuttler", "scuttler", "scuttler"], ["scuttler", "scuttler", "scuttler", "scuttler"], ["scuttler", "scuttler", "scuttler"]],
+			"say": [[J, "Lights. Good. The cradle wants half a minute to let go of the cell."]],
+			"start_say": [[J, "And that whine's going to carry for kilometres. Here they come."]],
+			"done_say": [[J, "Cradle's open. Now to haul this thing home."]],
+		},
+	]

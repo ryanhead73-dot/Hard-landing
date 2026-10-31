@@ -30,6 +30,10 @@ var _core: StandardMaterial3D
 var _shell: StandardMaterial3D
 
 
+func display_name() -> String:
+	return "THE WARDEN"
+
+
 func _init() -> void:
 	max_health = 1400.0
 	speed = 3.2

@@ -32,6 +32,7 @@ func _configure() -> void:
 	beacon_color = Color("3fd1b5")
 	beacon_period = 3.0
 	beacon_on = 1.0
+	mission = _mission()
 
 
 ## Where the Warden surfaces: behind the spire.
@@ -106,3 +107,20 @@ func _build_component_visual(holder: Node3D) -> void:
 		ring.material_override = _mat(Color("9aa0a3"), 0.35, 0.8)
 		ring.rotation = Vector3(i * 1.05, i * 0.6, 0.0)
 		holder.add_child(ring)
+
+## The Loom's mission: tune the three resonators round the spire, each only in the quiet between
+## pulses. Then the core comes free, and the Warden rises.
+func _mission() -> Array:
+	var H := Story.HOB
+	return [
+		{
+			"type": "pulse", "text": "Tune the resonators between the Loom's pulses",
+			"devices": [
+				{"pos": Vector3(-7.5, 0.0, -3.0), "kind": "resonator", "label": "Tune the resonator", "hold": 2.5},
+				{"pos": Vector3(7.5, 0.0, -4.0), "kind": "resonator", "label": "Tune the resonator", "hold": 2.5},
+				{"pos": Vector3(0.0, 0.0, -14.5), "kind": "resonator", "label": "Tune the resonator", "hold": 2.5},
+			],
+			"say": [[H, "Ilse sealed the core with her resonators. They have to be tuned to the beat, and a pulse in the middle of tuning undoes it."], [H, "Wait for a ring to pass, jump it, then tune. You have a few seconds each time."]],
+			"done_say": [[H, "All three are singing. The core is free. Juno... the ground's moving."]],
+		},
+	]

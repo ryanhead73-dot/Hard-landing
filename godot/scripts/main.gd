@@ -72,6 +72,7 @@ var logs_panel: LogPanel
 var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
+var missions: MissionRunner
 ## True once the ending card is up; interact then returns to the title.
 var ending_shown := false
 var _cine_cam: Camera3D
@@ -181,6 +182,10 @@ func _ready() -> void:
 		site.beacon_flashed.connect(func(at: Vector3):
 			if site.active:
 				Sfx.play("beacon_ping", at, -4.0, 0.0))
+	missions = MissionRunner.new()
+	missions.name = "Missions"
+	add_child(missions)
+	missions.setup(self)
 	kestrel.repair_changed.connect(_on_repair_changed)
 	for id in Kestrel.REPAIR_ORDER:
 		Game.set_repaired(id, kestrel.is_repaired(id))
@@ -262,6 +267,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			player.revive(site.component_point() + Vector3.UP * 0.5)
 	elif key == KEY_H:
 		player.revive(SPAWN)
+	elif key == KEY_M:
+		missions.complete_stage()
 
 
 func spawn_scuttler(at: Vector3) -> Scuttler:
@@ -309,8 +316,8 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram" or "warden".
-func spawn_enemy(kind: String, at: Vector3) -> Enemy:
+## Spawns a hostile: "scuttler", "spitter", "ram" or "warden". A name makes it an elite.
+func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 	var e: Enemy
 	match kind:
 		"spitter":
@@ -325,6 +332,7 @@ func spawn_enemy(kind: String, at: Vector3) -> Enemy:
 			e = Scuttler.new()
 	e.target = player
 	e.home = at
+	e.elite_name = elite_name
 	add_child(e)
 	e.global_position = at
 	e.died.connect(_on_enemy_died)
@@ -381,14 +389,18 @@ func save_game() -> bool:
 
 func load_state(data: Dictionary) -> void:
 	Game.apply_session(data)
+	# Repairs coming back would read as the mission moving on; keep the devices worked.
+	var done := Game.mission_done.duplicate()
 	var repaired: Dictionary = data.get("repaired", {})
 	for id in Kestrel.REPAIR_ORDER:
 		kestrel.set_repaired(id, repaired.get(id, false))
+	Game.mission_done = done
 	kestrel.snap_pose()
 	var site_states: Dictionary = data.get("sites", {})
 	for id in sites:
 		if site_states.has(id):
 			(sites[id] as ExpeditionSite).set_state(site_states[id])
+	missions.restore()
 	var pending := int(data.get("siege_pending", -1))
 	if pending >= 0:
 		siege.arm(pending)
@@ -427,6 +439,10 @@ func _find_interaction() -> Dictionary:
 		return {}
 	var pos := player.global_position
 	var current := Game.current_repair()
+	# The mission's own devices come first: near the component, the clamp you're cutting wins.
+	var device := missions.interaction(pos)
+	if not device.is_empty():
+		return device
 	for id in sites:
 		var site: ExpeditionSite = sites[id]
 		if not site.has_component() or pos.distance_to(site.component_point()) >= INTERACT_RANGE:
@@ -440,6 +456,8 @@ func _find_interaction() -> Dictionary:
 			return {"label": "%s: no use until the %s is fixed" % [label, Kestrel.REPAIR_NAMES[current].to_lower()]}
 		if Game.carrying != "":
 			return {"label": "%s: your hands are full" % label}
+		if not missions.can_take(id):
+			return {"label": "%s: it won't come free yet. %s" % [label, Game.mission_objective]}
 		return {"label": "[E] Take the %s" % r["component_name"], "action": _take_component.bind(id)}
 	for id in sites:
 		var site: ExpeditionSite = sites[id]
@@ -674,7 +692,8 @@ func _show_ending() -> void:
 func _waypoint():
 	match Game.phase():
 		"find":
-			return current_site().component_point()
+			var stage_point = missions.waypoint()
+			return stage_point if stage_point != null else current_site().component_point()
 		"return":
 			return install_point(Game.current_repair())
 		"launch":
@@ -743,7 +762,7 @@ func _on_player_died() -> void:
 # --- Setup --------------------------------------------------------------------------------
 
 func _dev_text() -> String:
-	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home"]
+	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home · M skip stage"]
 	for i in Kestrel.REPAIR_ORDER.size():
 		var id := Kestrel.REPAIR_ORDER[i]
 		lines.append("%d %s %s" % [i + 1, Kestrel.REPAIR_NAMES[id], "■" if kestrel.is_repaired(id) else "□"])

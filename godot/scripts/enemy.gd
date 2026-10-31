@@ -21,6 +21,12 @@ const STEER_INTERVAL := 0.2
 ## Scrap dropped on death: [min pieces, max pieces].
 @export var drops := Vector2i(1, 2)
 
+## Set before adding to the tree to make a named elite: bigger, much tougher, with a health bar.
+var elite_name := ""
+const ELITE_SCALE := 1.5
+const ELITE_HEALTH := 4.0
+const ELITE_MIN_HEALTH := 280.0
+
 ## What it hunts: the player, or a point on Kestrel's hull during a siege.
 var target: Node3D
 var home := Vector3.ZERO
@@ -47,11 +53,40 @@ func _ready() -> void:
 	floor_snap_length = 0.3
 	# Only ground and wreckage count as floor, so nothing rides along on the player.
 	platform_floor_layers = Game.LAYER_WORLD
-	max_health *= Game.enemy_health_scale()
-	health = max_health
 	if home == Vector3.ZERO:
 		home = global_position
 	_setup()
+	if elite_name != "":
+		_make_elite()
+	max_health *= Game.enemy_health_scale()
+	health = max_health
+
+
+## The name on its health bar.
+func display_name() -> String:
+	return elite_name
+
+
+func is_elite() -> bool:
+	return elite_name != ""
+
+
+func _make_elite() -> void:
+	max_health = maxf(max_health * ELITE_HEALTH, ELITE_MIN_HEALTH)
+	drops = Vector2i(drops.x + 6, drops.y + 8)
+	sight_range *= 1.5
+	leash_range *= 1.5
+	for child in get_children():
+		if child is Node3D and not child is CreatureAnimator:
+			(child as Node3D).scale *= ELITE_SCALE
+			(child as Node3D).position *= ELITE_SCALE
+	# A hot glow under it, so it reads as the big one from across the site.
+	var halo := OmniLight3D.new()
+	halo.light_color = Color("ff7a3a")
+	halo.light_energy = 1.6
+	halo.omni_range = 4.0
+	halo.position = Vector3(0.0, 1.6, 0.0)
+	add_child(halo)
 
 
 ## Override: build collision and visuals.
