@@ -289,6 +289,8 @@ func _siege() -> void:
 		if siege.hull < hull_before:
 			break
 	_check("besiegers damage the hull", siege.hull < hull_before, "hull=%.0f" % siege.hull)
+	_check("with Juno aboard, besiegers stay on the hull", kestrel.is_inside(player.global_position) and siege.siege_enemies().all(func(e): return e.target is HullPoint))
+	_check("outside isn't aboard", not kestrel.is_inside(main.SPAWN + Vector3(0.0, 0.0, 12.0)))
 	# Clear every wave by hand.
 	var scrap_before := Game.scrap
 	for wave_i in ShipSiege.SIEGES[0].size():

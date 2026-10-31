@@ -113,6 +113,7 @@ func _move(delta: float) -> Vector3:
 
 func _spit() -> void:
 	state = State.RECOVER
+	_anim("attack")
 	_timer = 0.5
 	_spit_timer = randf_range(spit_cooldown.x, spit_cooldown.y)
 	_sac.emission_energy_multiplier = 1.0
@@ -159,6 +160,10 @@ func _die() -> void:
 	tween.tween_interval(2.5)
 	tween.tween_property(_visual, "position:y", -1.0, 1.0)
 	tween.tween_callback(queue_free)
+
+
+func anim_state() -> String:
+	return String(State.find_key(state)).to_lower()
 
 
 func _build_visual() -> void:

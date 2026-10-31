@@ -42,3 +42,24 @@ static func _set_collision(node: Node, active: bool) -> void:
 		if child is CollisionShape3D:
 			(child as CollisionShape3D).set_deferred("disabled", not active)
 		_set_collision(child, active)
+
+
+## The install moment: the new part settles into place with a spring and throws sparks.
+## Only played for a live install, never when a save is loaded.
+func play_repair() -> void:
+	var part := _repaired_child()
+	if part == null or not is_inside_tree():
+		return
+	var rest := part.scale
+	part.scale = rest * 0.82
+	var tween := create_tween()
+	tween.tween_property(part, "scale", rest, 0.9).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	Vfx.burst(get_parent(), global_position + Vector3.UP * 0.4, Color("ffb24d"), 28, 4.5, 0.05, 0.7, Vector3.UP, 75.0, -9.0)
+
+
+func _repaired_child() -> Node3D:
+	for child in get_children():
+		var child_name := String(child.name).to_lower()
+		if child is Node3D and (child_name == "repaired" or child_name.ends_with("_repaired")):
+			return child
+	return null

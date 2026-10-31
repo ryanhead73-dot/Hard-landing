@@ -135,3 +135,55 @@ static func motes(parent: Node3D) -> CPUParticles3D:
 	parent.add_child(p)
 	p.emitting = true
 	return p
+
+
+## Soft, non-glowing particles for smoke and dust, cached per colour.
+static func soft(color: Color) -> StandardMaterial3D:
+	var key := "soft/%s" % color.to_html()
+	if _mats.has(key):
+		return _mats[key]
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = color
+	_mats[key] = m
+	return m
+
+
+## A trail of dark smoke streaming from a moving point (Kestrel coming down). Returns the emitter.
+static func smoke(parent: Node3D, at: Vector3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Smoke"
+	p.amount = 90
+	p.lifetime = 2.6
+	p.local_coords = false
+	p.direction = Vector3.UP
+	p.spread = 40.0
+	p.gravity = Vector3(0.0, 1.2, 0.0)
+	p.initial_velocity_min = 0.5
+	p.initial_velocity_max = 2.0
+	p.scale_amount_min = 1.2
+	p.scale_amount_max = 2.6
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.15, 1.0])
+	fade.colors = PackedColorArray([Color(1.0, 0.6, 0.3, 0.9), Color(0.25, 0.24, 0.23, 0.8), Color(0.4, 0.4, 0.4, 0.0)])
+	p.color_ramp = fade
+	var quad := QuadMesh.new()
+	quad.size = Vector2(2.2, 2.2)
+	quad.material = soft(Color(1, 1, 1))
+	p.mesh = quad
+	p.position = at
+	parent.add_child(p)
+	p.emitting = true
+	return p
+
+
+## A low ring of dust and steam thrown up by an impact, freed when done.
+static func dust(parent: Node, at: Vector3, size := 1.0) -> CPUParticles3D:
+	var p := burst(parent, at, Color.WHITE, int(70 * size), 9.0 * size, 2.2 * size, 2.4, Vector3.UP, 85.0, 1.0)
+	(p.mesh as QuadMesh).material = soft(Color("8d918f"))
+	p.damping_min = 3.0
+	p.damping_max = 5.0
+	return p
