@@ -55,6 +55,13 @@ static func burst(parent: Node, at: Vector3, color: Color, amount := 16, speed :
 	return p
 
 
+## A foot comes down in a pool: a low spray of droplets.
+static func splash(parent: Node, at: Vector3, size := 1.0) -> CPUParticles3D:
+	var p := burst(parent, at, Color("b8c8c4"), int(10 * size), 2.2 * size, 0.05, 0.45, Vector3.UP, 35.0, -9.8)
+	(p.mesh as QuadMesh).material = soft(Color(0.75, 0.82, 0.8, 0.8))
+	return p
+
+
 ## Wildlife dies: a puff of the Loom's teal light leaves the body.
 static func death(parent: Node, at: Vector3, size := 1.0) -> CPUParticles3D:
 	return burst(parent, at + Vector3.UP * 0.5 * size, Color("3fd1b5"), int(18 * size), 2.0 * size, 0.12 * size, 1.1, Vector3.UP, 70.0, 1.5)

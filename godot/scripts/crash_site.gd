@@ -36,6 +36,7 @@ var _heights: Dictionary = {}
 
 
 func _ready() -> void:
+	add_to_group("crash_site")
 	build()
 
 
@@ -68,6 +69,19 @@ func set_dusk(dusk: bool) -> void:
 
 
 ## Moss, cracks and pool rims glow brighter as the light goes (0 day .. 1 dusk).
+## True when `pos` (world space) is standing in one of the basin's pools.
+func in_pool(pos: Vector3) -> bool:
+	var local := to_local(pos)
+	if local.y > WATER_Y + 0.25:
+		return false
+	for pool in pools:
+		var c: Vector3 = pool[0]
+		var r: float = pool[1]
+		if Vector2(local.x - c.x, local.z - c.z).length() < r * 0.95:
+			return true
+	return false
+
+
 func set_glow(amount: float) -> void:
 	WorldProps.set_glow(amount)
 	_rim_mat.emission_energy_multiplier = lerpf(0.5, 1.6, amount)

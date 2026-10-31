@@ -90,7 +90,7 @@ var _aux_lights: Array[OmniLight3D] = []
 var _emergency_lights: Array[OmniLight3D] = []
 var _lamps: Array[MeshInstance3D] = []
 var _screens: Array[MeshInstance3D] = []
-var _interior_probe: ReflectionProbe
+var _interior_probes: Array[ReflectionProbe] = []
 var _pose_tween: Tween
 var _ramp_hinge: Node3D
 var _ramp_tween: Tween
@@ -192,15 +192,6 @@ func _build_shell() -> void:
 	var t: float = layout["wall"] * 0.5
 	for r in layout["rooms"]:
 		_csg(shell, [r["x"][0] - t, r["x"][1] + t], [-0.2, r["ceiling"] + 0.2], [r["z"][0] - t, r["z"][1] + t], "hull")
-	_csg(shell, [0.8, 3.7], [-0.2, 2.0], [11.4, 14.6], "hull")
-	var nose := CSGSphere3D.new()
-	nose.radius = 1.6
-	nose.radial_segments = 16
-	nose.rings = 8
-	nose.position = plan(1.4, 0.9, 13.0)
-	nose.scale = Vector3(0.9, 0.7, 1.0)
-	nose.material = _mat("hull")
-	shell.add_child(nose)
 	for band in OXIDE_BANDS:
 		_csg(shell, band[0], band[1], band[2], "oxide")
 	for r in layout["rooms"]:
@@ -275,15 +266,24 @@ func _build_exterior() -> void:
 		stbd_wing.append(Vector2(pt.x, 26.0 - pt.y))
 	_wing(ext, stbd_wing, "hull")
 	_box(ext, [16.6, 20.0], [3.0, 3.8], [24.9, 25.4], "oxide", false)
-	_engine(ext, 18.4, "metal", 9.0)
-	for zc in [7.6, 18.4]:
-		_box(ext, [30.4, 33.2], [2.6, 5.4], [zc - 0.08, zc + 0.08], "hull", false)
-		_box(ext, [32.0, 33.3], [4.9, 5.5], [zc - 0.1, zc + 0.1], "oxide", false)
+	# The modelled skin (blender/build_kestrel.py): arched roof, keel, nose, fins, nacelle.
+	for part in ["kestrel_roof", "kestrel_keel", "kestrel_fins"]:
+		_skin(ext, part)
+	var nose := _skin(ext, "kestrel_nose")
+	var nose_body := StaticBody3D.new()
+	nose_body.name = "NoseCollision"
+	var nose_shape := CollisionShape3D.new()
+	for m in nose.find_children("*", "MeshInstance3D", true, false):
+		if String(m.name).begins_with("nose"):
+			nose_shape.shape = (m as MeshInstance3D).mesh.create_convex_shape(true, true)
+			break
+	nose_body.add_child(nose_shape)
+	ext.add_child(nose_body)
+	_nacelle(ext, 18.4, "hull")
 	_box(ext, [29.6, 33.2], [1.9, 2.05], [5.4, 5.9], "hull", false)
 	_box(ext, [29.6, 33.2], [1.9, 2.05], [20.1, 20.6], "hull", false)
 	_box(ext, [25.0, 28.6], [1.4, 2.4], [8.4, 9.3], "metal", false)
 	_box(ext, [25.0, 28.6], [1.4, 2.4], [16.7, 17.6], "metal", false)
-	_box(ext, [11.0, 30.0], [3.2, 3.7], [12.4, 13.6], "hull", false)
 	# Aft ramp, jammed shut until the landing gear is fixed. It swings down on a hinge at deck level.
 	_ramp_hinge = Node3D.new()
 	_ramp_hinge.name = "CargoRamp"
@@ -303,15 +303,22 @@ func _build_lighting() -> void:
 		_lamps.append(lamp)
 	for pos in EMERGENCY_LIGHTS:
 		_emergency_lights.append(_omni(pos, Color("ff3b2e"), 0.5, 5.0))
-	# Keeps the sky's ambient light from flooding the interior, so the lights do the work.
-	_interior_probe = ReflectionProbe.new()
-	_interior_probe.name = "InteriorAmbient"
-	_interior_probe.size = Vector3(30.0, 4.6, 8.4)
-	_interior_probe.position = plan(17.0, 1.8, 13.0)
-	_interior_probe.interior = true
-	_interior_probe.ambient_mode = ReflectionProbe.AMBIENT_COLOR
-	_interior_probe.blend_distance = 0.5
-	add_child(_interior_probe)
+	# Keeps the sky's ambient light from flooding the interior, so the lights do the work. One
+	# probe per room, fitted inside its walls, so the hull's outside faces stay daylit.
+	for room in layout["rooms"]:
+		var probe := ReflectionProbe.new()
+		probe.name = "InteriorAmbient_%s" % room["id"]
+		var x: Array = room["x"]
+		var z: Array = room["z"]
+		var y0 := float(room["floor"])
+		var y1 := float(room["ceiling"])
+		probe.size = Vector3(x[1] - x[0] - 0.02, y1 - y0 + 0.4, z[1] - z[0] - 0.02)
+		probe.position = plan((x[0] + x[1]) * 0.5, (y0 + y1) * 0.5, (z[0] + z[1]) * 0.5)
+		probe.interior = true
+		probe.ambient_mode = ReflectionProbe.AMBIENT_COLOR
+		probe.blend_distance = 0.3
+		add_child(probe)
+		_interior_probes.append(probe)
 
 
 # --- Repairs ------------------------------------------------------------------------------
@@ -360,9 +367,9 @@ func _apply_aux(on: bool) -> void:
 		lamp.material_override = _mat("amber_glow" if on else "metal_dark")
 	for screen in _screens:
 		screen.material_override = _mat("screen_on" if on else "screen_off")
-	if _interior_probe:
-		_interior_probe.ambient_color = Color(0.32, 0.25, 0.17) if on else Color(0.09, 0.11, 0.14)
-		_interior_probe.ambient_color_energy = 0.8 if on else 0.6
+	for probe in _interior_probes:
+		probe.ambient_color = Color(0.32, 0.25, 0.17) if on else Color(0.09, 0.11, 0.14)
+		probe.ambient_color_energy = 0.8 if on else 0.6
 
 
 func _apply_pose(level: bool, animate: bool) -> void:
@@ -531,7 +538,7 @@ func _build_engine(damaged: Node3D, fixed: Node3D) -> void:
 	_box(damaged, [26.2, 26.8], [0.9, 1.9], [6.9, 7.9], "void", false)
 	for i in 4:
 		_rot(_box(damaged, [24.0 + i * 0.9, 24.6 + i * 0.9], [-0.9, -0.6], [5.6 - i * 0.4, 6.2 - i * 0.4], "metal", false), Vector3(0.0, i * 0.7, 0.0))
-	_engine(fixed, 7.6, "bare_metal", 9.0)
+	_nacelle(fixed, 7.6, "bare_metal")
 	_cyl(fixed, Vector3(25.3, 1.9, 7.6), 1.05, 0.25, "x", "oxide")
 
 
@@ -644,6 +651,25 @@ func set_engine_power(power: float) -> void:
 		e.initial_velocity_max = 5.0 + 18.0 * power
 		e.scale_amount_max = 0.4 + 1.2 * power
 	engine_power = power
+
+
+## Loads a part of the modelled skin. Meshes named oxide_* and dark_* take those materials;
+## the rest take `mat_id`.
+func _skin(parent: Node, part: String, mat_id := "hull") -> Node3D:
+	var scene: PackedScene = load("res://assets/kestrel/%s.glb" % part)
+	var node := scene.instantiate() as Node3D
+	node.name = part.capitalize().replace(" ", "")
+	for m in node.find_children("*", "MeshInstance3D", true, false):
+		var n := String(m.name)
+		(m as MeshInstance3D).material_override = _mat("oxide" if n.begins_with("oxide") else ("metal_dark" if n.begins_with("dark") else mat_id))
+	parent.add_child(node)
+	return node
+
+
+## An engine nacelle on the line plan z = zc (the model is built on the centreline).
+func _nacelle(parent: Node, zc: float, mat_id: String) -> void:
+	var n := _skin(parent, "kestrel_nacelle", mat_id)
+	n.position.z = zc - _centre_z
 
 
 func _engine(parent: Node, zc: float, mat_id: String, length: float) -> void:

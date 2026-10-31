@@ -161,6 +161,9 @@ func _die() -> void:
 	collision_mask = Game.LAYER_WORLD
 	if is_inside_tree():
 		Vfx.death(get_parent(), global_position, death_puff)
+		# A named kill lands hard: a longer freeze and a heavy shake.
+		if is_elite() or display_name() == "THE WARDEN":
+			get_tree().call_group("player", "big_kill")
 	died.emit(self)
 
 

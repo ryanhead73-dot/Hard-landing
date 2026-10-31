@@ -32,11 +32,38 @@ func _ready() -> void:
 		var flat := look - at
 		main.player.face(atan2(-flat.x, -flat.z))
 		main.player.aim_at(look)
+		var cam: Camera3D = null
+		if String(shot[0]).begins_with("juno"):
+			# A portrait: a free camera ahead of Juno, looking back at her.
+			cam = Camera3D.new()
+			cam.fov = 40.0
+			main.add_child(cam)
+			var front: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
+			var side: Vector3 = front.cross(Vector3.UP)
+			var target := at + Vector3(0.0, 1.05, 0.0)
+			cam.look_at_from_position(target + front * 3.0 + side * 1.2 + Vector3(0.0, 0.3, 0.0), target)
+			cam.make_current()
+		var beasts: Array = []
+		if shot[0] == "creatures":
+			# A line-up a few metres ahead, frozen once they've settled into their idle pose.
+			var fwd: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
+			var right: Vector3 = fwd.cross(Vector3.UP)
+			for i in 3:
+				var kind: String = ["scuttler", "spitter", "ram"][i]
+				var e: Node3D = main.spawn_enemy(kind, at + fwd * (6.0 + i) + right * (float(i) - 1.0) * 2.6)
+				e.look_at(at, Vector3.UP)
+				beasts.append(e)
 		await _frames(40)
+		for e in beasts:
+			e.process_mode = Node.PROCESS_MODE_DISABLED
 		await RenderingServer.frame_post_draw
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s.png" % [out, shot[0]])
 		print("shot ", shot[0])
+		if cam:
+			cam.queue_free()
+		for e in beasts:
+			e.queue_free()
 	get_tree().quit()
 
 
@@ -52,9 +79,14 @@ func _shots() -> Array:
 		["loom", "navigation", Vector3(3.0, 0.3, 16.0), Vector3(0.0, 6.0, -6.0)],
 		["ship_aft", "", Vector3(32.0, 0.5, 10.0), Vector3(0.0, 2.0, 0.0)],
 		["basin", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["ship_front", "", Vector3(-30.0, 0.5, -8.0), Vector3(0.0, 2.5, 0.0)],
+		["ship_side", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
+		["workshop", "", Vector3(-3.0, 1.5, 15.0), Vector3(-3.0, 2.0, 2.0)],
 		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
 		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
 		["basin_dusk", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
+		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 	]
 

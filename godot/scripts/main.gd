@@ -26,6 +26,7 @@ const KEYS := {
 	"sprint": [KEY_SHIFT],
 	"jump": [KEY_SPACE],
 	"crouch": [KEY_C, KEY_CTRL],
+	"dodge": [KEY_V, KEY_ALT],
 	"interact": [KEY_E],
 	"flashlight": [KEY_F],
 	"reload": [KEY_R],
@@ -113,7 +114,10 @@ func _ready() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	player.health_changed.connect(hud.set_health)
-	player.damaged.connect(func(_amount): hud.flash_damage())
+	player.damaged.connect(func(_amount):
+		hud.flash_damage()
+		if player.last_hit_from != Vector3.ZERO:
+			hud.damage_from(player.last_hit_from))
 	player.died.connect(_on_player_died)
 	player.weapon.ammo_changed.connect(_on_ammo_changed)
 	player.weapon.hit_confirmed.connect(hud.hitmarker)
@@ -818,9 +822,18 @@ func _build_environment() -> void:
 	_env.sky = sky
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.tonemap_white = 6.0
 	_env.ssao_enabled = true
+	_env.ssao_radius = 1.6
+	_env.ssao_intensity = 2.2
+	_env.ssil_radius = 4.0
+	_env.ssil_intensity = 0.8
 	_env.glow_enabled = true
 	_env.glow_intensity = 0.6
+	_env.set_glow_level(0, 0.0)
+	_env.set_glow_level(2, 1.0)
+	_env.set_glow_level(4, 0.8)
+	_env.set_glow_level(5, 0.5)
 	_env.fog_enabled = true
 	# Steam hangs low over the wetlands: fog thickens toward the ground.
 	_env.fog_height = 3.0
@@ -832,16 +845,37 @@ func _build_environment() -> void:
 	_env.adjustment_saturation = 1.1
 	_env.glow_bloom = 0.05
 	_env.glow_hdr_threshold = 0.9
-	# Volumetric fog stays at zero density globally; it lets local FogVolumes (spore fog) render.
+	# Volumetric fog is always on so local FogVolumes (spore fog) render. On Quality it also
+	# fills the basin with a thin haze the sun shines through (light shafts at dusk).
 	_env.volumetric_fog_enabled = true
 	_env.volumetric_fog_density = 0.0
+	_env.volumetric_fog_anisotropy = 0.55
+	_env.volumetric_fog_length = 96.0
+	_env.volumetric_fog_detail_spread = 1.5
+	_env.volumetric_fog_ambient_inject = 0.1
+	_env.volumetric_fog_sky_affect = 0.0
 	var world := WorldEnvironment.new()
 	world.environment = _env
 	add_child(world)
 	_sun = DirectionalLight3D.new()
 	_sun.shadow_enabled = true
 	_sun.directional_shadow_max_distance = 150.0
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_sun.directional_shadow_blend_splits = true
+	_sun.light_angular_distance = 0.6
+	_sun.light_volumetric_fog_energy = 1.4
 	add_child(_sun)
+	Game.graphics_changed.connect(_apply_graphics)
+	_apply_graphics()
+
+
+## Quality adds screen-space indirect light and the basin haze; Performance drops both.
+func _apply_graphics() -> void:
+	var quality := Game.graphics >= 1
+	_env.ssil_enabled = quality
+	_sun.light_angular_distance = 0.6 if quality else 0.0
+	if site:
+		set_daylight(daylight)
 
 
 ## Day keeps the basalt readable (bright sky, low sun). Dusk shows the amber interior as home.
@@ -869,4 +903,9 @@ func set_daylight(amount: float) -> void:
 	_env.ambient_light_energy = lerpf(0.4, 0.3, k)
 	_env.fog_light_color = Color("8f9a9c").lerp(Color("3a3540"), k)
 	_env.fog_density = lerpf(0.002, 0.004, k)
+	if Game.graphics >= 1:
+		_env.volumetric_fog_density = lerpf(0.0022, 0.007, k)
+		_env.volumetric_fog_albedo = Color("c9d2d0").lerp(Color("d9a58a"), k)
+	else:
+		_env.volumetric_fog_density = 0.0
 	site.set_glow(k)

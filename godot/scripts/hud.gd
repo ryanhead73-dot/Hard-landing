@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · L logs · Shift sprint · Space jump · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -50,6 +50,8 @@ var _banner_time := 0.0
 
 var _hit_time := 0.0
 var _hit_killed := false
+## Recent hits on Juno: [world position of the source, seconds left], drawn as red arcs.
+var _hurt_marks: Array = []
 var _message_time := 0.0
 var _waypoint_target = null
 
@@ -228,6 +230,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_hit_time = maxf(_hit_time - delta, 0.0)
+	for m in _hurt_marks:
+		m[1] -= delta
+	_hurt_marks = _hurt_marks.filter(func(m): return m[1] > 0.0)
 	_crosshair.queue_redraw()
 	if _vignette.color.a > 0.0:
 		_vignette.color.a = maxf(_vignette.color.a - delta * 0.8, 0.0)
@@ -334,6 +339,17 @@ func set_scrap(amount: int) -> void:
 
 func flash_damage() -> void:
 	_vignette.color.a = 0.35
+
+
+## Shows which way a hit came from: a red arc round the crosshair, facing the source.
+func damage_from(source: Vector3) -> void:
+	_hurt_marks.append([source, 1.3])
+	if _hurt_marks.size() > 4:
+		_hurt_marks.pop_front()
+
+
+func hurt_mark_count() -> int:
+	return _hurt_marks.size()
 
 
 func hitmarker(killed: bool) -> void:
@@ -527,6 +543,17 @@ func _draw_crosshair() -> void:
 	var col := Color(1, 1, 1, 0.85)
 	for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
 		_crosshair.draw_line(c + d * 6.0, c + d * 13.0, col, 2.0)
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		var heading := deg_to_rad(compass_heading())
+		for m in _hurt_marks:
+			var d: Vector3 = m[0] - cam.global_position
+			if Vector2(d.x, d.z).length() < 0.5:
+				continue
+			var off := wrapf(atan2(d.x, -d.z) - heading, -PI, PI)
+			var a := -PI * 0.5 + off
+			var alpha := clampf(m[1], 0.0, 1.0)
+			_crosshair.draw_arc(c, 96.0, a - 0.32, a + 0.32, 14, Color(1.0, 0.22, 0.12, 0.75 * alpha), 5.0, true)
 	if _hit_time > 0.0:
 		var hit_col := Color("ff5a3a") if _hit_killed else Color.WHITE
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
