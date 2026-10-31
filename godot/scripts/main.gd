@@ -91,7 +91,7 @@ var day_cycle := true
 var dev_panel := false
 
 var _env: Environment
-var _sky: ProceduralSkyMaterial
+var _sky: ShaderMaterial
 var _sun: DirectionalLight3D
 var _interaction: Dictionary = {}
 var _ship_hum: Node
@@ -330,6 +330,10 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 			e = w
 		_:
 			e = Scuttler.new()
+	# Out among the hummocks, start on the ground, not inside it.
+	var ground := site.height_at(at.x, at.z)
+	if at.y < ground + 0.3:
+		at.y = ground + 0.5
 	e.target = player
 	e.home = at
 	e.elite_name = elite_name
@@ -795,9 +799,20 @@ func _ensure_action(action: String) -> void:
 
 
 func _build_environment() -> void:
-	_sky = ProceduralSkyMaterial.new()
+	_sky = ShaderMaterial.new()
+	_sky.shader = preload("res://shaders/sky.gdshader")
+	var clouds := NoiseTexture2D.new()
+	clouds.width = 512
+	clouds.height = 512
+	clouds.seamless = true
+	var cloud_noise := FastNoiseLite.new()
+	cloud_noise.frequency = 0.008
+	cloud_noise.fractal_octaves = 5
+	clouds.noise = cloud_noise
+	_sky.set_shader_parameter("cloud_noise", clouds)
 	var sky := Sky.new()
 	sky.sky_material = _sky
+	sky.radiance_size = Sky.RADIANCE_SIZE_128
 	_env = Environment.new()
 	_env.background_mode = Environment.BG_SKY
 	_env.sky = sky
@@ -811,6 +826,7 @@ func _build_environment() -> void:
 	_env.fog_height = 3.0
 	_env.fog_height_density = 0.04
 	_env.fog_sun_scatter = 0.15
+	_env.fog_sky_affect = 0.25
 	_env.adjustment_enabled = true
 	_env.adjustment_contrast = 1.08
 	_env.adjustment_saturation = 1.1
@@ -840,10 +856,13 @@ func set_daylight(amount: float) -> void:
 	daylight = clampf(amount, 0.0, 1.0)
 	dusk = daylight > 0.5
 	var k := daylight
-	_sky.sky_top_color = Color("7d8a8f").lerp(Color("1d2733"), k)
-	_sky.sky_horizon_color = Color("b7bfbd").lerp(Color("5b4a52"), k)
-	_sky.ground_horizon_color = Color("3c4448").lerp(Color("2a2a30"), k)
-	_sky.ground_bottom_color = Color("1b1d1f").lerp(Color("0e1012"), k)
+	_sky.set_shader_parameter("top_color", Color("6f8590").lerp(Color("232b3d"), k))
+	_sky.set_shader_parameter("horizon_color", Color("c9cfca").lerp(Color("c27a52"), k))
+	_sky.set_shader_parameter("ground_color", Color("2a2f31").lerp(Color("15161a"), k))
+	_sky.set_shader_parameter("sun_tint", Color("fff1dc").lerp(Color("ffab6b"), k))
+	_sky.set_shader_parameter("cloud_light", Color("eeeeea").lerp(Color("e39a6e"), k))
+	_sky.set_shader_parameter("cloud_dark", Color("7b858a").lerp(Color("3a3448"), k))
+	_sky.set_shader_parameter("sun_glow", lerpf(0.8, 1.6, k))
 	_sun.rotation_degrees = Vector3(-38.0, 35.0, 0.0).lerp(Vector3(-8.0, 60.0, 0.0), k)
 	_sun.light_color = Color("fff3e0").lerp(Color("ff9a6a"), k)
 	_sun.light_energy = lerpf(1.0, 0.25, k)

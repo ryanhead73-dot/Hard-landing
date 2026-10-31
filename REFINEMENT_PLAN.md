@@ -49,4 +49,5 @@ Tests: a new `missions_test` plays every mission stage by stage, plus save/load 
 
 ## Where things stand
 
-- M7 (missions): MissionRunner + MissionDevice, all seven missions, elites, missions_test.
+- M7 (missions): MissionRunner + MissionDevice, all seven missions, elites, missions_test. Merged in PR #13.
+- M8 (world): terrain mesh + height-map collider with hills, rim and pool hollows (flat at the ship, sites and the paths between); terrain, rock, water and sky shaders; Blender basalt clusters, boulders, crags, moss and reeds (`blender/build_world.py`).

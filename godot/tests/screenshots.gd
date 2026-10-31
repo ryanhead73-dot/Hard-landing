@@ -16,7 +16,15 @@ func _ready() -> void:
 	await _frames(20)
 	for s in get_tree().get_nodes_in_group("enemies"):
 		s.queue_free()
+	var only := args[1].split(",") if args.size() > 1 else PackedStringArray()
 	for shot in _shots():
+		if not only.is_empty() and not shot[0] in only:
+			continue
+		main.day_cycle = false
+		main.set_daylight(1.0 if String(shot[0]).ends_with("_dusk") else 0.0)
+		if shot[1] == "pool":
+			var pool: Array = main.site.pools[1]
+			shot = [shot[0], "", pool[0] + Vector3(pool[1] + 6.0, 0.5, 4.0), pool[0]]
 		var site: Node3D = main.sites.get(shot[1])
 		var at: Vector3 = site.to_global(shot[2]) if site else shot[2]
 		var look: Vector3 = site.to_global(shot[3]) if site else shot[3]
@@ -43,6 +51,11 @@ func _shots() -> Array:
 		["graveyard", "engine", Vector3(3.0, 0.3, 18.0), Vector3(0.0, 3.0, -15.0)],
 		["loom", "navigation", Vector3(3.0, 0.3, 16.0), Vector3(0.0, 6.0, -6.0)],
 		["ship_aft", "", Vector3(32.0, 0.5, 10.0), Vector3(0.0, 2.0, 0.0)],
+		["basin", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
+		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
+		["basin_dusk", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 	]
 
 
