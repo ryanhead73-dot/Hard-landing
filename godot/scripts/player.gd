@@ -39,17 +39,18 @@ var _body: Node3D
 var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
 var _flashlight: SpotLight3D
-var _cell_pack: MeshInstance3D
-var _manifold_pack: MeshInstance3D
+## Carried components on the back, by Campaign component id.
+var _packs: Dictionary = {}
 var _since_damage := 99.0
 var _combat_face := 0.0
-var _plated := false
+var _plating_seen := 0
 var _stride := 0.0
 var _foot := 0
 var _hold_fire := false
 
 
 func _ready() -> void:
+	add_to_group("player")
 	collision_layer = Game.LAYER_PLAYER
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_ENEMY
 	floor_snap_length = 0.4
@@ -108,7 +109,11 @@ func _ready() -> void:
 
 
 func max_health() -> float:
-	return base_max_health + (40.0 if Game.has_upgrade("plating") else 0.0)
+	return base_max_health + 40.0 * _plating_count()
+
+
+func _plating_count() -> int:
+	return int(Game.has_upgrade("plating")) + int(Game.has_upgrade("plating_2"))
 
 
 func camera() -> Camera3D:
@@ -288,39 +293,34 @@ func _build_body() -> void:
 	visor.material_override = glow
 	visor.position = Vector3(0.0, 1.58, -0.3)
 	_body.add_child(visor)
-	# The aux power cell rides on the back while carried.
-	_cell_pack = MeshInstance3D.new()
-	var pack := BoxMesh.new()
-	pack.size = Vector3(0.5, 0.7, 0.3)
-	_cell_pack.mesh = pack
-	var cell_mat := glow.duplicate() as StandardMaterial3D
-	cell_mat.emission_energy_multiplier = 2.5
-	_cell_pack.material_override = cell_mat
-	_cell_pack.position = Vector3(0.0, 1.2, 0.42)
-	_cell_pack.visible = false
-	_body.add_child(_cell_pack)
-	# The coolant manifold is strapped across the back.
-	_manifold_pack = MeshInstance3D.new()
-	var pipes := BoxMesh.new()
-	pipes.size = Vector3(1.1, 0.45, 0.22)
-	_manifold_pack.mesh = pipes
-	var frost := glow.duplicate() as StandardMaterial3D
-	frost.albedo_color = Color("7fd6ff")
-	frost.emission = Color("7fd6ff")
-	frost.emission_energy_multiplier = 1.8
-	_manifold_pack.material_override = frost
-	_manifold_pack.position = Vector3(0.0, 1.25, 0.4)
-	_manifold_pack.visible = false
-	_body.add_child(_manifold_pack)
+	# Whatever component is being carried rides on the back.
+	for id in Campaign.PACKS:
+		var spec: Array = Campaign.PACKS[id]
+		var pack := MeshInstance3D.new()
+		pack.name = "Pack_%s" % id
+		var box := BoxMesh.new()
+		box.size = spec[0]
+		pack.mesh = box
+		var mat := glow.duplicate() as StandardMaterial3D
+		mat.albedo_color = spec[1]
+		mat.emission = spec[1]
+		mat.emission_energy_multiplier = spec[2]
+		pack.material_override = mat
+		pack.position = Vector3(0.0, 1.2, 0.3 + spec[0].z * 0.5)
+		pack.visible = false
+		_body.add_child(pack)
+		_packs[id] = pack
 
 
 func _on_carrying_changed(item: String) -> void:
-	_cell_pack.visible = item == "aux_cell"
-	_manifold_pack.visible = item == "manifold"
+	for id in _packs:
+		_packs[id].visible = id == item
 
 
 func _on_upgrades_changed() -> void:
-	if Game.has_upgrade("plating") and not _plated:
-		_plated = true
-		health += 40.0
+	var count := _plating_count()
+	if count > _plating_seen:
+		health += 40.0 * (count - _plating_seen)
+	_plating_seen = count
+	health = minf(health, max_health())
 	health_changed.emit(health, max_health())

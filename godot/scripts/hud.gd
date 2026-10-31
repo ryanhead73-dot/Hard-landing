@@ -18,6 +18,10 @@ var _message: Label
 var _vignette: ColorRect
 var _death: Label
 var _dev: Label
+var _repairs: Label
+var _scan: Control
+var _ending: ColorRect
+var _scan_marks: Array = []
 
 var _hit_time := 0.0
 var _hit_killed := false
@@ -34,6 +38,19 @@ func _ready() -> void:
 	_anchor(_objective, 0.5, 0.0, -400, 34, 400, 64)
 	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_objective.add_theme_color_override("font_color", Color("ffd08a"))
+
+	_repairs = _label(14, Vector2.ZERO)
+	_anchor(_repairs, 0.5, 0.0, -400, 60, 400, 80)
+	_repairs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_repairs.modulate = Color(1, 1, 1, 0.7)
+	Game.repairs_changed.connect(_update_repairs)
+	_update_repairs()
+
+	_scan = Control.new()
+	_scan.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scan.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scan.draw.connect(_draw_scan)
+	add_child(_scan)
 
 	_waypoint = _label(15, Vector2.ZERO)
 	_waypoint.add_theme_color_override("font_color", Color("ffb24d"))
@@ -68,7 +85,8 @@ func _ready() -> void:
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_message = _label(18, Vector2.ZERO)
-	_anchor(_message, 0.5, 0.0, -500, 76, 500, 104)
+	_anchor(_message, 0.5, 0.0, -560, 88, 560, 140)
+	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_vignette = ColorRect.new()
@@ -88,6 +106,19 @@ func _ready() -> void:
 	_dev.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_dev.visible = false
 
+	_ending = ColorRect.new()
+	_ending.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ending.color = Color(0.02, 0.03, 0.04, 0.0)
+	_ending.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ending.visible = false
+	add_child(_ending)
+	var ending_text := _label(26, Vector2.ZERO)
+	ending_text.reparent(_ending)
+	ending_text.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ending_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ending_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ending_text.text = "Kestrel climbs out through the steam.\n\nHARD LANDING\n\nThanks for playing."
+
 
 func _process(delta: float) -> void:
 	_hit_time = maxf(_hit_time - delta, 0.0)
@@ -98,6 +129,7 @@ func _process(delta: float) -> void:
 		_message_time -= delta
 		_message.modulate.a = clampf(_message_time, 0.0, 1.0)
 	_update_waypoint()
+	_scan.queue_redraw()
 
 
 func set_objective(text: String) -> void:
@@ -144,6 +176,40 @@ func flash_damage() -> void:
 func hitmarker(killed: bool) -> void:
 	_hit_time = 0.15
 	_hit_killed = killed
+
+
+## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
+func set_scan(marks: Array) -> void:
+	_scan_marks = marks
+
+
+func show_ending() -> void:
+	_ending.visible = true
+	create_tween().tween_property(_ending, "color:a", 0.85, 6.0).set_delay(2.0)
+
+
+func ending_visible() -> bool:
+	return _ending.visible
+
+
+func _update_repairs() -> void:
+	_repairs.text = "KESTREL  %d / %d systems restored" % [Game.repairs_done(), Campaign.REPAIRS.size()]
+
+
+func _draw_scan() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	for m in _scan_marks:
+		var pos: Vector3 = m["pos"] + Vector3.UP * 1.0
+		if cam.is_position_behind(pos):
+			continue
+		var p := cam.unproject_position(pos)
+		if m["kind"] == "crate":
+			var col := Color(1.0, 0.7, 0.3, 0.8)
+			_scan.draw_polyline(PackedVector2Array([p + Vector2(0, -6), p + Vector2(6, 0), p + Vector2(0, 6), p + Vector2(-6, 0), p + Vector2(0, -6)]), col, 1.5)
+		else:
+			_scan.draw_arc(p, 6.0, 0.0, TAU, 12, Color(0.25, 0.82, 0.71, 0.8), 1.5)
 
 
 func set_dead(dead: bool) -> void:

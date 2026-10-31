@@ -98,7 +98,7 @@ func try_fire(aiming: bool) -> bool:
 		start_reload()
 		return false
 	in_mag -= 1
-	_cooldown = fire_interval
+	_cooldown = fire_interval * (0.8 if Game.has_upgrade("rapid_cycler") else 1.0)
 
 	var spread := aim_spread if aiming else hip_spread
 	var dir := -camera.global_basis.z
@@ -118,6 +118,8 @@ func try_fire(aiming: bool) -> bool:
 			var killed: bool = target.take_damage(shot_damage(), result.position, dir)
 			hit_confirmed.emit(killed)
 			Sfx.play("kill_tick" if killed else "hit_tick", null, -4.0, 0.0)
+		elif target.has_meta("on_hit"):
+			(target.get_meta("on_hit") as Callable).call()
 		_impact(result.position, result.normal)
 	_tracer(_muzzle.global_position, end)
 	_show_flash()

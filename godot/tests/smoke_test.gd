@@ -1,26 +1,11 @@
-extends Node
+extends "res://tests/test_base.gd"
 ## Headless walk-through of the vertical slice. Run:
 ##   godot --headless --path . res://tests/smoke_test.tscn
 ## Walks the ship's routes, fights a scuttler, runs the recover/return/install loop, buys an
 ## upgrade and checks death and respawn. Prints PASS/FAIL lines and exits 1 on any failure.
 
-var main: Node3D
-var kestrel: Kestrel
-var player: Player
-var failures := 0
-var finished := false
-
-
-func _ready() -> void:
-	main = load("res://scenes/main.tscn").instantiate()
-	add_child(main)
-	kestrel = main.kestrel
-	player = main.player
-	await _run()
-	# A script error aborts _run without a FAIL line, so make sure it got to the end.
-	_check("test ran to the end", finished)
-	print("SMOKE TEST %s (%d failures)" % ["PASSED" if failures == 0 else "FAILED", failures])
-	get_tree().quit(1 if failures else 0)
+func _name() -> String:
+	return "SMOKE TEST"
 
 
 func _run() -> void:
@@ -36,7 +21,7 @@ func _run() -> void:
 	_check("pause menu pauses the game", get_tree().paused and pause.visible)
 	pause.close()
 	_check("resume unpauses", not get_tree().paused and not pause.visible)
-	_clear_scuttlers()
+	_clear_enemies()
 
 	# --- Ship routes -------------------------------------------------------------------------
 	_place(kestrel.to_global(kestrel.plan(12.9, 0.0, 20.6)), 0.0)
@@ -63,7 +48,7 @@ func _run() -> void:
 	await _frames(10)
 
 	# --- Combat ------------------------------------------------------------------------------
-	var arena := Vector3(70.0, 0.5, 40.0)
+	var arena := Vector3(45.0, 0.5, 45.0)
 	_place(arena, 0.0)
 	await _frames(10)
 	var enemy: Scuttler = main.spawn_scuttler(arena + Vector3(0.6, 0.0, -9.0))
@@ -128,27 +113,27 @@ func _run() -> void:
 	await get_tree().create_timer(main.RESPAWN_DELAY + 0.3).timeout
 
 	# --- Recover, return, install ------------------------------------------------------------
-	_clear_scuttlers()
+	_clear_enemies()
 	player.revive(main.wreck.manifold_point() + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("manifold waits until Kestrel has power", main._interaction.get("label", "").contains("no use"), main._interaction.get("label", ""))
+	_check("manifold waits until Kestrel has power", _label().contains("no use"), _label())
 	await _press("interact")
-	_check("manifold can't be taken out of order", main.wreck.has_manifold() and Game.carrying == "")
+	_check("manifold can't be taken out of order", main.wreck.has_component() and Game.carrying == "")
 
 	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("aux bay asks for a power cell", main._interaction.get("label", "").contains("needs"), main._interaction.get("label", ""))
+	_check("aux bay asks for a power cell", _label().contains("needs"), _label())
 	await _press("interact")
 	_check("cannot install without the cell", not kestrel.is_repaired("aux_power"))
 
-	_clear_scuttlers()
+	_clear_enemies()
 	player.revive(main.station.cell_point() + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("cell prompt at the station", main._interaction.get("label", "").contains("power cell"), main._interaction.get("label", ""))
+	_check("cell prompt at the station", _label().contains("power cell"), _label())
 	await _press("interact")
-	_check("cell is carried", Game.carrying == "aux_cell" and not main.station.has_cell())
-	_check("ambush spawns on the way home", get_tree().get_nodes_in_group("scuttlers").size() >= 3)
-	_clear_scuttlers()
+	_check("cell is carried", Game.carrying == "aux_cell" and not main.station.has_component())
+	_check("ambush spawns on the way home", _enemy_count() >= 3)
+	_clear_enemies()
 
 	_check("one crate can be searched", main.station.crate_count() == 4)
 	player.revive(main.station.crate_point(0) + Vector3(0.0, 0.2, 1.2))
@@ -160,7 +145,7 @@ func _run() -> void:
 	player.revive(kestrel.to_global(kestrel.interact_points["aux_power"]) + Vector3.UP * 0.2)
 	await _frames(10)
 	await _press("interact")
-	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.stage == Game.Stage.FIND_MANIFOLD and Game.carrying == "")
+	_check("installing the cell restores aux power", kestrel.is_repaired("aux_power") and Game.current_repair() == "cooling" and Game.carrying == "")
 	_check("ship hum starts with aux power", main._ship_hum != null and main._ship_hum.playing)
 
 	# --- Fabricator ---------------------------------------------------------------------------
@@ -171,7 +156,7 @@ func _run() -> void:
 	_check("fabricator builds the extended magazine", Game.has_upgrade("extended_mag") and player.weapon.mag_size() == 36, "scrap=%d" % Game.scrap)
 
 	# --- Steam vents --------------------------------------------------------------------------
-	_clear_scuttlers()
+	_clear_enemies()
 	var vent: SteamVent = main.wreck.vents()[0]
 	var starts: Array[float] = []
 	for v in main.wreck.vents():
@@ -194,13 +179,13 @@ func _run() -> void:
 	vent.force_burst()
 	await get_tree().create_timer(0.6).timeout
 	_check("steam vent scalds scuttlers too", is_instance_valid(victim) and victim.health < victim.max_health)
-	_clear_scuttlers()
+	_clear_enemies()
 
 	# --- Cooling manifold ---------------------------------------------------------------------
 	Game.add_scrap(40)
 	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
 	await _frames(10)
-	_check("heavy builds need cooling", main._interaction.get("label", "").contains("overheats"), main._interaction.get("label", ""))
+	_check("heavy builds need cooling", _label().contains("overheats"), _label())
 	await _press("interact")
 	_check("fabricator refuses plating while overheating", not Game.has_upgrade("plating"))
 
@@ -216,21 +201,21 @@ func _run() -> void:
 			break
 	Input.action_release("move_forward")
 	_check("hold is walkable from the cargo door to the manifold", _flat_distance(player.global_position, rack) < 1.6, "left=%.1f" % _flat_distance(player.global_position, rack))
-	_clear_scuttlers()
+	_clear_enemies()
 
 	player.revive(rack + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("manifold prompt in the wreck", main._interaction.get("label", "").contains("coolant manifold"), main._interaction.get("label", ""))
+	_check("manifold prompt in the wreck", _label().contains("coolant manifold"), _label())
 	await _press("interact")
-	_check("manifold is carried", Game.carrying == "manifold" and not main.wreck.has_manifold() and Game.stage == Game.Stage.RETURN_MANIFOLD)
-	_check("scuttlers rise out of the pool", get_tree().get_nodes_in_group("scuttlers").size() >= 3)
-	_clear_scuttlers()
+	_check("manifold is carried", Game.carrying == "manifold" and not main.wreck.has_component() and Game.phase() == "return")
+	_check("scuttlers rise out of the pool", _enemy_count() >= 3)
+	_clear_enemies()
 
 	player.revive(kestrel.to_global(kestrel.interact_points["cooling"]) + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("install bay accepts the manifold", main._interaction.get("label", "").contains("Fit the coolant manifold"), main._interaction.get("label", ""))
+	_check("install bay accepts the manifold", _label().contains("Fit the coolant manifold"), _label())
 	await _press("interact")
-	_check("fitting the manifold repairs cooling", kestrel.is_repaired("cooling") and Game.stage == Game.Stage.COOLED and Game.carrying == "")
+	_check("fitting the manifold repairs cooling", kestrel.is_repaired("cooling") and Game.current_repair() == "canopy" and Game.carrying == "")
 	player.revive(kestrel.to_global(kestrel.plan(16.2, 0.1, 10.9)))
 	await _frames(10)
 	await _press("interact")
@@ -254,44 +239,3 @@ func _run() -> void:
 	_check("all repairs reset to damaged", Kestrel.REPAIR_ORDER.all(func(id): return not kestrel.is_repaired(id)))
 	_check("heavy builds lock again without cooling", not Game.can_fabricate("heavy_rounds"))
 	finished = true
-
-
-func _flat_distance(a: Vector3, b: Vector3) -> float:
-	return Vector2(a.x - b.x, a.z - b.z).length()
-
-
-func _clear_scuttlers() -> void:
-	for s in get_tree().get_nodes_in_group("scuttlers"):
-		s.remove_from_group("scuttlers")
-		s.queue_free()
-
-
-func _place(pos: Vector3, yaw: float) -> void:
-	player.velocity = Vector3.ZERO
-	player.global_position = pos
-	player.face(yaw)
-
-
-func _press(action: String) -> void:
-	Input.action_press(action)
-	await _frames(2)
-	Input.action_release(action)
-	await _frames(2)
-
-
-func _walk(seconds: float) -> void:
-	Input.action_press("move_forward")
-	await get_tree().create_timer(seconds).timeout
-	Input.action_release("move_forward")
-	await _frames(10)
-
-
-func _frames(n: int) -> void:
-	for i in n:
-		await get_tree().physics_frame
-
-
-func _check(label: String, ok: bool, detail := "") -> void:
-	print("%s  %s  %s" % ["PASS" if ok else "FAIL", label, detail])
-	if not ok:
-		failures += 1

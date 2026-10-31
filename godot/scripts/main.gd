@@ -1,14 +1,20 @@
 extends Node3D
-## Vertical slice flow: sky and sun, player, HUD, enemies, interactions and dev controls.
-## Loop: recover the aux power cell from the relay station, carry it home and install it, which
-## powers the workshop fabricator. Then salvage a coolant manifold from the hauler wreck in the hot
-## springs, which lets the fabricator run heavy builds.
+## Game flow: sky and sun, player, HUD, enemies, interactions and dev controls.
+## The campaign (see Campaign) restores Kestrel one repair at a time: follow the active site's
+## beacon, recover its component, carry it home and install it. Each repair turns on a benefit.
+## When all seven are done, the pilot's seat launches Kestrel.
 
 const SPAWN := Vector3(-3.0, 0.5, 15.0)
 const INTERACT_RANGE := 1.8
 const FABRICATOR_POINT := Vector3(16.2, 0.0, 10.7)
 const ROAMER_POINTS := [Vector3(-28.0, 0.5, 30.0), Vector3(-42.0, 0.5, 22.0)]
 const RESPAWN_DELAY := 2.5
+## Install points are checked on the flat with a little height slack, since the ship sits tilted,
+## but not so much that a point inside the hull answers from the ground outside.
+const INSTALL_HEIGHT_SLACK := 0.7
+## How far the scanner (canopy repair) picks up crates and wildlife.
+const SCAN_CRATES := 70.0
+const SCAN_ENEMIES := 45.0
 const KEYS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -31,6 +37,11 @@ const BUTTONS := {
 @onready var station: RelayStation = $RelayStation
 @onready var wreck: HaulerWreck = $HaulerWreck
 
+## Expedition sites by repair id.
+var sites: Dictionary = {}
+## Set false (tests) to stop resident packs waking up as the player nears a site.
+var spawn_packs := true
+
 var player: Player
 var hud: Hud
 var dusk := false
@@ -41,6 +52,7 @@ var _sky: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _interaction: Dictionary = {}
 var _ship_hum: Node
+var _pack_check := 0.0
 
 
 func _ready() -> void:
@@ -71,21 +83,19 @@ func _ready() -> void:
 
 	add_child(PauseMenu.new())
 	Sfx.loop("wind_loop", null, -14.0)
-	# Only the site you're heading for pings, so the sound points the way.
-	station.beacon_flashed.connect(func(at: Vector3):
-		if Game.stage == Game.Stage.RECOVER_CELL:
-			Sfx.play("beacon_ping", at, -4.0, 0.0))
-	wreck.strobe_flashed.connect(func(at: Vector3):
-		if Game.stage == Game.Stage.FIND_MANIFOLD:
-			Sfx.play("beacon_ping", at, -4.0, 0.0))
+	for r in Campaign.REPAIRS:
+		var site: ExpeditionSite = get_node(String(r["site"]))
+		sites[r["id"]] = site
+		# Only the site you're heading for pings, so the sound points the way.
+		site.beacon_flashed.connect(func(at: Vector3):
+			if site.active:
+				Sfx.play("beacon_ping", at, -4.0, 0.0))
 	kestrel.repair_changed.connect(_on_repair_changed)
-
-	for p in station.spawn_points():
-		spawn_scuttler(p)
-	for p in wreck.spawn_points():
-		spawn_scuttler(p)
+	for id in Kestrel.REPAIR_ORDER:
+		Game.set_repaired(id, kestrel.is_repaired(id))
 	for p in ROAMER_POINTS:
 		spawn_scuttler(p)
+	_update_active_site()
 	_set_dusk(false)
 
 
@@ -95,6 +105,11 @@ func _process(_delta: float) -> void:
 	if _interaction.has("action") and Input.is_action_just_pressed("interact") and not player.dead:
 		(_interaction["action"] as Callable).call()
 	hud.set_waypoint(_waypoint())
+	hud.set_scan(scanner_marks())
+	_pack_check -= _delta
+	if _pack_check <= 0.0:
+		_pack_check = 0.5
+		_wake_packs()
 	if dev_panel:
 		hud.set_dev(true, _dev_text())
 	if player.global_position.y < -20.0:
@@ -117,9 +132,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key == KEY_K:
 		Game.add_scrap(50)
 	elif key == KEY_T:
-		player.revive(station.cell_point() + Vector3(0.0, 0.5, 4.0))
-	elif key == KEY_G:
-		player.revive(wreck.manifold_point() + Vector3(0.0, 0.5, 0.0))
+		var site := current_site()
+		if site:
+			player.revive(site.component_point() + Vector3.UP * 0.5)
 	elif key == KEY_H:
 		player.revive(SPAWN)
 
@@ -134,74 +149,138 @@ func spawn_scuttler(at: Vector3) -> Scuttler:
 	return s
 
 
+# --- Campaign ----------------------------------------------------------------------------
+
+## The site the campaign is heading for, or null when every repair is done.
+func current_site() -> ExpeditionSite:
+	return sites.get(Game.current_repair())
+
+
+## Where to stand to install a repair (or "launch" / "armoury"), in world space.
+func install_point(id: String) -> Vector3:
+	return kestrel.to_global(kestrel.interact_points[id])
+
+
+func _near_install(id: String) -> bool:
+	var p := install_point(id)
+	var pos := player.global_position
+	return Vector2(pos.x - p.x, pos.z - p.z).length() < INTERACT_RANGE and absf(pos.y - p.y) < INSTALL_HEIGHT_SLACK
+
+
+func _update_active_site() -> void:
+	var current := Game.current_repair()
+	for id in sites:
+		(sites[id] as ExpeditionSite).active = id == current
+
+
+## Resident packs wake the first time the player comes within a site's wake radius.
+func _wake_packs() -> void:
+	if not spawn_packs or player.dead:
+		return
+	for id in sites:
+		var site: ExpeditionSite = sites[id]
+		if site.pack_spawned or player.global_position.distance_to(site.global_position) > site.wake_radius:
+			continue
+		site.pack_spawned = true
+		var points := site.spawn_points()
+		for i in points.size():
+			spawn_enemy(site.spawn_kind(i), points[i])
+
+
+## Spawns a hostile of the given kind. Only scuttlers exist so far.
+func spawn_enemy(_kind: String, at: Vector3) -> Node3D:
+	return spawn_scuttler(at)
+
+
+## What the cockpit scanner shows once the canopy is sealed: [{pos, kind}].
+func scanner_marks() -> Array:
+	var marks := []
+	if not Game.is_repaired("canopy") or player == null:
+		return marks
+	var pos := player.global_position
+	for id in sites:
+		var site: ExpeditionSite = sites[id]
+		for i in site.crate_count():
+			if not site.crate_searched(i) and site.crate_point(i).distance_to(pos) < SCAN_CRATES:
+				marks.append({"pos": site.crate_point(i), "kind": "crate"})
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e.global_position.distance_to(pos) < SCAN_ENEMIES:
+			marks.append({"pos": e.global_position, "kind": "enemy"})
+	return marks
+
+
 # --- Interactions -------------------------------------------------------------------------
 
 func _find_interaction() -> Dictionary:
-	if player.dead:
+	if player.dead or Game.launched:
 		return {}
 	var pos := player.global_position
-	if station.has_cell() and pos.distance_to(station.cell_point()) < INTERACT_RANGE:
-		return {"label": "[E] Take the aux power cell", "action": _take_cell}
-	if wreck.has_manifold() and pos.distance_to(wreck.manifold_point()) < INTERACT_RANGE:
-		# Out of order it would replace the cell in your hands and skip the first repair.
-		if Game.stage < Game.Stage.FIND_MANIFOLD:
-			return {"label": "Coolant manifold: no use until Kestrel has power to run the pumps"}
+	var current := Game.current_repair()
+	for id in sites:
+		var site: ExpeditionSite = sites[id]
+		if not site.has_component() or pos.distance_to(site.component_point()) >= INTERACT_RANGE:
+			continue
+		var r := Campaign.get_repair(id)
+		var label := Campaign.sentence(r["component_name"])
+		if Game.is_repaired(id):
+			return {"label": "%s: Kestrel doesn't need this any more" % label}
+		# Out of order it would skip a repair, or replace what's in your hands.
+		if id != current:
+			return {"label": "%s: no use until the %s is fixed" % [label, Kestrel.REPAIR_NAMES[current].to_lower()]}
 		if Game.carrying != "":
-			return {"label": "Coolant manifold: your hands are full"}
-		return {"label": "[E] Take the coolant manifold", "action": _take_manifold}
-	for site in [station, wreck]:
+			return {"label": "%s: your hands are full" % label}
+		return {"label": "[E] Take the %s" % r["component_name"], "action": _take_component.bind(id)}
+	for id in sites:
+		var site: ExpeditionSite = sites[id]
 		for i in site.crate_count():
 			if not site.crate_searched(i) and pos.distance_to(site.crate_point(i)) < INTERACT_RANGE:
 				return {"label": "[E] Search salvage crate", "action": _search_crate.bind(site, i)}
-	var aux_point := kestrel.to_global(kestrel.interact_points["aux_power"])
-	if not kestrel.is_repaired("aux_power") and pos.distance_to(aux_point) < INTERACT_RANGE:
-		if Game.carrying == "aux_cell":
-			return {"label": "[E] Install the aux power cell", "action": _install_cell}
-		return {"label": "Aux power bay: needs a replacement power cell"}
-	var bay := kestrel.to_global(kestrel.interact_points["cooling"])
-	if not kestrel.is_repaired("cooling") and pos.distance_to(bay) < INTERACT_RANGE:
-		if Game.carrying == "manifold":
-			return {"label": "[E] Fit the coolant manifold", "action": _install_manifold}
-		return {"label": "Cooling: the manifold is cracked and venting coolant"}
+	if current != "" and _near_install(current):
+		var r := Campaign.get_repair(current)
+		if Game.carrying == r["component"]:
+			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
+		return {"label": r["bay_label"]}
+	if current == "" and _near_install("launch"):
+		return {"label": "[E] Launch Kestrel", "action": launch}
+	if _near_install("armoury"):
+		if not Game.is_repaired("landing_gear"):
+			return {"label": "Armoury locker: jammed shut while the hull is twisted"}
+		return {"label": "[E] Resupply: reload and patch the suit", "action": _resupply}
 	var bench := kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
 	if pos.distance_to(bench) < INTERACT_RANGE + 0.6:
-		if not kestrel.is_repaired("aux_power"):
+		if not Game.is_repaired("aux_power"):
 			return {"label": "Fabricator offline: no power"}
 		var id := Game.next_upgrade()
 		if id == "":
 			return {"label": "Fabricator: every upgrade built"}
 		var info: Dictionary = Game.UPGRADES[id]
 		if not Game.can_fabricate(id):
-			return {"label": "%s: the fabricator overheats on heavy builds until cooling is fixed" % info["name"]}
+			return {"label": "%s: %s" % [info["name"], Game.NEEDS_TEXT[info["needs"]]]}
 		if Game.scrap < int(info["cost"]):
 			return {"label": "%s needs %d scrap (%s)" % [info["name"], info["cost"], info["effect"]]}
 		return {"label": "[E] Fabricate %s, %d scrap (%s)" % [info["name"], info["cost"], info["effect"]], "action": Game.buy_upgrade.bind(id)}
 	return {}
 
 
-func _take_cell() -> void:
-	station.take_cell()
-	Game.take_cell()
-	# The cell's hum draws the scuttlers out: an ambush on the way home.
-	var home := kestrel.global_position
-	var from := station.global_position
-	for t in [0.35, 0.55, 0.75]:
-		var p: Vector3 = from.lerp(home, t)
-		var side := (home - from).cross(Vector3.UP).normalized() * (9.0 if t != 0.55 else -9.0)
-		spawn_scuttler(p + side + Vector3.UP * 0.5).alert(false)
+func _take_component(id: String) -> void:
+	var site: ExpeditionSite = sites[id]
+	site.take_component()
+	Game.take_component(site.component_id)
+	# Taking it stirs the wildlife: an ambush at the site, and on the way home for the first one.
+	for p in site.ambush_points():
+		spawn_enemy("scuttler", p).alert(false)
+	if id == "aux_power":
+		var home := kestrel.global_position
+		var from := site.global_position
+		for t in [0.35, 0.55, 0.75]:
+			var p: Vector3 = from.lerp(home, t)
+			var side := (home - from).cross(Vector3.UP).normalized() * (9.0 if t != 0.55 else -9.0)
+			spawn_scuttler(p + side + Vector3.UP * 0.5).alert(false)
 
 
-func _take_manifold() -> void:
-	wreck.take_manifold()
-	Game.take_manifold()
-	# Prising it loose rattles the whole hull: scuttlers come up out of the pool.
-	for p in wreck.ambush_points():
-		spawn_scuttler(p).alert(false)
-
-
-func _install_manifold() -> void:
-	kestrel.set_repaired("cooling", true)
-	Game.install_manifold()
+func _install(id: String) -> void:
+	Game.install_component()
+	kestrel.set_repaired(id, true)
 
 
 func _search_crate(site: Node3D, i: int) -> void:
@@ -210,21 +289,39 @@ func _search_crate(site: Node3D, i: int) -> void:
 	hud.show_message("Found %d scrap." % found)
 
 
-func _install_cell() -> void:
-	kestrel.set_repaired("aux_power", true)
-	Game.install_cell()
+func _resupply() -> void:
+	player.weapon.refill()
+	player.health = player.max_health()
+	player.health_changed.emit(player.health, player.max_health())
+	hud.show_message("Resupplied: magazine full, suit patched.")
+	Sfx.play("rifle_reload", null, -2.0, 0.0)
+
+
+## Lifts off. The full departure sequence lives in a later milestone; this ends the run.
+func launch() -> void:
+	if Game.current_repair() != "" or Game.launched:
+		return
+	Game.launch()
+	hud.show_ending()
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.calm()
+	player.visible = false
+	player.set_physics_process(false)
+	var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(kestrel, "position:y", kestrel.position.y + 80.0, 8.0)
+	Sfx.play("power_up")
 
 
 func _waypoint():
-	match Game.stage:
-		Game.Stage.RECOVER_CELL:
-			return station.cell_point()
-		Game.Stage.RETURN_CELL:
-			return kestrel.to_global(kestrel.interact_points["aux_power"])
-		Game.Stage.FIND_MANIFOLD:
-			return wreck.manifold_point()
-		Game.Stage.RETURN_MANIFOLD:
-			return kestrel.to_global(kestrel.interact_points["cooling"])
+	match Game.phase():
+		"find":
+			return current_site().component_point()
+		"return":
+			return install_point(Game.current_repair())
+		"launch":
+			return install_point("launch")
+		"done":
+			return null
 	var id := Game.next_upgrade()
 	if id != "" and Game.can_fabricate(id) and Game.scrap >= int(Game.UPGRADES[id]["cost"]):
 		return kestrel.to_global(kestrel.plan(FABRICATOR_POINT.x, FABRICATOR_POINT.y, FABRICATOR_POINT.z))
@@ -244,8 +341,8 @@ func _on_scuttler_died(s: Scuttler) -> void:
 
 ## Aux power brings the ship to life: a hum you can hear from the workshop.
 func _on_repair_changed(id: String, repaired: bool) -> void:
-	if id == "cooling":
-		Game.cooling_repaired = repaired
+	Game.set_repaired(id, repaired)
+	_update_active_site()
 	if id != "aux_power":
 		return
 	if repaired and _ship_hum == null:
@@ -270,13 +367,13 @@ func _on_player_died() -> void:
 # --- Setup --------------------------------------------------------------------------------
 
 func _dev_text() -> String:
-	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T station · G wreck · H home"]
+	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home"]
 	for i in Kestrel.REPAIR_ORDER.size():
 		var id := Kestrel.REPAIR_ORDER[i]
 		lines.append("%d %s %s" % [i + 1, Kestrel.REPAIR_NAMES[id], "■" if kestrel.is_repaired(id) else "□"])
 	var boom := player.boom_current()
 	lines.append("Camera boom %.1f m%s" % [boom, "  SQUEEZED" if boom < player.boom_target() - 0.2 else ""])
-	lines.append("Scuttlers alive: %d" % get_tree().get_nodes_in_group("scuttlers").size())
+	lines.append("Hostiles alive: %d" % get_tree().get_nodes_in_group("enemies").size())
 	return "\n".join(lines)
 
 
@@ -315,6 +412,9 @@ func _build_environment() -> void:
 	_env.glow_enabled = true
 	_env.glow_intensity = 0.6
 	_env.fog_enabled = true
+	# Volumetric fog stays at zero density globally; it lets local FogVolumes (spore fog) render.
+	_env.volumetric_fog_enabled = true
+	_env.volumetric_fog_density = 0.0
 	var world := WorldEnvironment.new()
 	world.environment = _env
 	add_child(world)

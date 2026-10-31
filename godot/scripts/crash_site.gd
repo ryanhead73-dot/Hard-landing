@@ -7,7 +7,11 @@ const SEED := 7
 const SIZE := 400.0
 const SHIP_CLEAR_RADIUS := 22.0
 ## Other sites that props must keep clear of: [centre, radius]. Matches main.tscn.
-const KEEP_CLEAR := [[Vector3(-60.0, 0.0, 58.0), 22.0], [Vector3(48.0, 0.0, -58.0), 30.0]]
+const KEEP_CLEAR := [
+	[Vector3(-60.0, 0.0, 58.0), 22.0], [Vector3(48.0, 0.0, -58.0), 30.0], [Vector3(-82.0, 0.0, -28.0), 24.0],
+	[Vector3(14.0, 0.0, 86.0), 34.0], [Vector3(86.0, 0.0, 28.0), 26.0], [Vector3(-28.0, 0.0, -90.0), 36.0],
+	[Vector3(-102.0, 0.0, 20.0), 24.0],
+]
 
 var _moss_mat: StandardMaterial3D
 var _rim_mat: StandardMaterial3D
@@ -65,6 +69,16 @@ func _build_ridges(rng: RandomNumberGenerator) -> void:
 		var angle := TAU * i / 40.0 + rng.randf_range(-0.05, 0.05)
 		var dist := rng.randf_range(115.0, 150.0)
 		var size := Vector3(rng.randf_range(25.0, 45.0), rng.randf_range(12.0, 36.0), rng.randf_range(20.0, 35.0))
+		# Push the ridge outward until it clears every expedition site.
+		var reach := maxf(size.x, size.z) * 0.6
+		for step in 30:
+			var at := Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+			var clear := true
+			for zone in KEEP_CLEAR:
+				clear = clear and at.distance_to(zone[0]) > zone[1] + reach
+			if clear:
+				break
+			dist += 3.0
 		var rock := _static_box(size, slate)
 		rock.position = Vector3(cos(angle) * dist, size.y * 0.5 - 3.0, sin(angle) * dist)
 		rock.rotation = Vector3(rng.randf_range(-0.15, 0.15), rng.randf_range(0.0, TAU), rng.randf_range(-0.15, 0.15))

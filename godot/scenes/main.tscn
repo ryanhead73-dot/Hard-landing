@@ -1,10 +1,15 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/crash_site.gd" id="2_site"]
 [ext_resource type="Script" path="res://scripts/kestrel.gd" id="3_kestrel"]
 [ext_resource type="Script" path="res://scripts/relay_station.gd" id="4_station"]
 [ext_resource type="Script" path="res://scripts/hauler_wreck.gd" id="5_wreck"]
+[ext_resource type="Script" path="res://scripts/spire_skiff.gd" id="6_spire_skiff"]
+[ext_resource type="Script" path="res://scripts/quarry_crawler.gd" id="7_quarry_crawler"]
+[ext_resource type="Script" path="res://scripts/moss_dropship.gd" id="8_moss_dropship"]
+[ext_resource type="Script" path="res://scripts/freighter_graveyard.gd" id="9_freighter_graveyard"]
+[ext_resource type="Script" path="res://scripts/loom_spire.gd" id="10_loom_spire"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -23,3 +28,23 @@ script = ExtResource("4_station")
 [node name="HaulerWreck" type="Node3D" parent="."]
 transform = Transform3D(0.77, 0, -0.637, 0, 1, 0, 0.637, 0, 0.77, 48, 0, -58)
 script = ExtResource("5_wreck")
+
+[node name="SpireSkiff" type="Node3D" parent="."]
+transform = Transform3D(0.323, 0, 0.946, 0, 1, 0, -0.946, 0, 0.323, -82, 0, -28)
+script = ExtResource("6_spire_skiff")
+
+[node name="QuarryCrawler" type="Node3D" parent="."]
+transform = Transform3D(-0.987, 0, -0.161, 0, 1, 0, 0.161, 0, -0.987, 14, 0, 86)
+script = ExtResource("7_quarry_crawler")
+
+[node name="MossDropship" type="Node3D" parent="."]
+transform = Transform3D(-0.310, 0, -0.951, 0, 1, 0, 0.951, 0, -0.310, 86, 0, 28)
+script = ExtResource("8_moss_dropship")
+
+[node name="FreighterGraveyard" type="Node3D" parent="."]
+transform = Transform3D(0.955, 0, 0.297, 0, 1, 0, -0.297, 0, 0.955, -28, 0, -90)
+script = ExtResource("9_freighter_graveyard")
+
+[node name="LoomSpire" type="Node3D" parent="."]
+transform = Transform3D(-0.192, 0, 0.981, 0, 1, 0, -0.981, 0, -0.192, -102, 0, 20)
+script = ExtResource("10_loom_spire")
