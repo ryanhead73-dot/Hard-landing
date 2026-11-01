@@ -23,6 +23,10 @@ var _shell: StandardMaterial3D
 func _init() -> void:
 	max_health = 60.0
 	speed = 5.0
+	# The glowing spine ridge along its back.
+	weak_joint = "Body"
+	weak_offset = Vector3(0.0, 0.42, 0.05)
+	weak_radius = 0.45
 
 
 func _setup() -> void:

@@ -129,6 +129,7 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	player.weapon.ammo_changed.connect(_on_ammo_changed)
 	player.weapon.hit_confirmed.connect(hud.hitmarker)
+	player.weapon.crit_landed.connect(hud.crit_marker)
 	Game.scrap_changed.connect(hud.set_scrap)
 	Game.objective_changed.connect(hud.set_objective)
 	Game.message.connect(hud.show_message)

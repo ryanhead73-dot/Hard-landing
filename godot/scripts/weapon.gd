@@ -7,6 +7,8 @@ extends Node3D
 signal fired
 signal ammo_changed(in_mag: int, mag_size: int, reloading: bool)
 signal hit_confirmed(killed: bool)
+## A shot landed on a weak spot (emitted after hit_confirmed).
+signal crit_landed
 signal switched(id: String)
 
 const ORDER: Array[String] = ["rifle", "scattergun", "arc_lance"]
@@ -180,13 +182,18 @@ func try_fire(aiming: bool) -> bool:
 	var s := spec()
 	var hit_any := false
 	var killed_any := false
+	var crit_any := false
 	for p in int(s["pellets"]):
 		var result := _trace(spread(aiming), float(s["range"]), int(s["pierce"]))
 		hit_any = hit_any or result[0]
 		killed_any = killed_any or result[1]
+		crit_any = crit_any or result[2]
 	if hit_any:
 		hit_confirmed.emit(killed_any)
-		Sfx.play("kill_tick" if killed_any else "hit_tick", null, -4.0, 0.0)
+		if crit_any:
+			crit_landed.emit()
+		var tick := "kill_tick" if killed_any else ("hit_crit" if crit_any else "hit_tick")
+		Sfx.play(tick, null, -4.0, 0.0)
 	_show_flash()
 	Sfx.play(s["sound"], null, -3.0, 0.08)
 	fired.emit()
@@ -196,7 +203,7 @@ func try_fire(aiming: bool) -> bool:
 	return true
 
 
-## One ray (or pellet). Returns [hit an enemy, killed one].
+## One ray (or pellet). Returns [hit an enemy, killed one, hit a weak spot].
 func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 	var dir := -camera.global_basis.z
 	dir = dir.rotated(camera.global_basis.x, randf_range(-spread_amount, spread_amount))
@@ -211,6 +218,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 	var end := origin + dir * max_range
 	var hit := false
 	var killed := false
+	var crit := false
 	var damage := shot_damage()
 	for i in pierce:
 		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * max_range, Game.LAYER_WORLD | Game.LAYER_ENEMY)
@@ -226,6 +234,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 			if current == "scattergun":
 				falloff = clampf(1.0 - (origin.distance_to(end) - 8.0) / 20.0, 0.35, 1.0)
 			killed = target.take_damage(damage * falloff, result.position, dir) or killed
+			crit = crit or bool(target.get("last_hit_crit"))
 			hit = true
 			_impact(result.position, result.normal)
 			exclude.append((target as CollisionObject3D).get_rid())
@@ -238,7 +247,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 		_beam(_muzzle.global_position, end)
 	else:
 		_tracer(_muzzle.global_position, end)
-	return [hit, killed]
+	return [hit, killed, crit]
 
 
 func _emit_ammo() -> void:

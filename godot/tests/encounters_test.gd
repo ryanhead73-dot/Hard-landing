@@ -14,6 +14,7 @@ func _run() -> void:
 	await _lurker()
 	await _director()
 	await _weather()
+	await _weak_spots()
 	finished = true
 
 
@@ -213,6 +214,72 @@ func _weather() -> void:
 	w.enabled = false
 	w.clear_storm(true)
 	_clear_enemies()
+
+
+func _weak_spots() -> void:
+	var open := _open_point()
+	player.revive(open + Vector3(0.0, 0.0, 30.0))
+	await _frames(5)
+	for kind in ["scuttler", "spitter", "ram", "lurker"]:
+		var at := open + Vector3(0.0, 0.0, -6.0)
+		at.y = main.site.height_at(at.x, at.z) + 0.2
+		var e: Enemy = main.spawn_enemy(kind, at)
+		if e is Lurker:
+			_check("a submerged lurker shows no weak spot", e.weak_spot() == Vector3.INF)
+			e.state = Lurker.State.RECOVER
+			e._timer = 99.0
+		await _frames(30)
+		await get_tree().physics_frame
+		var ws := e.weak_spot()
+		_check("%s has a weak spot" % kind, ws != Vector3.INF)
+		if ws == Vector3.INF:
+			continue
+		# Straight down onto the glowing part, then square into its flank at mid height.
+		var top := _ray(ws + Vector3.UP * 3.0, ws + Vector3.DOWN * 2.0)
+		var mid := e.global_position + Vector3.UP * 0.45
+		var side_dir := e.global_basis.x
+		var flank := _ray(mid + side_dir * 5.0, mid - side_dir * 2.0)
+		_check("%s: a shot onto its weak spot crits" % kind, top != Vector3.INF and e.is_weak_hit(top, Vector3.DOWN), "%s vs %s" % [top, ws])
+		_check("%s: a shot into its flank does not" % kind, flank != Vector3.INF and not e.is_weak_hit(flank, -side_dir), "%s vs %s" % [flank, ws])
+		_check("%s: a blast never crits" % kind, not e.is_weak_hit(ws, Vector3.ZERO))
+		var hp := e.health
+		e.take_damage(10.0, top, Vector3.DOWN)
+		_check("%s: the crit hits harder" % kind, e.last_hit_crit and hp - e.health >= 10.0 * Enemy.CRIT_MULT - 0.01, "%.1f" % (hp - e.health))
+		e.take_damage(9999.0, e.global_position, Vector3.ZERO)
+		await _frames(3)
+	_clear_enemies()
+
+	# End to end: the rifle aimed at a scuttler's back ridge lands crits and the HUD shows them.
+	player.revive(open)
+	await _frames(5)
+	var target := open + Vector3(0.0, 0.0, -7.0)
+	target.y = main.site.height_at(target.x, target.z) + 0.2
+	var sc: Scuttler = main.spawn_enemy("scuttler", target)
+	sc.max_health = 9999.0
+	sc.health = 9999.0
+	await _frames(10)
+	var crits := [0]
+	player.weapon.crit_landed.connect(func(): crits[0] += 1)
+	var shown: int = main.hud.crits_shown
+	for i in 40:
+		if crits[0] > 0 or not is_instance_valid(sc):
+			break
+		var ws := sc.weak_spot()
+		player.aim_at(ws)
+		await get_tree().physics_frame
+		player.weapon._cooldown = 0.0
+		player.weapon.in_mag = maxi(player.weapon.in_mag, 2)
+		player.weapon.try_fire(true)
+		await _frames(2)
+	_check("aimed at the glowing ridge, the rifle lands a crit", crits[0] > 0 and sc.crits_taken > 0)
+	_check("the HUD shows a crit marker", main.hud.crits_shown > shown)
+	_clear_enemies()
+
+
+func _ray(from: Vector3, to: Vector3) -> Vector3:
+	var q := PhysicsRayQueryParameters3D.create(from, to, Game.LAYER_ENEMY)
+	var r := get_viewport().get_world_3d().direct_space_state.intersect_ray(q)
+	return r.position if not r.is_empty() else Vector3.INF
 
 
 ## A point out on the basin where packs roam, found by walking rings round the ship.
