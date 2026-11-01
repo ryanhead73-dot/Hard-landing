@@ -25,6 +25,7 @@ var _wander := Vector3.ZERO
 func _init() -> void:
 	max_health = 45.0
 	speed = 4.2
+	stagger_damage = 25.0
 	sight_range = 30.0
 	drops = Vector2i(1, 2)
 	# The acid sac on its back.
@@ -142,6 +143,19 @@ func _on_hurt(_dir: Vector3) -> void:
 	Sfx.play("scuttler_hurt", global_position, -4.0, 0.25)
 
 
+## A spit in the wind-up chokes off: the sac dims and it has to work up another.
+func _stagger(dir: Vector3) -> bool:
+	if state != State.MOVE and state != State.WINDUP:
+		return false
+	state = State.RECOVER
+	_timer = 0.7
+	_spit_timer = maxf(_spit_timer, 1.2)
+	_sac.emission_energy_multiplier = 1.0
+	velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 3.0
+	Sfx.play("scuttler_hurt", global_position, 0.0, 0.3)
+	return true
+
+
 func _on_alert() -> void:
 	if state == State.IDLE:
 		state = State.MOVE
@@ -159,6 +173,10 @@ func _die() -> void:
 	super._die()
 	Sfx.play("spitter_death", global_position, 0.0, 0.1)
 	_sac.emission_energy_multiplier = 0.0
+	var push := Vector3(last_hit_dir.x, 0.0, last_hit_dir.z)
+	if push.length() > 0.01:
+		var slide := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+		slide.tween_property(self, "global_position", global_position + push.normalized() * 1.0, 0.35)
 	var tween := create_tween()
 	tween.tween_property(_visual, "rotation:z", 1.4, 0.35)
 	tween.tween_interval(2.5)
