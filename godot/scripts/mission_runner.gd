@@ -14,6 +14,9 @@ extends Node
 ## `timer_range` of `pos`: run out and every device comes undone (`slip_text`, `slip_say`, and
 ## the site's `on_slip`), then the clock starts again. `harass` kinds spawn at `harass_pts` when
 ## the clock first starts and top up on each slip.
+## An activate stage with an `order` must be worked in that order (each device's `reading` shows
+## in its prompt as the clue); the wrong one undoes the stage (`wrong_text`, `wrong_say`,
+## `wrong_damage` to Juno, and the site's `on_wrong`).
 ## After the last stage comes the implicit "take" stage. Stage index and the devices done in the
 ## current stage live in Game (mission_stage, mission_done) so they save with the session.
 
@@ -71,6 +74,7 @@ func setup(game_main: Node) -> void:
 				d.kind = spec.get("kind", "breaker")
 				d.position = spec["pos"]
 				d.rotation.y = spec.get("yaw", 0.0)
+				d.pulse_rate = spec.get("pulse_rate", 4.0)
 				d.name = "Mission%s" % d.kind.capitalize()
 				site.add_child(d)
 				list.append(d)
@@ -189,6 +193,8 @@ func interaction(pos: Vector3) -> Dictionary:
 			continue
 		var spec: Dictionary = specs[i]
 		var label: String = spec.get("label", "Work the device")
+		if spec.has("reading"):
+			label += "  ·  %s" % spec["reading"]
 		if s["type"] == "defend":
 			if _defend_running:
 				return {"label": "%s: %d%%" % [s.get("bar", "WORKING").capitalize(), int(defend_ratio() * 100.0)]}
@@ -487,6 +493,10 @@ func _complete_device(index: int) -> void:
 	var si := stage_index(id)
 	if index in Game.mission_done:
 		return
+	var s0 := stage(id)
+	if s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index:
+		_wrong_order(id, s0, index)
+		return
 	Game.mission_done.append(index)
 	var d: MissionDevice = devices[id][si][index]
 	d.set_state(MissionDevice.State.DONE)
@@ -501,6 +511,28 @@ func _complete_device(index: int) -> void:
 		_advance(id)
 	else:
 		_update_objective()
+
+
+## Worked out of order: everything in the stage comes undone, and it hurts.
+func _wrong_order(id: String, s: Dictionary, index: int) -> void:
+	var si := stage_index(id)
+	var d: MissionDevice = devices[id][si][index]
+	Game.mission_done.clear()
+	for dev in devices[id][si]:
+		(dev as MissionDevice).set_state(MissionDevice.State.PENDING, true)
+	var site: ExpeditionSite = main.sites[id]
+	if site.has_method("on_wrong"):
+		site.call("on_wrong", si, index)
+	Sfx.play("steam_burst", d.global_position, 0.0, 0.05)
+	Vfx.burst(get_tree().current_scene, d.global_position + Vector3.UP * 0.8, Color(0.9, 0.92, 0.9, 0.7), 30, 5.0, 0.25, 0.8, Vector3.UP, 50.0, 1.0)
+	var hurt := float(s.get("wrong_damage", 0.0))
+	if hurt > 0.0:
+		main.player.take_damage(hurt, d.global_position)
+	main.player.add_trauma(0.5)
+	main.hud.show_message(s.get("wrong_text", "Wrong order. It all came undone."))
+	if s.has("wrong_say"):
+		main.voice.interrupt(s["wrong_say"])
+	_update_objective()
 
 
 ## A search spot turned over: the find ends the stage; anything else is scrap, or a nest.

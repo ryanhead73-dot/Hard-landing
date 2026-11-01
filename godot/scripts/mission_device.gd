@@ -13,6 +13,8 @@ const BODY := Color("4a4f52")
 const TRIM := Color("c4622d")
 
 var kind := "breaker"
+## How fast the pending lamp pulses (a gauge reading: faster is more urgent).
+var pulse_rate := 4.0
 var state := State.DORMANT
 
 var _lamp_mat: StandardMaterial3D
@@ -30,7 +32,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if state == State.PENDING and _lamp_mat:
-		var k := 0.5 + 0.5 * sin(_time * 4.0)
+		var k := 0.5 + 0.5 * sin(_time * pulse_rate)
 		_lamp_mat.emission_energy_multiplier = 1.5 + 4.0 * k
 		_lamp_light.light_energy = 0.4 + 0.8 * k
 
