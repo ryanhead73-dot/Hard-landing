@@ -5,7 +5,8 @@ extends "res://tests/test_base.gd"
 ##   godot --headless --path . res://tests/audio_test.tscn
 
 const ARENA := Vector3(45.0, 0.5, 45.0)
-const LOOPS := ["wind_loop", "ship_hum_loop", "music_calm", "music_combat", "music_finale", "amb_springs_loop", "amb_loom_loop", "amb_interior_loop", "spool_loop"]
+const LOOPS := ["wind_loop", "ship_hum_loop", "music_calm", "music_combat", "music_finale", "amb_springs_loop", "amb_loom_loop",
+	"amb_interior_loop", "amb_moss_loop", "amb_wreck_loop", "spool_loop"]
 
 
 func _name() -> String:
@@ -16,6 +17,7 @@ func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
 	_library()
+	await _variants()
 	_buses()
 	await _music()
 	await _ambience()
@@ -32,14 +34,32 @@ func _library() -> void:
 	_check("every sound loads", missing.is_empty(), ", ".join(missing))
 	var not_looping: PackedStringArray = []
 	for id in LOOPS:
-		var s := Sfx.stream(id) as AudioStreamWAV
-		if s == null or s.loop_mode == AudioStreamWAV.LOOP_DISABLED:
+		if not Sfx.loops(Sfx.stream(id)):
 			not_looping.append(id)
 	_check("loops have loop points", not_looping.is_empty(), ", ".join(not_looping))
 	var lengths := [Sfx.stream("music_calm").get_length(), Sfx.stream("music_combat").get_length(), Sfx.stream("music_finale").get_length()]
 	_check("music stems are the same length", absf(lengths[0] - lengths[1]) < 0.01 and absf(lengths[0] - lengths[2]) < 0.01 and lengths[0] > 10.0, str(lengths))
 	var stray := Sfx.get_children().filter(func(c): return c is AudioStreamPlayer and (c as AudioStreamPlayer).stream in LOOPS.map(func(id): return Sfx.stream(id)))
 	_check("no loops left running on the Sfx autoload", stray.is_empty())
+
+
+func _variants() -> void:
+	_check("rifle shots have variants", Sfx.variant_count("rifle_shot") >= 3, str(Sfx.variant_count("rifle_shot")))
+	_check("footsteps have variants", Sfx.variant_count("footstep_0") >= 4 and Sfx.variant_count("step_metal") >= 4)
+	var seen := {}
+	for i in 40:
+		seen[Sfx.pick("rifle_shot")] = true
+	_check("plays pick between variants", seen.size() >= 2, str(seen.size()))
+	var interior := AudioServer.get_bus_index("Interior")
+	_check("an Interior reverb bus feeds Master", interior > 0 and AudioServer.get_bus_effect(interior, 0) is AudioEffectReverb)
+	var zones := kestrel.find_children("ReverbZone*", "Area3D", true, false)
+	_check("Kestrel's rooms send to the reverb bus", zones.size() >= 4 and (zones[0] as Area3D).reverb_bus_name == "Interior", str(zones.size()))
+	player.revive(kestrel.to_global(kestrel.plan(6.0, 1.3, 13.0)))
+	await _frames(3)
+	_check("Juno's boots ring on Kestrel's deck", player._on_metal())
+	player.revive(ARENA)
+	await _frames(3)
+	_check("and crunch on the basin", not player._on_metal())
 
 
 func _buses() -> void:
@@ -91,7 +111,13 @@ func _ambience() -> void:
 	player.revive(main.sites["navigation"].global_position + Vector3(0.0, 1.0, 6.0))
 	await get_tree().create_timer(1.0).timeout
 	_check("the Loom spire hums", a.zone == "loom" and a.levels["loom"] > 0.4, a.zone)
-	_check("ambience plays on its own bus", a.players.size() == 4 and a.players.values().all(func(p): return p.playing and p.bus == "Ambience"))
+	player.revive(main.sites["wing"].global_position + Vector3(0.0, 1.0, 6.0))
+	await _frames(5)
+	_check("the moss forest has its own bed", a.zone == "moss", a.zone)
+	player.revive(main.sites["engine"].global_position + Vector3(0.0, 1.0, 6.0))
+	await _frames(5)
+	_check("the freighter graveyard groans", a.zone == "wreck", a.zone)
+	_check("ambience plays on its own bus", a.players.size() == Ambience.LOOPS.size() and a.players.values().all(func(p): return p.playing and p.bus == "Ambience"))
 	player.revive(main.SPAWN)
 
 

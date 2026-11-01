@@ -69,6 +69,7 @@ func _build_crawler() -> void:
 	var steel := _mat(Color("3a3f43"), 0.5, 0.6)
 	var inner := _mat(Color("2a2d30"), 0.9)
 	Rig.spawn("site_crawler", self)
+	AudioZones.reverb_area(self, Vector3(6.6, 3.2, 13.2), Vector3(0.0, BAY_FLOOR + 1.6, -8.0), 0.6)
 	for side in [-1.0, 1.0]:
 		_collider(Vector3(1.6, 1.6, 15.0), Vector3(side * 4.4, 0.8, -8.0))
 		_collider(Vector3(0.3, 4.0, 14.0), Vector3(side * 3.45, 2.6, -8.0))
@@ -81,8 +82,8 @@ func _build_crawler() -> void:
 	_collider(Vector3(6.0, 3.0, 4.0), Vector3(0.0, 6.1, -13.0))
 	_collider(Vector3(1.0, 1.0, 9.0), Vector3(0.0, 3.0, -19.0), Vector3(-0.25, 0.0, 0.0))
 	# Bay floor plate, and the ramp up from the quarry floor.
-	_static_box(Vector3(6.6, 0.1, 13.2), Vector3(0.0, BAY_FLOOR - 0.05, -8.0), inner)
-	_slab(Vector3(0.0, 0.0, 2.6), Vector3(0.0, BAY_FLOOR, -1.6), 2.8, 0.3, steel)
+	_static_box(Vector3(6.6, 0.1, 13.2), Vector3(0.0, BAY_FLOOR - 0.05, -8.0), inner).set_meta("surface", "metal")
+	_slab(Vector3(0.0, 0.0, 2.6), Vector3(0.0, BAY_FLOOR, -1.6), 2.8, 0.3, steel).set_meta("surface", "metal")
 	# Dim red emergency lamp inside; the rest is up to the flashlight.
 	_light(Vector3(0.0, BAY_FLOOR + 2.8, -9.0), Color("ff3b2e"), 0.35, 5.0)
 	_mesh_box(Vector3(0.6, 0.08, 0.2), Vector3(0.0, BAY_FLOOR + 3.0, -9.0), _emissive(Color("ff3b2e"), 2.0))

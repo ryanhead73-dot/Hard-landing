@@ -1,19 +1,23 @@
 class_name Ambience
 extends Node
 ## The basin's background sound, crossfaded by where Juno is: wind in the open, bubbling hot
-## springs at the hauler wreck, the Loom's deep hum near the spire, and creaking room tone inside
-## Kestrel (her powered hum is a separate 3D loop in the workshop).
+## springs at the hauler wreck, the Loom's deep hum near the spire, insects and drips in the moss
+## forest, groaning metal in the freighter graveyard, and creaking room tone inside Kestrel (her
+## powered hum is a separate 3D loop in the workshop).
 
-const LOOPS := {"wind": "wind_loop", "springs": "amb_springs_loop", "loom": "amb_loom_loop", "interior": "amb_interior_loop"}
-const BASE_DB := {"wind": -14.0, "springs": -9.0, "loom": -7.0, "interior": -10.0}
+const LOOPS := {
+	"wind": "wind_loop", "springs": "amb_springs_loop", "loom": "amb_loom_loop", "interior": "amb_interior_loop",
+	"moss": "amb_moss_loop", "wreck": "amb_wreck_loop",
+}
+const BASE_DB := {"wind": -14.0, "springs": -9.0, "loom": -7.0, "interior": -10.0, "moss": -9.0, "wreck": -9.0}
 ## Which sites have their own ambience, and how close counts as being there.
-const SITE_ZONES := {"cooling": "springs", "navigation": "loom"}
-const SITE_RADIUS := 45.0
+const SITE_ZONES := {"cooling": "springs", "navigation": "loom", "wing": "moss", "engine": "wreck"}
+const SITE_RADIUS := 36.0
 const FADE := 0.6
 
 var main: Node
 var zone := "wind"
-var levels := {"wind": 1.0, "springs": 0.0, "loom": 0.0, "interior": 0.0}
+var levels := {"wind": 1.0, "springs": 0.0, "loom": 0.0, "interior": 0.0, "moss": 0.0, "wreck": 0.0}
 var players := {}
 
 

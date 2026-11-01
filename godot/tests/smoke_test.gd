@@ -14,8 +14,8 @@ func _run() -> void:
 	_check("relay station faces the ship", main.station.global_basis.z.dot((kestrel.global_position - main.station.global_position).normalized()) > 0.95)
 	_check("hauler wreck faces the ship", main.wreck.global_basis.z.dot((kestrel.global_position - main.wreck.global_position).normalized()) > 0.95)
 	_check("sound effects load", Sfx.SOUNDS.all(func(id): return Sfx.has_sound(id)))
-	var wind: AudioStreamWAV = load("res://audio/wind_loop.wav")
-	_check("wind loop has loop points", wind.loop_mode != AudioStreamWAV.LOOP_DISABLED and wind.loop_end > 0, "mode=%d end=%d" % [wind.loop_mode, wind.loop_end])
+	var wind := Sfx.stream("wind_loop")
+	_check("wind bed loads and loops", wind != null and Sfx.loops(wind), str(wind))
 	var pause: PauseMenu = main.find_children("*", "PauseMenu", false, false)[0]
 	pause.open()
 	_check("pause menu pauses the game", get_tree().paused and pause.visible)

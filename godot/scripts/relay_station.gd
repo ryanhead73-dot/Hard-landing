@@ -45,6 +45,7 @@ func _build_pad_and_building() -> void:
 	# x 7 m prefab round (0, 2, -5.5) with 0.2 m walls, a front door and two windows facing +z, a
 	# side door in the east wall and a hole in the roof. Collision is boxes matching its walls.
 	Rig.spawn("site_relay", self)
+	AudioZones.reverb_area(self, Vector3(9.6, 3.7, 6.6), Vector3(0.0, 1.95, -5.5), 0.45)
 	var wall := _mat(Color("8a8f86"), 0.9)
 	_collider(Vector3(10.0, 4.0, 0.2), Vector3(0.0, 2.0, -8.9))
 	_collider(Vector3(0.2, 4.0, 7.0), Vector3(-4.9, 2.0, -5.5))
