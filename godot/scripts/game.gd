@@ -103,14 +103,35 @@ func load_settings() -> void:
 	apply_settings()
 
 
-## Music and Ambience buses, both feeding Master, so music has its own volume setting.
+## Music and Ambience buses, both feeding Master, so music has its own volume setting; an
+## Interior reverb bus that enclosed spaces send to (AudioZones); and a limiter on Master so a
+## pile-up of explosions never clips.
 static func ensure_buses() -> void:
-	for bus_name in ["Music", "Ambience"]:
+	for bus_name in ["Music", "Ambience", "Interior"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			var i := AudioServer.bus_count - 1
 			AudioServer.set_bus_name(i, bus_name)
 			AudioServer.set_bus_send(i, "Master")
+			if bus_name == "Interior":
+				var verb := AudioEffectReverb.new()
+				verb.room_size = 0.42
+				verb.damping = 0.55
+				verb.spread = 0.8
+				verb.predelay_msec = 12.0
+				verb.dry = 0.0
+				verb.wet = 0.55
+				verb.hipass = 0.15
+				AudioServer.add_bus_effect(i, verb)
+	var has_limiter := false
+	for k in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, k) is AudioEffectHardLimiter:
+			has_limiter = true
+	if not has_limiter:
+		var limiter := AudioEffectHardLimiter.new()
+		limiter.ceiling_db = -0.5
+		limiter.pre_gain_db = 0.0
+		AudioServer.add_bus_effect(0, limiter)
 
 
 func save_settings() -> void:

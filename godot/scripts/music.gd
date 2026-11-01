@@ -1,6 +1,6 @@
 class_name MusicDirector
 extends Node
-## Adaptive music. Three stems at the same tempo and length (tools/make_sfx.py) start together
+## Adaptive music. Three stems at the same tempo and length (tools/audio/make_music.py) start together
 ## and loop in lockstep; the mood only changes their volumes. Calm always plays. Combat comes in
 ## when wildlife is hunting near Juno or Kestrel is under siege, and the finale layer drives the
 ## engine spool and the launch.

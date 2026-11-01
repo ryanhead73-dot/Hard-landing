@@ -99,6 +99,7 @@ var turret: PointDefense
 
 
 func _ready() -> void:
+	add_to_group("kestrel")
 	rebuild()
 
 
@@ -319,6 +320,8 @@ func _build_lighting() -> void:
 		probe.blend_distance = 0.3
 		add_child(probe)
 		_interior_probes.append(probe)
+		# Sounds inside ring off the room's walls.
+		AudioZones.reverb_area(self, probe.size, probe.position, 0.55, String(room["id"]))
 
 
 # --- Repairs ------------------------------------------------------------------------------

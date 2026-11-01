@@ -1,6 +1,8 @@
 extends Node
-## Sound effects. Autoloaded as "Sfx". Sounds are WAVs in res://audio named after their key,
-## so a recorded file with the same name replaces the generated placeholder.
+## Sound effects. Autoloaded as "Sfx". Sounds live in res://audio named after their key: WAVs
+## for effects (tools/audio/make_sfx.py), Ogg Vorbis for music and ambience beds
+## (tools/audio/make_music.py), so a recorded file with the same name replaces a generated one.
+## A sound can have variants, <id>__1, <id>__2...; each play picks one at random.
 
 const SOUNDS: Array[String] = [
 	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "kill_tick",
@@ -15,19 +17,53 @@ const SOUNDS: Array[String] = [
 	"amb_springs_loop", "amb_loom_loop", "amb_interior_loop", "spool_loop",
 	"crash_impact", "repair_clunk", "log_chime", "ui_click", "warden_slam",
 	"spitter_death", "ram_death", "launch_roar", "splash_0", "splash_1", "roll_whoosh",
+	"step_metal", "amb_moss_loop", "amb_wreck_loop",
 ]
+const MAX_VARIANTS := 8
 
 var _streams: Dictionary = {}
+var _variants: Dictionary = {}
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for id in SOUNDS:
-		var path := "res://audio/%s.wav" % id
+		var s := _load(id)
+		if s == null:
+			push_warning("Sfx: missing res://audio/%s" % id)
+			continue
+		_streams[id] = s
+		var all: Array[AudioStream] = [s]
+		for k in range(1, MAX_VARIANTS):
+			var v := _load("%s__%d" % [id, k])
+			if v == null:
+				break
+			all.append(v)
+		_variants[id] = all
+
+
+static func _load(id: String) -> AudioStream:
+	for ext in [".wav", ".ogg"]:
+		var path := "res://audio/%s%s" % [id, ext]
 		if ResourceLoader.exists(path):
-			_streams[id] = load(path)
-		else:
-			push_warning("Sfx: missing %s" % path)
+			var s: AudioStream = load(path)
+			# Ogg beds are music and ambience: they always loop.
+			if s is AudioStreamOggVorbis:
+				(s as AudioStreamOggVorbis).loop = true
+			return s
+	return null
+
+
+func variant_count(id: String) -> int:
+	return _variants.get(id, []).size()
+
+
+## One of the sound's variants, at random.
+func pick(id: String) -> AudioStream:
+	var all: Array = _variants.get(id, [])
+	if all.is_empty():
+		return null
+	return all[randi() % all.size()]
 
 
 func has_sound(id: String) -> bool:
@@ -53,13 +89,23 @@ func loop_flat(id: String, owner: Node, volume_db := 0.0, bus := "Master") -> Au
 	return p
 
 
+## Whether a stream loops on its own (loop points in a WAV, or an Ogg set to loop).
+static func loops(s: AudioStream) -> bool:
+	if s is AudioStreamWAV:
+		return (s as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED
+	if s is AudioStreamOggVorbis:
+		return (s as AudioStreamOggVorbis).loop
+	return false
+
+
 ## Plays a one-shot. Pass a position for a 3D sound, or leave it out for a flat UI-style sound.
 func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06) -> void:
 	if not _streams.has(id):
 		return
+	var chosen := pick(id)
 	if at is Vector3:
 		var p3 := AudioStreamPlayer3D.new()
-		p3.stream = _streams[id]
+		p3.stream = chosen
 		p3.volume_db = volume_db
 		p3.unit_size = 8.0
 		p3.max_distance = 80.0
@@ -70,7 +116,7 @@ func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06
 		p3.finished.connect(p3.queue_free)
 	else:
 		var p := AudioStreamPlayer.new()
-		p.stream = _streams[id]
+		p.stream = chosen
 		p.volume_db = volume_db
 		p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
 		add_child(p)
@@ -83,7 +129,7 @@ func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06
 func loop(id: String, parent: Node3D, volume_db := 0.0) -> Node:
 	if not _streams.has(id) or parent == null:
 		return null
-	# Loop points come from the WAV's smpl chunk (see tools/make_sfx.py). A replacement file
+	# Loop points come from the WAV's smpl chunk (see tools/audio/make_sfx.py). A replacement file
 	# without them still loops, by restarting when it ends.
 	var s: AudioStream = _streams[id]
 	var p3 := AudioStreamPlayer3D.new()

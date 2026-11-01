@@ -428,8 +428,24 @@ func _footsteps(delta: float) -> void:
 		if site and site.in_pool(global_position):
 			Vfx.splash(get_parent(), global_position + Vector3.UP * 0.05, 1.3 if _sprinting else 1.0)
 			Sfx.play("splash_%d" % _foot, global_position, -12.0 if crouching else -6.0, 0.12)
+		elif _on_metal():
+			Sfx.play("step_metal", global_position, -13.0 if crouching else -8.0, 0.08)
 		else:
 			Sfx.play("footstep_%d" % _foot, global_position, -14.0 if crouching else -9.0, 0.1)
+
+
+## Deck plates: Kestrel's floors, and any floor tagged with a "metal" surface (the wrecks' decks).
+func _on_metal() -> bool:
+	var k = get_tree().get_first_node_in_group("kestrel")
+	if k and k.is_inside(global_position):
+		return true
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i)
+		if c.get_normal().y > 0.7:
+			var body := c.get_collider() as Node
+			if body and body.get_meta("surface", "") == "metal":
+				return true
+	return false
 
 
 func _update_crouch(want: bool) -> void:

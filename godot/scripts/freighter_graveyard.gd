@@ -78,6 +78,7 @@ func _build_site() -> void:
 ## The engine section lies along z with its nozzle open toward the maze.
 func _build_engine() -> void:
 	Rig.spawn("site_engine", self)
+	AudioZones.reverb_area(self, Vector3(7.0, 7.0, 11.6), Vector3(0.0, 4.2, -24.0), 0.7)
 	# Collision: the shell as a ring of boxes and the bulkhead as a disc.
 	for i in 24:
 		var a := TAU * i / 24.0
@@ -92,8 +93,8 @@ func _build_engine() -> void:
 	cap.position = Vector3(0.0, 4.2, -29.8)
 	cap.rotation.x = PI * 0.5
 	add_child(cap)
-	_static_box(Vector3(4.6, 0.2, 11.6), Vector3(0.0, ENGINE_FLOOR - 0.1, -23.8), _mat(Color("3a3f43"), 0.5, 0.6))
-	_slab(Vector3(0.0, 0.0, -15.6), Vector3(0.0, ENGINE_FLOOR, -18.2), 3.0, 0.3, _mat(Color("3a3f43"), 0.5, 0.6))
+	_static_box(Vector3(4.6, 0.2, 11.6), Vector3(0.0, ENGINE_FLOOR - 0.1, -23.8), _mat(Color("3a3f43"), 0.5, 0.6)).set_meta("surface", "metal")
+	_slab(Vector3(0.0, 0.0, -15.6), Vector3(0.0, ENGINE_FLOOR, -18.2), 3.0, 0.3, _mat(Color("3a3f43"), 0.5, 0.6)).set_meta("surface", "metal")
 	_light(Vector3(0.0, 3.4, -24.0), Color("ff9a5a"), 1.0, 7.0)
 	for i in 6:
 		var a := TAU * i / 6.0
