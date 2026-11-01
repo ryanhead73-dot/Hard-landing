@@ -26,6 +26,17 @@ static var sight_scale := 1.0
 ## Set before adding to the tree to make a named elite: bigger, much tougher, with a health bar.
 var elite_name := ""
 const ELITE_SCALE := 1.5
+## Shots that land on a creature's glowing weak spot (spines, sac, vents, eyes) hit this much harder,
+## and ignore armour.
+const CRIT_MULT := 1.75
+## The weak spot: a point `weak_offset` in the frame of rig joint `weak_joint`, `weak_radius` wide.
+var weak_joint := ""
+var weak_offset := Vector3.ZERO
+var weak_radius := 0.0
+## Whether the last hit taken was on the weak spot.
+var last_hit_crit := false
+var crits_taken := 0
+var _weak: Node3D
 const ELITE_HEALTH := 4.0
 const ELITE_MIN_HEALTH := 280.0
 
@@ -104,7 +115,13 @@ func is_dead() -> bool:
 func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Vector3.ZERO) -> bool:
 	if dead:
 		return false
-	health -= amount * _damage_scale(point, dir)
+	var mult := _damage_scale(point, dir)
+	last_hit_crit = is_weak_hit(point, dir)
+	if last_hit_crit:
+		mult = maxf(mult, 1.0) * CRIT_MULT
+		crits_taken += 1
+		_crit_effect(point)
+	health -= amount * mult
 	_on_hurt(dir)
 	_flash()
 	if health > 0.0:
@@ -114,6 +131,29 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		return true
 	alert(true)
 	return false
+
+
+## Where the weak spot is now, or Vector3.INF when it has none or it is hidden.
+func weak_spot() -> Vector3:
+	if _weak == null or not is_instance_valid(_weak) or not _weak_open():
+		return Vector3.INF
+	return _weak.global_transform * weak_offset
+
+
+## True when a shot (not a blast: blasts have no direction) at `point` lands on the weak spot.
+func is_weak_hit(point: Vector3, dir: Vector3) -> bool:
+	if dir == Vector3.ZERO:
+		return false
+	var at := weak_spot()
+	if at == Vector3.INF:
+		return false
+	return point.distance_to(at) <= weak_radius * (ELITE_SCALE if is_elite() else 1.0)
+
+
+func _crit_effect(point: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	Vfx.burst(get_parent(), point, Color("ffd36a"), 14, 5.0, 0.06, 0.3, Vector3.UP, 120.0, -6.0)
 
 
 ## Starts hunting. Nearby wildlife joins in when the alarm spreads.
@@ -141,6 +181,11 @@ func calm() -> void:
 ## Multiplier for incoming damage (armour, weak spots).
 func _damage_scale(_point: Vector3, _dir: Vector3) -> float:
 	return 1.0
+
+
+## Whether the weak spot can be hit right now.
+func _weak_open() -> bool:
+	return true
 
 
 func _on_hurt(_dir: Vector3) -> void:
@@ -260,6 +305,8 @@ func _flash_rig(root: Node) -> void:
 ## Loads a creature's model under `parent` and registers it for hit flashes.
 func _load_rig(model: String, parent: Node3D) -> Node3D:
 	_rig = Rig.spawn(model, parent)
+	if weak_joint != "":
+		_weak = Rig.joint(_rig, weak_joint)
 	_flash_rig(_rig)
 	anim = CreatureAnimator.new()
 	anim.name = "Animator"

@@ -622,8 +622,17 @@ def spool_loop(v):
 
 
 # Peak levels, so the mix keeps the balance the game's volume settings were tuned against.
+@sound("hit_crit", 2)
+def hit_crit(v):
+    """A weak-spot hit: a wet crack under a bright two-note ping, sharper than hit_tick."""
+    crack = bp(white(0.09), 900 + 200 * v, 4200) * env(0.09, 0.0005, 0.07)
+    ping = place(0.22, (0, osc(2350 + 120 * v, 0.08) * env(0.08, 0.0005, 0.07)),
+                 (0.035, osc(3140 + 160 * v, 0.16) * env(0.16, 0.0005, 0.14)))
+    return place(0.22, (0, crack * 0.8), (0, ping * 0.4))
+
+
 PEAKS = {
-    "hit_tick": 0.5, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
+    "hit_tick": 0.5, "hit_crit": 0.55, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
     "stim": 0.6, "acid_splash": 0.7, "spitter_charge": 0.6, "spitter_spit": 0.7, "ram_paw": 0.8, "ram_charge": 0.85,
     "ram_stun": 0.9, "warden_roar": 0.9, "siege_horn": 0.7, "crash_impact": 0.95, "repair_clunk": 0.85, "log_chime": 0.5,

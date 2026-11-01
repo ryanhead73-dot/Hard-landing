@@ -43,6 +43,10 @@ func _init() -> void:
 	alert_radius = 0.0
 	drops = Vector2i(3, 4)
 	death_puff = 1.3
+	# The eye stalks: the only bit showing while it waits, and only hittable once it surfaces.
+	weak_joint = "Head"
+	weak_offset = Vector3(0.0, 0.25, -0.15)
+	weak_radius = 0.42
 
 
 func _setup() -> void:
@@ -196,6 +200,10 @@ func _damage_scale(_point: Vector3, _dir: Vector3) -> float:
 	if state == State.WINDUP:
 		return 1.5
 	return 1.0
+
+
+func _weak_open() -> bool:
+	return state != State.SUBMERGED
 
 
 func _on_hurt(dir: Vector3) -> void:
