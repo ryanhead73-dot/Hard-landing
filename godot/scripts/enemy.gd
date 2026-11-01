@@ -37,6 +37,11 @@ var weak_radius := 0.0
 var last_hit_crit := false
 var crits_taken := 0
 var _weak: Node3D
+## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
+## circle at a distance and wait their turn, so a pack reads as a pack and not a pile-up.
+const ATTACKERS := [1, 2, 3]
+## Per target (instance id): the creatures holding an attack slot on it.
+static var _slots: Dictionary = {}
 const ELITE_HEALTH := 4.0
 const ELITE_MIN_HEALTH := 280.0
 
@@ -171,6 +176,7 @@ func alert(spread := true) -> void:
 
 ## Gives up and goes home, for example when the player goes down.
 func calm() -> void:
+	_release_slot()
 	if not dead:
 		hunting = false
 		_on_calm()
@@ -201,6 +207,7 @@ func _on_calm() -> void:
 
 
 func _die() -> void:
+	_release_slot()
 	dead = true
 	hunting = false
 	remove_from_group("enemies")
@@ -215,6 +222,35 @@ func _die() -> void:
 
 
 # --- Helpers ------------------------------------------------------------------------------
+
+## Takes (or keeps) one of the target's attack slots. Only Juno is rationed; anything else, like
+## a point on Kestrel's hull, can be swarmed.
+func _has_slot() -> bool:
+	if not _target_alive() or not target.is_in_group("player"):
+		return true
+	var key := target.get_instance_id()
+	var held: Array = _slots.get(key, [])
+	held = held.filter(func(e): return is_instance_valid(e) and not e.dead and e.hunting and e.target == target)
+	_slots[key] = held
+	if self in held:
+		return true
+	if held.size() < ATTACKERS[clampi(Game.difficulty, 0, 2)]:
+		held.append(self)
+		return true
+	return false
+
+
+## Hands the slot on, after a bite or when giving up.
+func _release_slot() -> void:
+	for key in _slots:
+		(_slots[key] as Array).erase(self)
+
+
+## How many creatures hold slots on `who` right now (tests).
+static func attackers_on(who: Node) -> int:
+	var held: Array = _slots.get(who.get_instance_id(), [])
+	return held.filter(func(e): return is_instance_valid(e) and not e.dead).size()
+
 
 func _target_alive() -> bool:
 	return target != null and is_instance_valid(target) and not ("dead" in target and target.dead)

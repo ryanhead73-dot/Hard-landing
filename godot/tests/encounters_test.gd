@@ -18,6 +18,7 @@ func _run() -> void:
 	await _caches()
 	await _skimmer()
 	await _map()
+	await _pack_tactics()
 	finished = true
 
 
@@ -456,6 +457,42 @@ func _map() -> void:
 	var p := MapPanel.to_map(Vector3(-MapPanel.HALF, 0.0, MapPanel.HALF))
 	_check("map corners line up with the basin", p.is_equal_approx(Vector2(0.0, MapPanel.VIEW)), str(p))
 	_check("spotted caches are saved", (Game.session_state()["caches_seen"] as Array).has(c.index))
+
+
+func _pack_tactics() -> void:
+	_clear_enemies()
+	await _frames(3)
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var pack: Array[Scuttler] = []
+	for k in 5:
+		var a := TAU * k / 5.0
+		pack.append(main.spawn_enemy("scuttler", open + Vector3(cos(a), 0.0, sin(a)) * 9.0))
+	await _frames(2)
+	for s in pack:
+		s.alert(false)
+	var most := 0
+	var waited := false
+	var ring_ok := true
+	var closest := 99.0
+	var biters := {}
+	for i in 60 * 7:
+		await get_tree().physics_frame
+		player.health = player.max_health()
+		most = maxi(most, Enemy.attackers_on(player))
+		for s in pack:
+			if s.state == Scuttler.State.WINDUP:
+				biters[s.get_instance_id()] = true
+			if s.is_waiting() and _flat_distance(s.global_position, player.global_position) < Scuttler.RING + 1.5:
+				waited = true
+				closest = minf(closest, _flat_distance(s.global_position, player.global_position))
+				ring_ok = closest > 2.2
+	_check("only two close in to bite at once on normal", most > 0 and most <= Enemy.ATTACKERS[1], str(most))
+	_check("the rest circle and wait their turn", waited)
+	_check("waiting ones keep their distance", ring_ok, "closest %.1f m" % closest)
+	_check("they take turns", biters.size() >= 3, "%d biters" % biters.size())
+	_clear_enemies()
 
 
 func _ray(from: Vector3, to: Vector3) -> Vector3:
