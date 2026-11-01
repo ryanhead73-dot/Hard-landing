@@ -35,6 +35,12 @@ func _ready() -> void:
 		if shot[1] == "pool" and shot[0] == "lurker_pool":
 			var lp: Array = main.wildlife.lurker_pools[0]
 			shot = [shot[0], "", lp[0] + Vector3(lp[1] + 5.0, 0.8, 3.0), lp[0]]
+		elif shot[1] == "cache":
+			var c: Node3D = main.wildlife.caches[2]
+			var back := 40.0 if shot[0] == "cache_far" else 6.0
+			var from: Vector3 = c.global_position + Vector3(back * 0.8, 0.0, back * 0.6)
+			from.y = main.site.height_at(from.x, from.z) + 0.5
+			shot = [shot[0], "", from, c.global_position + Vector3.UP * (2.0 if back > 10.0 else 0.4)]
 		elif shot[1] == "pool":
 			var pool: Array = main.site.pools[1]
 			shot = [shot[0], "", pool[0] + Vector3(pool[1] + 6.0, 0.5, 4.0), pool[0]]
@@ -136,6 +142,8 @@ func _shots() -> Array:
 		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
 		["lurker", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 0.6, 30.0)],
 		["lurker_pool", "pool", Vector3.ZERO, Vector3.ZERO],
+		["cache", "cache", Vector3.ZERO, Vector3.ZERO],
+		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],

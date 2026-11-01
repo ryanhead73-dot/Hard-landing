@@ -381,6 +381,8 @@ func scanner_marks() -> Array:
 		for i in site.crate_count():
 			if not site.crate_searched(i) and site.crate_point(i).distance_to(pos) < SCAN_CRATES:
 				marks.append({"pos": site.crate_point(i), "kind": "crate"})
+	if wildlife:
+		marks.append_array(wildlife.cache_marks(pos, SCAN_CRATES))
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.global_position.distance_to(pos) < SCAN_ENEMIES:
 			marks.append({"pos": e.global_position, "kind": "enemy"})
@@ -432,6 +434,7 @@ func load_state(data: Dictionary) -> void:
 		if site_states.has(id):
 			(sites[id] as ExpeditionSite).set_state(site_states[id])
 	missions.restore()
+	wildlife.restore()
 	var pending := int(data.get("siege_pending", -1))
 	if pending >= 0:
 		siege.arm(pending)
@@ -495,6 +498,9 @@ func _find_interaction() -> Dictionary:
 		for i in site.crate_count():
 			if not site.crate_searched(i) and pos.distance_to(site.crate_point(i)) < INTERACT_RANGE:
 				return {"label": "[E] Search salvage crate", "action": _search_crate.bind(site, i)}
+	var cache := wildlife.cache_interaction(pos, INTERACT_RANGE) if wildlife else {}
+	if not cache.is_empty():
+		return cache
 	if current != "" and _near_install(current):
 		var r := Campaign.get_repair(current)
 		if Game.carrying == r["component"]:

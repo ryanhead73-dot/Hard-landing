@@ -68,6 +68,8 @@ var launched := false
 var launch_objective := ""
 ## Story logs found, in the order they were found.
 var logs: Array[String] = []
+## Drift caches out on the basin that have been opened, by index (see wildlife.gd).
+var caches_opened: Array[int] = []
 ## Owned weapons, and ammo per weapon: id -> [in magazine, reserve] (reserve -1 is unlimited).
 var weapons: Array[String] = ["rifle"]
 var ammo: Dictionary = {}
@@ -167,6 +169,7 @@ func reset() -> void:
 	stims = 1
 	charges = 1
 	logs.clear()
+	caches_opened.clear()
 	launch_objective = ""
 	mission_stage.clear()
 	mission_done.clear()
@@ -212,6 +215,7 @@ func session_state() -> Dictionary:
 		"stims": stims,
 		"charges": charges,
 		"logs": logs.duplicate(),
+		"caches_opened": caches_opened.duplicate(),
 		"mission_stage": mission_stage.duplicate(),
 		"mission_done": mission_done.duplicate(),
 	}
@@ -243,6 +247,9 @@ func apply_session(data: Dictionary) -> void:
 	for i in data.get("mission_done", []):
 		mission_done.append(int(i))
 	logs.assign(data.get("logs", []).filter(func(id): return not Story.get_log(String(id)).is_empty()))
+	caches_opened.clear()
+	for i in data.get("caches_opened", []):
+		caches_opened.append(int(i))
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()

@@ -15,6 +15,7 @@ func _run() -> void:
 	await _director()
 	await _weather()
 	await _weak_spots()
+	await _caches()
 	finished = true
 
 
@@ -274,6 +275,76 @@ func _weak_spots() -> void:
 	_check("aimed at the glowing ridge, the rifle lands a crit", crits[0] > 0 and sc.crits_taken > 0)
 	_check("the HUD shows a crit marker", main.hud.crits_shown > shown)
 	_clear_enemies()
+
+
+func _caches() -> void:
+	var w: Wildlife = main.wildlife
+	_check("drift caches lie out on the basin", w.caches.size() == Wildlife.CACHE_COUNT, str(w.caches.size()))
+	var ship: Vector3 = kestrel.global_position
+	var bad: PackedStringArray = []
+	var space := get_viewport().get_world_3d().direct_space_state
+	for c in w.caches:
+		var p := c.global_position
+		if _flat_distance(p, ship) < Wildlife.SHIP_CLEAR + 10.0:
+			bad.append("%d near the ship" % c.index)
+		if main.site.on_path(p.x, p.z) or main.site.in_pool(p):
+			bad.append("%d on a path or in a pool" % c.index)
+		for o in w.caches:
+			if o != c and _flat_distance(p, o.global_position) < Wildlife.CACHE_SPACING - 0.1:
+				bad.append("%d crowds %d" % [c.index, o.index])
+		var q := PhysicsShapeQueryParameters3D.new()
+		var sphere := SphereShape3D.new()
+		sphere.radius = 1.6
+		q.shape = sphere
+		q.transform = Transform3D(Basis(), p + Vector3.UP * 2.0)
+		q.collision_mask = Game.LAYER_WORLD
+		q.exclude = [(c.get_node("DriftCache") as CollisionObject3D).get_rid()]
+		if not space.intersect_shape(q, 4).is_empty():
+			bad.append("%d inside rock" % c.index)
+	_check("each sits on open ground, apart, clear of rock, paths and pools", bad.is_empty(), ", ".join(bad))
+	_check("a locator beam shows where each one is", w.caches.all(func(c): return c.get_node("Locator").visible))
+	_check("some have a nest under them", w.caches.filter(func(c): return c.guarded).size() == Wildlife.CACHE_GUARDED.size())
+
+	# The scanner picks them up once the canopy is back.
+	var plain: BasinCache = w.caches[0]
+	player.revive(plain.global_position + Vector3(0.0, 0.3, 6.0))
+	await _frames(5)
+	Game.repaired["canopy"] = true
+	_check("the scanner shows a nearby cache", main.scanner_marks().any(func(m): return m["kind"] == "crate" and m["pos"].distance_to(plain.global_position) < 0.1))
+	Game.repaired.clear()
+
+	# Prising one open.
+	player.revive(plain.global_position + Vector3(0.0, 0.3, 1.5))
+	await _frames(5)
+	var offer: Dictionary = main._find_interaction()
+	_check("up close it offers to prise the cache open", String(offer.get("label", "")).contains("drift cache"), str(offer.get("label", "")))
+	var scrap := Game.scrap
+	if offer.has("action"):
+		offer["action"].call()
+	await _frames(3)
+	_check("it pays out scrap", Game.scrap >= scrap + 12, "%d -> %d" % [scrap, Game.scrap])
+	_check("opened, it goes dark", plain.opened and not plain.get_node("Locator").visible and 0 in Game.caches_opened)
+	_check("its log is found", Story.get_log("basin_1") != {} and "basin_1" in Game.logs)
+	_check("an opened cache offers nothing more", not String(main._find_interaction().get("label", "")).contains("drift cache"))
+	_check("an opened cache drops off the scanner", w.cache_marks(plain.global_position, 5.0).is_empty())
+
+	# A nest under one.
+	var nest: BasinCache = w.caches[Wildlife.CACHE_GUARDED[0]]
+	player.revive(nest.global_position + Vector3(0.0, 0.3, 1.5))
+	await _frames(5)
+	var guards := w.open_cache(nest.index)
+	await _frames(3)
+	_check("opening a nested cache brings the pack up", guards.size() >= 3 and guards.all(func(e): return e.hunting), str(guards.size()))
+	_check("they come up round it, close", guards.all(func(e): return _flat_distance(e.global_position, nest.global_position) < 9.0))
+	_check("Juno sees it coming", Wildlife.CACHE_LINES.any(func(l): return main.voice.heard(String(l[1]).left(12))))
+	_clear_enemies()
+
+	# Saved and restored.
+	var data := Game.session_state()
+	_check("opened caches are saved", (data["caches_opened"] as Array).has(nest.index))
+	Game.caches_opened.append(3)
+	w.restore()
+	_check("loading a save darkens the caches already opened", w.caches[3].opened and not w.caches[3].get_node("Locator").visible)
 
 
 func _ray(from: Vector3, to: Vector3) -> Vector3:
