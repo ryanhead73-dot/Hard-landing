@@ -10,6 +10,11 @@ const ROCKFALL_POINTS := [
 	Vector3(8.5, 0.0, 2.0), Vector3(-3.0, 0.0, 6.5), Vector3(4.0, 0.0, -19.5),
 ]
 const BAY_FLOOR := 1.1
+## Scuttler burrows in the quarry floor: the fuse thief runs between them.
+const BURROWS := [
+	Vector3(-14.0, 0.0, 4.0), Vector3(14.0, 0.0, -14.0), Vector3(-14.0, 0.0, -16.0),
+	Vector3(6.0, 0.0, 13.0), Vector3(-3.0, 0.0, 15.0), Vector3(14.5, 0.0, 1.0),
+]
 
 var _rockfalls: Array[Node3D] = []
 
@@ -43,6 +48,17 @@ func _build_site() -> void:
 	_build_quarry()
 	_build_crawler()
 	_build_rockfalls()
+	_build_burrows()
+
+
+func _build_burrows() -> void:
+	var rim := _mat(Color("2d3133"), 0.95)
+	var hole := _mat(Color("050606"), 1.0)
+	# Low spoil rings (no collider, so the thief can run straight in) round a black mouth.
+	for b in BURROWS:
+		_disc(b, 1.35, 0.1, rim)
+		_disc(b + Vector3.UP * 0.06, 1.05, 0.1, rim)
+		_disc(b + Vector3.UP * 0.12, 0.65, 0.02, hole)
 
 
 func _build_quarry() -> void:
@@ -131,6 +147,15 @@ func _mission() -> Array:
 				{"pos": Vector3(2.4, BAY_FLOOR, -9.0), "kind": "floodlight", "label": "Restart the floodlight", "hold": 1.0},
 			],
 			"say": [[H, "It's black as pitch in that quarry, and the rams like the dark. The crew left floodlights on battery."]],
+		},
+		{
+			"type": "chase", "text": "Run down the scuttler that took the crane's fuse",
+			"name": "FUSE THIEF", "pos": Vector3(-1.0, 0.0, 6.0), "burrows": BURROWS,
+			"say": [
+				[H, "Lights are up. Now, the crane's fuse socket is empty, and there's a scuttler out there glowing like a lamp."],
+				[H, "It took the fuse! It'll dive for its burrows. Catch it in the open."],
+			],
+			"found": "Fuse recovered. The crane has power again.",
 		},
 		{
 			"type": "defend", "text": "Power the crawler's crane to lower the strut pack",

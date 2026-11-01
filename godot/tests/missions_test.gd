@@ -128,6 +128,8 @@ func _play_mission(r: Dictionary) -> void:
 				await _elite(id, s)
 			"search":
 				await _search(id, si, s)
+			"chase":
+				await _chase(id, si, s)
 		_check("%s stage %d (%s) completes" % [id, si, s["type"]], runner.stage_index(id) == si + 1, "at %d" % runner.stage_index(id))
 		if id == "cooling" and si == 0:
 			var vents := (site as HaulerWreck).vents()
@@ -172,6 +174,39 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 				await _go_to_device(d)
 			await _hold(hold + 0.4)
 		_check("%s stage %d device %d: worked" % [id, si, i], d.state == MissionDevice.State.DONE or runner.stage_index(id) > si)
+
+
+## A chase: the thief runs, the visor tracks it (and its burrow when it's under), it can't be
+## hit underground, it surfaces far from Juno, and killing it ends the stage.
+func _chase(id: String, si: int, s: Dictionary) -> void:
+	var site: ExpeditionSite = main.sites[id]
+	var start := site.to_global(s["pos"])
+	player.revive(start + Vector3(0.0, 0.3, 4.0))
+	await _frames(10)
+	var t: FuseThief = runner.thief()
+	_check("%s: the thief appears" % id, t != null and is_instance_valid(t) and t.display_name() == s["name"])
+	if t == null:
+		return
+	_check("%s: its name bar shows" % id, main.hud._boss == t)
+	var near := player.global_position.distance_to(t.global_position)
+	await get_tree().create_timer(1.5).timeout
+	var far := player.global_position.distance_to(t.global_position)
+	_check("%s: the thief runs from her" % id, far > near + 2.0, "%.1f -> %.1f" % [near, far])
+	var wp = runner.waypoint()
+	_check("%s: the waypoint tracks the thief" % id, wp is Vector3 and (wp as Vector3).distance_to(t.track_point()) < 0.5 and (t.is_under() or t.track_point() == t.global_position))
+	t._dive()
+	await _frames(2)
+	var hp := t.health
+	t.take_damage(50.0, t.global_position, Vector3.FORWARD)
+	_check("%s: underground it can't be hit" % id, t.is_under() and t.health == hp and not t.visible)
+	wp = runner.waypoint()
+	_check("%s: underground the visor shows where it'll surface" % id, wp is Vector3 and t.burrows.any(func(b): return b.distance_to(wp) < 0.1))
+	await get_tree().create_timer(FuseThief.UNDER_TIME + 0.3).timeout
+	var from_her := Vector2(t.global_position.x - player.global_position.x, t.global_position.z - player.global_position.z).length()
+	_check("%s: it surfaces well away from her" % id, not t.is_under() and t.visible and from_her >= FuseThief.SAFE, "%.1f m" % from_her)
+	t.take_damage(99999.0, t.global_position, Vector3.FORWARD)
+	await _frames(4)
+	_check("%s: killing the thief gets the fuse back" % id, runner.stage_index(id) == si + 1 and runner.thief() == null and main.hud._boss == null)
 
 
 ## An ordered stage: the prompt shows the clue, and working one out of turn undoes the stage

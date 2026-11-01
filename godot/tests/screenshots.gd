@@ -99,6 +99,16 @@ func _ready() -> void:
 					Game.caches_seen.append(c.index)
 			main.wildlife.caches[2].set_opened()
 			main.map_panel.open()
+		if shot[0] == "thief":
+			# The fuse thief caught in the open, loot glowing, beside a burrow.
+			var t := FuseThief.new()
+			t.thief_name = "FUSE THIEF"
+			main.spawn_enemy_node(t, main.sites["landing_gear"].to_global(Vector3(-11.5, 0.0, 4.5)))
+			main.hud.show_boss(t)
+			await _frames(2)
+			t.look_at(at, Vector3.UP)
+			t.rotate_y(PI * 0.6)
+			beasts.append(t)
 		if String(shot[0]).begins_with("skimmer"):
 			# Hanging before the dive, belly lit, or (skimmer_dive) stooping with wings swept.
 			var fwd: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
@@ -179,6 +189,7 @@ func _shots() -> Array:
 		["skimmer", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
 		["skimmer_dive", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
+		["thief", "landing_gear", Vector3(-6.0, 0.5, 9.0), Vector3(-12.5, 0.6, 4.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
