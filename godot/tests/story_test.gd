@@ -32,6 +32,11 @@ func _data() -> void:
 		if sources.has(key):
 			bad.append("two logs at " + key)
 		sources[key] = true
+		if l["site"] == "basin":
+			var cache_src: String = l["source"]
+			if not cache_src.begins_with("cache:") or int(cache_src.substr(6)) >= main.wildlife.caches.size():
+				bad.append("no drift cache for " + key)
+			continue
 		if Campaign.index_of(l["site"]) < 0:
 			bad.append("unknown site " + l["site"])
 			continue
