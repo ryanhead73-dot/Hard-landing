@@ -117,6 +117,8 @@ func _play_mission(r: Dictionary) -> void:
 				player.revive(site.to_global(s["pos"]) + Vector3.UP * 0.2)
 				await _frames(10)
 			"activate", "pulse":
+				if s.has("timer"):
+					await _timed(id, si, s)
 				await _work_devices(id, si, s)
 			"defend":
 				await _defend(id, si, s)
@@ -159,7 +161,7 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 			if i == 0:
 				# A short hold is not enough, and letting go cancels it.
 				await _hold(hold * 0.4)
-				_check("%s: letting go early cancels the hold" % id, d.state == MissionDevice.State.PENDING and not main.hud.task_visible())
+				_check("%s: letting go early cancels the hold" % id, d.state == MissionDevice.State.PENDING and runner.channel_ratio() < 0.0 and (not main.hud.task_visible() or runner.clock_ratio() >= 0.0))
 				if s["type"] == "pulse":
 					await _check_pulse_breaks(id, d, hold)
 			if s["type"] == "pulse":
@@ -167,6 +169,41 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 				await _go_to_device(d)
 			await _hold(hold + 0.4)
 		_check("%s stage %d device %d: worked" % [id, si, i], d.state == MissionDevice.State.DONE or runner.stage_index(id) > si)
+
+
+## A timed stage: the clock waits for Juno, harassers come with it, and running out undoes
+## every device and starts the clock again.
+func _timed(id: String, si: int, s: Dictionary) -> void:
+	var site: ExpeditionSite = main.sites[id]
+	var list: Array = runner.devices[id][si]
+	# The climb ends right at the anchors, so the clock is already going: start it over as if
+	# she had just come back from afar (a load, or a death).
+	runner._stop_clock()
+	player.revive(site.to_global(s["pos"]) + Vector3(0.0, 0.3, float(s.get("timer_range", MissionRunner.TIMER_RANGE)) + 25.0))
+	await _frames(10)
+	_check("%s: the clock waits until she's there" % id, runner.clock_ratio() < 0.0)
+	var unreachable := range(list.size()).filter(func(i): return _stand_spot(list[i]) == Vector3.INF)
+	_check("%s: every timed device can be reached" % id, unreachable.is_empty(), str(unreachable))
+	await _go_to_device(list[0])
+	var harassers := get_tree().get_nodes_in_group("enemies").filter(func(e): return e is Skimmer).size()
+	_check("%s: the clock starts when she arrives" % id, runner.clock_ratio() > 0.9, "%.2f" % runner.clock_ratio())
+	_check("%s: harassers come with the clock" % id, harassers >= s.get("harass", []).size(), str(harassers))
+	_check("%s: the clock shows on the task bar" % id, main.hud.task_visible())
+	_clear_enemies()
+	await _frames(2)
+	await _hold(float(s["devices"][0]["hold"]) + 0.4)
+	_check("%s: a device locks against the clock" % id, 0 in Game.mission_done, str(Game.mission_done))
+	var skiff_before: Vector3 = site.get("_skiff").position if site.get("_skiff") else Vector3.ZERO
+	runner._clock = 0.05
+	await _frames(4)
+	_check("%s: running out undoes every device" % id, Game.mission_done.is_empty() and list[0].state == MissionDevice.State.PENDING and runner.slips() == 1, "%s, slips %d" % [Game.mission_done, runner.slips()])
+	_check("%s: and the clock starts again" % id, runner.clock_ratio() > 0.9 and runner.stage_index(id) == si, "%.2f" % runner.clock_ratio())
+	_check("%s: the harassers top back up" % id, get_tree().get_nodes_in_group("enemies").filter(func(e): return e is Skimmer and not e.is_queued_for_deletion()).size() >= s.get("harass", []).size())
+	await get_tree().create_timer(0.8).timeout
+	if site.get("_skiff"):
+		_check("%s: the Lark lurches toward the brink" % id, (site.get("_skiff") as Node3D).position.distance_to(skiff_before) > 0.1)
+	_clear_enemies()
+	await _frames(3)
 
 
 ## A search: the waypoint only finds the area, the signal leads to the find, wrong spots pay

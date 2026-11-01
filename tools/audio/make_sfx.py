@@ -689,6 +689,17 @@ def signal_ping(v):
     return blip * 0.6
 
 
+@sound("hull_groan")
+def hull_groan(v):
+    """A stranded hull shifting on rock: a low bending moan, a grinding scrape, a jolt."""
+    d = 2.8
+    moan = modal(d, metal_modes(62, 10, 2.2, 2.4)) * 0.7
+    bend = osc(sweep(95, 60, d), d) * env(d, 0.4, 2.2) * 0.35
+    scrape = bp(white(1.6), 300, 1800) * env(1.6, 0.15, 1.2) * 0.45
+    jolt = thud(48, 0.8, 0.6) * 1.6
+    return outdoor(place(d, (0, moan), (0, bend), (0.6, scrape), (1.7, sat(jolt, 2.0))), 0.5)
+
+
 PEAKS = {
     "hit_tick": 0.5, "hit_crit": 0.55, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
@@ -701,6 +712,7 @@ PEAKS = {
     "thunder": 0.9,
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
     "signal_ping": 0.4, "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
+    "hull_groan": 0.9,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).
