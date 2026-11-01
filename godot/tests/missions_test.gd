@@ -119,6 +119,8 @@ func _play_mission(r: Dictionary) -> void:
 			"activate", "pulse":
 				if s.has("timer"):
 					await _timed(id, si, s)
+				if s.has("order"):
+					await _ordered(id, si, s)
 				await _work_devices(id, si, s)
 			"defend":
 				await _defend(id, si, s)
@@ -147,7 +149,8 @@ func _play_mission(r: Dictionary) -> void:
 func _work_devices(id: String, si: int, s: Dictionary) -> void:
 	var list: Array = runner.devices[id][si]
 	_check("%s stage %d: devices are lit" % [id, si], range(list.size()).all(func(i): return list[i].state == (MissionDevice.State.DONE if i in Game.mission_done else MissionDevice.State.PENDING)))
-	for i in list.size():
+	var seq: Array = s.get("order", range(list.size()))
+	for i in seq:
 		var d: MissionDevice = list[i]
 		if i in Game.mission_done:
 			continue
@@ -158,7 +161,7 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 		if hold <= 0.0:
 			await _press("interact")
 		else:
-			if i == 0:
+			if i == seq[0]:
 				# A short hold is not enough, and letting go cancels it.
 				await _hold(hold * 0.4)
 				_check("%s: letting go early cancels the hold" % id, d.state == MissionDevice.State.PENDING and runner.channel_ratio() < 0.0 and (not main.hud.task_visible() or runner.clock_ratio() >= 0.0))
@@ -169,6 +172,29 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 				await _go_to_device(d)
 			await _hold(hold + 0.4)
 		_check("%s stage %d device %d: worked" % [id, si, i], d.state == MissionDevice.State.DONE or runner.stage_index(id) > si)
+
+
+## An ordered stage: the prompt shows the clue, and working one out of turn undoes the stage
+## and hurts.
+func _ordered(id: String, si: int, s: Dictionary) -> void:
+	var list: Array = runner.devices[id][si]
+	var order: Array = s["order"]
+	var first: int = order[0]
+	await _go_to_device(list[first])
+	_check("%s: the prompt shows the reading" % id, _label().contains(s["devices"][first]["reading"]), _label())
+	await _hold(float(s["devices"][first].get("hold", 0.0)) + 0.4)
+	_check("%s: the right one first holds" % id, Game.mission_done == [first], str(Game.mission_done))
+	var wrong: int = order[2] if order.size() > 2 else order[0]
+	var health := player.health
+	await _go_to_device(list[wrong])
+	await _hold(float(s["devices"][wrong].get("hold", 0.0)) + 0.4)
+	_check("%s: out of turn undoes the stage" % id, Game.mission_done.is_empty() and list[first].state == MissionDevice.State.PENDING and runner.stage_index(id) == si, str(Game.mission_done))
+	_check("%s: and it hurts" % id, player.health < health or s.get("wrong_damage", 0.0) <= 0.0, "%.0f -> %.0f" % [health, player.health])
+	if id == "cooling":
+		var vents := (main.sites[id] as HaulerWreck).vents()
+		_check("cooling: the blow-back reopens the vents", vents.all(func(v): return not v.is_shut()))
+	player.health = player.max_health()
+	await _frames(3)
 
 
 ## A timed stage: the clock waits for Juno, harassers come with it, and running out undoes
@@ -317,6 +343,9 @@ func _elite(id: String, s: Dictionary) -> void:
 
 ## Saves halfway through the cooling mission (valves shut, one clamp cut) and loads it back.
 func _check_save_mid_mission() -> void:
+	# The valves come first: an ordered stage, so try it out of turn before finishing it.
+	_clear_enemies()
+	await _ordered("cooling", 0, runner.stage("cooling"))
 	runner.complete_stage()
 	runner._complete_device(0)
 	await _frames(3)
