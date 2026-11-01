@@ -20,6 +20,7 @@ const SOUNDS: Array[String] = [
 	"step_metal", "amb_moss_loop", "amb_wreck_loop", "charge_throw", "charge_bounce", "charge_blast",
 	"lurker_emerge", "lurker_hiss", "lurker_bite", "lurker_hurt", "lurker_death", "lurker_dive",
 	"rain_loop", "thunder",
+	"skimmer_screech", "skimmer_dive", "skimmer_rake", "skimmer_flap", "skimmer_hurt", "skimmer_death",
 ]
 const MAX_VARIANTS := 8
 

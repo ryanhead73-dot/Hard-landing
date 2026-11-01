@@ -16,6 +16,7 @@ func _run() -> void:
 	await _weather()
 	await _weak_spots()
 	await _caches()
+	await _skimmer()
 	finished = true
 
 
@@ -345,6 +346,85 @@ func _caches() -> void:
 	Game.caches_opened.append(3)
 	w.restore()
 	_check("loading a save darkens the caches already opened", w.caches[3].opened and not w.caches[3].get_node("Locator").visible)
+
+
+func _skimmer() -> void:
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var at := open + Vector3(0.0, 0.0, -12.0)
+	var sk: Skimmer = main.spawn_enemy("skimmer", at)
+	sk.alert(false)
+	var ground: float = main.site.height_at(open.x, open.z)
+	var top := 0.0
+	var beats := {}
+	var states := {}
+	for i in 60 * 9:
+		await get_tree().physics_frame
+		top = maxf(top, sk.global_position.y - ground)
+		states[sk.anim_state()] = true
+		beats[int(sk.anim.wing_beat / 8.0)] = true
+		if sk.state == Skimmer.State.WINDUP:
+			break
+	_check("a skimmer takes off and climbs to cruise height", top > sk.cruise_height - 1.5, "%.1f m" % top)
+	_check("it wheels overhead before it commits", states.has("circle"))
+	_check("its wings beat", beats.size() >= 4, str(beats.size()))
+	_check("then it hangs and screams", sk.state == Skimmer.State.WINDUP)
+	var before := player.health
+	var raked := false
+	var lowest := 99.0
+	for i in 60 * 3:
+		await get_tree().physics_frame
+		lowest = minf(lowest, sk.global_position.y - ground)
+		if player.health < before:
+			raked = true
+			break
+	_check("it dives and rakes Juno on the way past", raked and sk.rakes == 1, "health %.0f -> %.0f, lowest %.1f m" % [before, player.health, lowest])
+	var climbed := false
+	for i in 60 * 3:
+		await get_tree().physics_frame
+		if sk.state == Skimmer.State.CLIMB or sk.state == Skimmer.State.CIRCLE:
+			climbed = true
+			break
+	_check("and climbs away to go round again", climbed, sk.anim_state())
+
+	# Shot out of the air mid-dive, it tumbles to the ground, stunned and soft.
+	sk.state = Skimmer.State.DIVE
+	sk._dive_dir = Vector3.DOWN
+	sk._timer = 1.0
+	sk.health = sk.max_health
+	sk.take_damage(20.0, sk.global_position, Vector3.FORWARD)
+	_check("a solid hit mid-dive knocks it down", sk.is_grounded())
+	var landed := false
+	for i in 60 * 2:
+		await get_tree().physics_frame
+		if sk.is_on_floor():
+			landed = true
+			break
+	_check("it falls to the rock", landed, "%.1f m up" % (sk.global_position.y - main.site.height_at(sk.global_position.x, sk.global_position.z)))
+	var hp := sk.health
+	sk.take_damage(10.0, sk.global_position, Vector3.FORWARD)
+	_check("grounded, it takes extra damage", hp - sk.health >= 14.9, "%.1f" % (hp - sk.health))
+	# The belly sac is its weak spot, shot from below.
+	sk._timer = 99.0
+	await get_tree().physics_frame
+	var ws := sk.weak_spot()
+	_check("its belly sac is a weak spot", ws != Vector3.INF and sk.is_weak_hit(ws + Vector3.DOWN * 0.15, Vector3.UP))
+	sk.take_damage(9999.0, sk.global_position, Vector3.FORWARD)
+	_check("it dies", sk.dead and sk.anim_state() == "dead")
+	_clear_enemies()
+
+	for id in ["aux_power", "cooling", "canopy"]:
+		Game.repaired[id] = true
+	var seen := false
+	for i in 60:
+		seen = seen or "skimmer" in main.wildlife.pack_kinds()
+	_check("skimmers join the packs once three repairs are in", seen)
+	Game.repaired.clear()
+	var early := false
+	for i in 60:
+		early = early or "skimmer" in main.wildlife.pack_kinds()
+	_check("but not before", not early)
 
 
 func _ray(from: Vector3, to: Vector3) -> Vector3:

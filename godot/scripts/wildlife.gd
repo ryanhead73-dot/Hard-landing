@@ -2,10 +2,10 @@ class_name Wildlife
 extends Node
 ## Life in the open basin between the sites, so the walks out and back are never empty:
 ## - Mire lurkers lie in the larger pools and wake the first time Juno comes near.
-## - Roaming packs cross the ground ahead of her, more often and tougher as Kestrel comes back
-##   to life (spitters once two repairs are in, rams from four). Never near the ship, never in
-##   a site's own patch, never during a siege or the launch, and they wander off when left far
-##   behind.
+## - Roaming packs cross the ground ahead of her, tougher as Kestrel comes back to life
+##   (spitters once two repairs are in, skimmers overhead from three, rams from four). Never
+##   near the ship, never in a site's own patch, never during a siege or the launch, and they
+##   wander off when left far behind.
 ## - Drift caches: cargo flung loose by ships that came down over the years, half-buried out
 ##   between the paths, their locator beams showing from far off. Each holds scrap and supplies,
 ##   some a log, and a few sit on a scuttler nest that boils up when the lid comes off.
@@ -109,6 +109,10 @@ func pack_kinds() -> Array:
 		kinds.append("spitter")
 	if repairs >= 4 and randf() < 0.4:
 		kinds[0] = "ram"
+	if repairs >= 3 and randf() < 0.45:
+		kinds.append("skimmer")
+		if repairs >= 5:
+			kinds.append("skimmer")
 	if Game.difficulty == 2:
 		kinds.append("scuttler")
 	return kinds

@@ -341,7 +341,7 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram", "lurker" or "warden". A name makes it an elite.
+## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer" or "warden". A name makes it an elite.
 func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 	var e: Enemy
 	match kind:
@@ -351,6 +351,8 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 			e = Ram.new()
 		"lurker":
 			e = Lurker.new()
+		"skimmer":
+			e = Skimmer.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)
