@@ -28,6 +28,8 @@ const CACHE_SEED := 7741
 ## Caches with a nest dug in under them.
 const CACHE_GUARDED := [1, 4, 6]
 const CACHE_SPACING := 24.0
+## How close Juno must come for a cache to go on her map.
+const CACHE_SPOT := 55.0
 const CACHE_LINES := [
 	[Story.JUNO, "Movement under the lid. Oh, that's a nest."],
 	[Story.JUNO, "Should have checked the ground first. Here they come."],
@@ -64,6 +66,7 @@ func update(delta: float) -> void:
 	if player == null or player.dead or Game.launched:
 		return
 	_wake_lurkers(player.global_position)
+	_spot_caches(player.global_position)
 	roamers.assign(roamers.filter(func(e): return is_instance_valid(e) and not e.dead))
 	for e in roamers.duplicate():
 		if _flat(e.global_position - player.global_position).length() > ROAM_DESPAWN and not e.hunting:
@@ -225,6 +228,13 @@ func _cache_spot_ok(p: Vector3, others: Array[Vector3]) -> bool:
 	q.transform = Transform3D(Basis(), p + Vector3.UP * 2.0)
 	q.collision_mask = Game.LAYER_WORLD
 	return space.intersect_shape(q, 1).is_empty()
+
+
+## Caches within sight of Juno go on her map.
+func _spot_caches(pos: Vector3) -> void:
+	for c in caches:
+		if not c.index in Game.caches_seen and _flat(pos - c.global_position).length() < CACHE_SPOT:
+			Game.caches_seen.append(c.index)
 
 
 ## What [E] does near an unopened cache, or {} when none is in reach.

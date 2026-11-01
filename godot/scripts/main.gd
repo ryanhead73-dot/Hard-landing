@@ -37,6 +37,7 @@ const KEYS := {
 	"weapon_3": [KEY_3],
 	"inventory": [KEY_TAB, KEY_I],
 	"logs": [KEY_L],
+	"map": [KEY_M],
 }
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
@@ -75,6 +76,7 @@ var wildlife: Wildlife
 var weather: Weather
 var voice: Voice
 var logs_panel: LogPanel
+var map_panel: MapPanel
 var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
@@ -156,6 +158,9 @@ func _ready() -> void:
 	add_child(inventory)
 	logs_panel = LogPanel.new()
 	add_child(logs_panel)
+	map_panel = MapPanel.new()
+	map_panel.main = self
+	add_child(map_panel)
 	voice = Voice.new()
 	voice.hud = hud
 	add_child(voice)
@@ -255,6 +260,8 @@ func _process(_delta: float) -> void:
 		inventory.open()
 	elif Input.is_action_just_pressed("logs") and not player.dead and not Game.launched:
 		logs_panel.open_latest()
+	elif Input.is_action_just_pressed("map") and not player.dead and not Game.launched:
+		map_panel.open()
 	hud.set_waypoint(_waypoint())
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta

@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
