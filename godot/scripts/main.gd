@@ -939,3 +939,5 @@ func set_daylight(amount: float) -> void:
 		_env.volumetric_fog_density = 0.0
 	site.set_glow(k)
 	site.set_rain(w)
+	if kestrel:
+		kestrel.set_rain(w)

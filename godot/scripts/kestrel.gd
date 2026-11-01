@@ -8,6 +8,7 @@ extends Node3D
 signal repair_changed(id: String, repaired: bool)
 
 const LAYOUT_PATH := "res://data/kestrel_layout.json"
+const HULL_SHADER := preload("res://shaders/hull.gdshader")
 const REPAIR_ORDER: Array[String] = ["aux_power", "cooling", "canopy", "landing_gear", "wing", "engine", "navigation"]
 const REPAIR_NAMES := {
 	"aux_power": "Auxiliary power",
@@ -727,9 +728,59 @@ func _screen_material() -> Material:
 	return _mats["screen_live"]
 
 
-func _mat(id: String) -> StandardMaterial3D:
+## Painted and bare metal parts use the hull shader (shaders/hull.gdshader): panels, seams,
+## rivets, chipped paint, grime streaks and crash mud, laid out in ship space.
+const HULL_LOOKS := {
+	"hull": {"base_color": Color("ddd3bb"), "chip": 0.55, "grime": 0.7, "mud": 1.0},
+	"oxide": {"base_color": Color("b4532a"), "primer_color": Color("cfc6ae"), "chip": 0.7, "grime": 0.6, "mud": 1.0, "tint_drift": 0.04},
+	"panel": {"base_color": Color("d8cfba"), "panel_size": Vector2(1.15, 2.7), "seam_width": 0.005, "chip": 0.25, "grime": 0.35, "mud": 0.0, "paint_roughness": 0.65},
+	"deck": {"base_color": Color("3a3f43"), "pattern": 1, "metallic_amount": 0.55, "paint_roughness": 0.5, "chip": 0.5, "primer_color": Color("2a2d30"), "bare_color": Color("7d8186"), "grime": 0.5, "mud": 0.0},
+	"metal": {"base_color": Color("464c50"), "pattern": 2, "metallic_amount": 0.5, "paint_roughness": 0.45, "chip": 0.45, "primer_color": Color("2f3336"), "bare_color": Color("8a8f93"), "grime": 0.5, "mud": 0.6},
+	"metal_dark": {"base_color": Color("26292c"), "pattern": 2, "metallic_amount": 0.45, "paint_roughness": 0.5, "chip": 0.35, "primer_color": Color("1b1d1f"), "bare_color": Color("6d7276"), "grime": 0.4, "mud": 0.4},
+	"salvage": {"base_color": Color("7d8c84"), "panel_size": Vector2(0.7, 0.7), "chip": 0.75, "primer_color": Color("4f544f"), "grime": 0.35, "mud": 0.0, "tint_drift": 0.12, "metallic_amount": 0.25},
+	"bare_metal": {"base_color": Color("9aa0a3"), "panel_size": Vector2(1.1, 0.7), "metallic_amount": 0.85, "paint_roughness": 0.38, "chip": 0.0, "grime": 0.55, "mud": 0.3, "soot": 0.6},
+}
+
+## World -> ship space for the hull shader, refreshed whenever Kestrel moves.
+var _ship_xform := Transform3D()
+
+
+func _process(_delta: float) -> void:
+	_sync_ship_space()
+
+
+func _sync_ship_space() -> void:
+	if not is_inside_tree():
+		return
+	var inv := global_transform.affine_inverse()
+	if inv.is_equal_approx(_ship_xform):
+		return
+	_ship_xform = inv
+	for id in _mats:
+		var m: Material = _mats[id]
+		if m is ShaderMaterial and HULL_LOOKS.has(id):
+			(m as ShaderMaterial).set_shader_parameter("ship_xform", Projection(inv))
+
+
+## Rain darkens and glosses the hull (Weather -> main.set_daylight -> here).
+func set_rain(amount: float) -> void:
+	for id in HULL_LOOKS:
+		if _mats.has(id):
+			(_mats[id] as ShaderMaterial).set_shader_parameter("rain", amount if id in ["hull", "oxide", "salvage", "bare_metal", "metal"] else 0.0)
+
+
+func _mat(id: String) -> Material:
 	if _mats.has(id):
 		return _mats[id]
+	if HULL_LOOKS.has(id):
+		var sm := ShaderMaterial.new()
+		sm.shader = HULL_SHADER
+		sm.set_shader_parameter("noise_tex", Surfaces.noise_texture())
+		for key in HULL_LOOKS[id]:
+			sm.set_shader_parameter(key, HULL_LOOKS[id][key])
+		sm.set_shader_parameter("ship_xform", Projection(_ship_xform))
+		_mats[id] = sm
+		return sm
 	var m := StandardMaterial3D.new()
 	match id:
 		"glass":

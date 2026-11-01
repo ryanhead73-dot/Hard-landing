@@ -207,8 +207,8 @@ func _bursts() -> int:
 
 
 func _surfaces() -> void:
-	var hull := kestrel._mat("hull")
-	_check("Kestrel's hull has panelling", hull.albedo_texture != null and hull.uv1_triplanar and not hull.uv1_world_triplanar)
+	var hull: ShaderMaterial = kestrel._mat("hull")
+	_check("Kestrel's hull has panelling in ship space", hull.shader == Kestrel.HULL_SHADER and hull.get_shader_parameter("noise_tex") != null and kestrel._mat("deck").get_shader_parameter("pattern") == 1)
 	_check("glass and glow stay untextured", kestrel._mat("glass").albedo_texture == null and kestrel._mat("amber_glow").albedo_texture == null)
 	var stone: StandardMaterial3D = main.site._mat(Color("1b1d1f"), 0.95)
 	var pool: MeshInstance3D = main.site.find_child("Pool", false, false)

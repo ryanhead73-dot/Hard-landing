@@ -39,6 +39,8 @@ func _ready() -> void:
 		"k_aft": [Vector3(32, 7, -14), centre], "k_top": [Vector3(-14, 22, -18), centre],
 		"k_gear": [Vector3(6.0, 0.9, -8.0), Vector3(1.5, 0.6, -2.6)],
 		"k_mast": [Vector3(14.0, 7.5, -5.0), Vector3(10.0, 5.0, 0.0)],
+		"k_close": [Vector3(-6.0, 1.9, 9.5), Vector3(-2.0, 1.8, 4.0)],
+		"k_nose": [Vector3(-19.0, 2.4, 7.0), Vector3(-13.0, 1.6, 0.0)],
 	}
 	for name in views:
 		cam.position = views[name][0]

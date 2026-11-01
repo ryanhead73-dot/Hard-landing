@@ -21,6 +21,23 @@ const FAR_HALF := 320.0
 ## Water sits just under the flat floor, in hollows pressed into the ground.
 const WATER_Y := -0.14
 const POOL_DEPTH := 0.8
+## Authored landforms over the noise, in world metres: the opening expedition's walk from the ship
+## to the relay. The relay stands on a basalt shelf (RELAY_SHELF up) with a ridge behind it; the
+## way there drops into a wet hollow among the hot pools and climbs back up; two mounds frame
+## the way out from the crash site. "shelf" is a flat-topped rise, "ridge" a rounded spine along
+## a segment, "bowl" a hollow. Full effect inside `core`, easing out over `fall`. Slopes on the
+## walked route stay under 20 degrees so a component can be carried home.
+const RELAY_SHELF := 2.6
+const LANDFORMS := [
+	{"kind": "shelf", "a": Vector2(-60.0, 58.0), "core": 21.0, "fall": 12.0, "h": RELAY_SHELF},
+	{"kind": "ridge", "a": Vector2(-96.9, 62.6), "b": Vector2(-66.7, 94.5), "core": 4.0, "fall": 13.0, "h": 10.0},
+	{"kind": "ridge", "a": Vector2(-84.0, 30.0), "b": Vector2(-80.0, 44.0), "core": 2.0, "fall": 9.0, "h": 5.5},
+	{"kind": "bowl", "a": Vector2(-30.0, 40.0), "core": 7.0, "fall": 17.0, "h": -1.3},
+	{"kind": "ridge", "a": Vector2(-20.0, 10.0), "b": Vector2(-25.0, 13.0), "core": 2.0, "fall": 6.0, "h": 3.2},
+	{"kind": "ridge", "a": Vector2(-6.0, 23.0), "b": Vector2(-9.0, 27.0), "core": 2.5, "fall": 7.0, "h": 4.2},
+]
+## Small steaming pools in the hollow on the relay walk (under the lurker size, so they're safe).
+const ROUTE_POOLS := [[Vector2(-22.0, 34.0), 3.2], [Vector2(-36.0, 33.0), 2.6], [Vector2(-41.0, 51.0), 3.0]]
 const TERRAIN_SHADER := preload("res://shaders/terrain.gdshader")
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 
@@ -62,6 +79,8 @@ func build() -> void:
 	_build_pools(rng)
 	_build_columns(rng)
 	_build_moss(rng)
+	if is_inside_tree():
+		RouteDressing.build(self)
 
 
 func set_dusk(dusk: bool) -> void:
@@ -72,12 +91,10 @@ func set_dusk(dusk: bool) -> void:
 ## True when `pos` (world space) is standing in one of the basin's pools.
 func in_pool(pos: Vector3) -> bool:
 	var local := to_local(pos)
-	if local.y > WATER_Y + 0.25:
-		return false
 	for pool in pools:
 		var c: Vector3 = pool[0]
 		var r: float = pool[1]
-		if Vector2(local.x - c.x, local.z - c.z).length() < r * 0.95:
+		if local.y <= c.y + WATER_Y + 0.25 and Vector2(local.x - c.x, local.z - c.z).length() < r * 0.95:
 			return true
 	return false
 
@@ -143,7 +160,7 @@ func height_at(x: float, z: float) -> float:
 	var big := _rough.get_noise_2d(x, z) * 0.5 + 0.5
 	var hummocks := pow(n, 2.2) * 4.5 * (1.0 - smoothstep(100.0, 135.0, r))
 	var rim := smoothstep(98.0, 150.0, r) * (14.0 + 22.0 * big) + smoothstep(170.0, 300.0, r) * (30.0 + 50.0 * big)
-	var h := (hummocks + rim) * (1.0 - flatness(x, z))
+	var h := (hummocks + rim) * (1.0 - flatness(x, z)) + landform_at(x, z)
 	for pool in pools:
 		var d := Vector2(x - pool[0].x, z - pool[0].z).length()
 		if d < pool[1] + 1.5:
@@ -152,10 +169,36 @@ func height_at(x: float, z: float) -> float:
 	return h
 
 
+## The authored landforms' height at a point (see LANDFORMS).
+func landform_at(x: float, z: float) -> float:
+	var p := Vector2(x, z)
+	var h := 0.0
+	for f in LANDFORMS:
+		var d := 0.0
+		match f["kind"]:
+			"ridge":
+				var a: Vector2 = f["a"]
+				var ab: Vector2 = f["b"] - a
+				d = p.distance_to(a + ab * clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0))
+			_:
+				d = p.distance_to(f["a"])
+		var k := 1.0 - smoothstep(f["core"], f["core"] + f["fall"], d)
+		if f["kind"] == "ridge":
+			# Rounded, not flat-topped: the spine stands proud of its shoulders.
+			k = k * k * (3.0 - 2.0 * k)
+		h += float(f["h"]) * k
+	return h
+
+
+## Pools: [centre (y = the ground the water sits in), radius].
 func _place_pools(rng: RandomNumberGenerator) -> void:
 	pools.clear()
 	for i in 16:
 		pools.append([_scatter(rng, 26.0, 100.0), rng.randf_range(3.0, 9.0)])
+	for rp in ROUTE_POOLS:
+		pools.append([Vector3(rp[0].x, 0.0, rp[0].y), rp[1]])
+	for pool in pools:
+		pool[0].y = landform_at(pool[0].x, pool[0].z)
 
 
 func _grid_coords() -> PackedFloat32Array:
@@ -321,10 +364,10 @@ func _build_pools(_rng: RandomNumberGenerator) -> void:
 		water.name = "Pool"
 		water.mesh = _pool_mesh(radius + 0.6)
 		water.material_override = _water_mat
-		water.position = Vector3(pos.x, WATER_Y, pos.z)
+		water.position = Vector3(pos.x, pos.y + WATER_Y, pos.z)
 		add_child(water)
-		if i % 3 == 0:
-			_steam(Vector3(pos.x, 0.0, pos.z), radius)
+		if i % 3 == 0 or i >= 16:
+			_steam(Vector3(pos.x, pos.y, pos.z), radius)
 
 
 ## A flat disc whose UV.x runs from 0 at the centre to 1 at the rim (the shader's edge glow).
@@ -403,8 +446,38 @@ func _build_moss(rng: RandomNumberGenerator) -> void:
 			var p := Vector3(pool[0].x + cos(a) * d, 0.0, pool[0].z + sin(a) * d)
 			var size := rng.randf_range(0.7, 1.4)
 			var basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3.ONE * size)
-			tufts.append(Transform3D(basis, Vector3(p.x, maxf(height_at(p.x, p.z), WATER_Y) - 0.05, p.z)))
+			tufts.append(Transform3D(basis, Vector3(p.x, maxf(height_at(p.x, p.z), pool[0].y + WATER_Y) - 0.05, p.z)))
 	WorldProps.scatter(self, "reeds", tufts, WorldProps.reed_material())
+
+
+## A thin plume of steam leaking from a pipe or a crack (world space).
+func vent_steam(pos: Vector3, radius: float) -> CPUParticles3D:
+	var steam := CPUParticles3D.new()
+	steam.amount = 14
+	steam.lifetime = 3.0
+	steam.position = pos
+	steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	steam.emission_sphere_radius = radius
+	steam.direction = Vector3.UP
+	steam.spread = 8.0
+	steam.gravity = Vector3(0.25, 0.4, 0.0)
+	steam.initial_velocity_min = 0.6
+	steam.initial_velocity_max = 1.1
+	steam.scale_amount_min = 0.6
+	steam.scale_amount_max = 1.6
+	var quad := QuadMesh.new()
+	quad.material = Vfx.soft(Color(0.85, 0.88, 0.88, 0.22))
+	steam.mesh = quad
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	steam.color_ramp = fade
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.4))
+	grow.add_point(Vector2(1.0, 1.0))
+	steam.scale_amount_curve = grow
+	add_child(steam)
+	return steam
 
 
 func _steam(pos: Vector3, radius: float) -> void:

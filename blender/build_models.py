@@ -522,12 +522,29 @@ def components():
                 mat("oxide", OXIDE, 0.6))
 
     dark, steel, oxide = fresh()
+    # A canister cell in a carry frame: the amber core shows through three slots in the casing,
+    # heavy end caps with terminals, an oxide band, and side rails with a top handle. Reads as a
+    # power cell at a glance from behind Juno and in the cradle.
     root = pivot("AuxCell")
-    box("casing", (0.44, 0.62, 0.26), (0, 0, 0), root, dark, bevel=0.03)
-    box("window", (0.3, 0.42, 0.02), (0, 0.02, -0.135), root, mat("cell_glow", AMBER, 0.2, 0.0, 4.0))
-    for y in (-0.33, 0.33):
-        box("cap%d" % int(y * 10), (0.48, 0.06, 0.3), (0, y, 0), root, steel)
-    box("handle", (0.2, 0.05, 0.05), (0, 0.38, 0), root, oxide)
+    glow = mat("cell_glow", AMBER, 0.2, 0.0, 4.0)
+    cyl("core", 0.13, 0.5, (0, 0, 0), root, glow, verts=16, bevel=0.0)
+    for k in range(3):
+        a = math.tau * k / 3.0
+        for j in range(2):
+            b = a + math.tau / 6.0 + (j - 0.5) * 0.36
+            box("slat%d_%d" % (k, j), (0.06, 0.48, 0.05), (math.sin(b) * 0.15, 0, math.cos(b) * 0.15), root, dark, bevel=0.005,
+                rot=(0, math.degrees(b), 0))
+        box("rib%d" % k, (0.1, 0.5, 0.06), (math.sin(a) * 0.155, 0, math.cos(a) * 0.155), root, dark, bevel=0.01,
+            rot=(0, math.degrees(a), 0))
+    for y in (-0.29, 0.29):
+        cyl("cap%d" % int(y * 10), 0.19, 0.09, (0, y, 0), root, steel, verts=16)
+        cyl("collar%d" % int(y * 10), 0.165, 0.03, (0, y * 0.86, 0), root, dark, verts=16, bevel=0.0)
+    cyl("band", 0.158, 0.06, (0, 0.12, 0), root, oxide, verts=16, bevel=0.0)
+    for x in (-0.06, 0.06):
+        cyl("terminal%d" % int(x * 100), 0.025, 0.07, (x, -0.36, 0), root, steel, verts=8, bevel=0.0)
+    for sx in (-1, 1):
+        box("rail%d" % sx, (0.03, 0.7, 0.05), (sx * 0.22, 0, 0), root, dark, bevel=0.005)
+    box("handle", (0.47, 0.04, 0.05), (0, 0.37, 0), root, oxide, bevel=0.005)
     export("aux_cell")
 
     dark, steel, oxide = fresh()

@@ -22,7 +22,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 script = ExtResource("3_kestrel")
 
 [node name="RelayStation" type="Node3D" parent="."]
-transform = Transform3D(-0.688, 0, 0.725, 0, 1, 0, -0.725, 0, -0.688, -60, 0, 58)
+transform = Transform3D(-0.688, 0, 0.725, 0, 1, 0, -0.725, 0, -0.688, -60, 2.6, 58)
 script = ExtResource("4_station")
 
 [node name="HaulerWreck" type="Node3D" parent="."]

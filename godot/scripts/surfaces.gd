@@ -16,6 +16,25 @@ static func apply_hull(m: StandardMaterial3D, tile := 4.0, world := true) -> voi
 	_apply(m, "hull", tile, world)
 
 
+## Seamless greyscale value noise shared by the hull shader (grime, chips, streaks, mud).
+static func noise_texture() -> NoiseTexture2D:
+	if _cache.has("noise"):
+		return _cache["noise"]
+	var noise := FastNoiseLite.new()
+	noise.seed = 4471
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.012
+	noise.fractal_octaves = 5
+	var tex := NoiseTexture2D.new()
+	tex.width = 512
+	tex.height = 512
+	tex.seamless = true
+	tex.generate_mipmaps = true
+	tex.noise = noise
+	_cache["noise"] = tex
+	return tex
+
+
 static func apply_basalt(m: StandardMaterial3D, tile := 6.0) -> void:
 	_apply(m, "basalt", tile, true)
 
