@@ -9,6 +9,8 @@ enum State { IDLE, CHASE, WINDUP, RECOVER, DEAD }
 @export var attack_range := 1.9
 @export var windup_time := 0.45
 @export var recover_time := 0.7
+## Without an attack slot it circles this far out, waiting its turn.
+const RING := 4.2
 
 var state := State.IDLE
 
@@ -18,6 +20,10 @@ var _gait := 0.0
 var _visual: Node3D
 var _glow_mat: StandardMaterial3D
 var _shell: StandardMaterial3D
+var _circle_side := 1.0
+var _circle_timer := 0.0
+## After a bite it hangs back a moment before asking for another turn.
+var _rest := 0.0
 
 
 func _init() -> void:
@@ -44,6 +50,7 @@ func _setup() -> void:
 func _physics_process(delta: float) -> void:
 	_gravity_step(delta)
 	_timer -= delta
+	_rest -= delta
 	var flat_vel := Vector3.ZERO
 	match state:
 		State.IDLE:
@@ -59,6 +66,9 @@ func _physics_process(delta: float) -> void:
 			flat_vel = Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3.ZERO, 14.0 * delta)
 			if _timer <= 0.0:
 				state = State.CHASE
+				# Give someone else a go.
+				_release_slot()
+				_rest = 1.2
 	if state != State.RECOVER:
 		velocity.x = move_toward(velocity.x, flat_vel.x, 25.0 * delta)
 		velocity.z = move_toward(velocity.z, flat_vel.z, 25.0 * delta)
@@ -113,9 +123,32 @@ func _chase(delta: float) -> Vector3:
 	if _out_of_leash(to_target):
 		calm()
 		return Vector3.ZERO
+	if to_target.length() < RING + 1.5 and (_rest > 0.0 or not _has_slot()):
+		return _circle(to_target, delta)
 	var dir := _steer_around_walls(to_target.normalized(), delta)
 	_face(global_position + dir, delta * 10.0)
 	return dir * speed
+
+
+## Waiting its turn: skitters sideways round the ring, facing its prey, changing direction now
+## and then.
+func _circle(to_target: Vector3, delta: float) -> Vector3:
+	_circle_timer -= delta
+	if _circle_timer <= 0.0:
+		_circle_timer = randf_range(1.2, 2.6)
+		_circle_side = -_circle_side if randf() < 0.6 else _circle_side
+	var dist := to_target.length()
+	var inward := to_target / maxf(dist, 0.01)
+	var tangent := inward.cross(Vector3.UP) * _circle_side
+	var want := (tangent + inward * clampf((dist - RING) / 1.5, -1.0, 1.0)).normalized()
+	want = _steer_around_walls(want, delta)
+	_face(global_position + inward, delta * 8.0)
+	return want * speed * 0.55
+
+
+## Circling without a turn (not just backing off after a bite).
+func is_waiting() -> bool:
+	return state == State.CHASE and _rest <= 0.0 and _target_alive() and not self in _slots.get(target.get_instance_id(), [])
 
 
 func _lunge() -> void:
