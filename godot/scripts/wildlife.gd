@@ -153,8 +153,10 @@ func _heading(player: Node3D) -> Vector3:
 
 ## A spot ahead and to one side, on open ground: not near the ship, a site, a pool or the rim.
 func _pack_point(from: Vector3, heading: Vector3) -> Vector3:
-	for attempt in 12:
-		var angle := randf_range(-0.8, 0.8)
+	# Ahead first; if ahead is all ship, site, pool or rim, swing wider round to the sides.
+	for attempt in 24:
+		var spread := 0.8 if attempt < 12 else 1.8
+		var angle := randf_range(-spread, spread)
 		var dist := randf_range(ROAM_SPAWN.x, ROAM_SPAWN.y)
 		var p := from + heading.rotated(Vector3.UP, angle) * dist
 		p.y = main.site.height_at(p.x, p.z)
