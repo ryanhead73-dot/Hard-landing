@@ -11,6 +11,7 @@ const MODELS := {
 	"spitter": ["Body", "Neck", "Head", "Sac", "LegL1", "LegL2", "LegR1", "LegR2", "FootL1"],
 	"ram": ["Body", "Head", "Tail", "LegFL", "LegFR", "LegBL", "LegBR", "FootFL"],
 	"warden": ["Body", "Core", "Head", "PlateL", "PlateR", "ArmL", "ArmR", "FistL", "FistR", "LegL1", "LegR3"],
+	"lurker": ["Body", "Head", "Jaw", "StalkL", "StalkR", "Tail", "TailTip", "LegL1", "LegR2", "FootL1"],
 	"rifle": ["Muzzle"],
 	"scattergun": ["Muzzle", "Pump"],
 	"arc_lance": ["Muzzle"],
@@ -189,11 +190,11 @@ func _wildlife() -> void:
 	a.take_damage(9999.0, a.global_position, Vector3.FORWARD)
 	_check("a death gives off a teal puff", _bursts() > before)
 	var kinds_ok := true
-	for kind in ["spitter", "ram", "warden"]:
+	for kind in ["spitter", "ram", "warden", "lurker"]:
 		var e: Enemy = main.spawn_enemy(kind, at + Vector3(-10.0, 0.0, 0.0))
 		e.target = null
 		kinds_ok = kinds_ok and e._rig != null and not Rig.meshes(e._rig).is_empty()
-	_check("spitter, ram and Warden wear their models", kinds_ok)
+	_check("spitter, ram, Warden and lurker wear their models", kinds_ok)
 	var sp: Spitter = get_tree().get_nodes_in_group("enemies").filter(func(e): return e is Spitter)[0]
 	_check("the spitter's sac glow is its own", sp._sac != null and sp._sac.resource_name == "acid_sac")
 	var splash := Vfx.acid(main, at)
@@ -210,6 +211,11 @@ func _surfaces() -> void:
 	_check("Kestrel's hull has panelling", hull.albedo_texture != null and hull.uv1_triplanar and not hull.uv1_world_triplanar)
 	_check("glass and glow stay untextured", kestrel._mat("glass").albedo_texture == null and kestrel._mat("amber_glow").albedo_texture == null)
 	var stone: StandardMaterial3D = main.site._mat(Color("1b1d1f"), 0.95)
+	var pool: MeshInstance3D = main.site.find_child("Pool", false, false)
+	var verts: PackedVector3Array = pool.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	# Godot's front faces wind clockwise as seen, so seen from above (v1-v0)x(v2-v0) points down.
+	_check("pool water faces up (not culled from above)", (verts[1] - verts[0]).cross(verts[2] - verts[0]).y < 0.0)
+	_check("smoke, steam and sparks are soft round sprites", Vfx.soft(Color.WHITE).albedo_texture != null and Vfx.glow(Color.WHITE).albedo_texture != null)
 	_check("the basin floor is basalt", stone.albedo_texture == Surfaces._textures("basalt")[0] and stone.uv1_world_triplanar)
 
 

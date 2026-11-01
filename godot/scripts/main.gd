@@ -69,6 +69,8 @@ var hud: Hud
 var fabricator: FabricatorMenu
 var inventory: InventoryPanel
 var siege: ShipSiege
+## Lurkers in the pools and roaming packs on the open basin.
+var wildlife: Wildlife
 var voice: Voice
 var logs_panel: LogPanel
 var finale: Finale
@@ -198,6 +200,10 @@ func _ready() -> void:
 		Game.set_repaired(id, kestrel.is_repaired(id))
 	for p in ROAMER_POINTS:
 		spawn_scuttler(p)
+	wildlife = Wildlife.new()
+	wildlife.name = "Wildlife"
+	add_child(wildlife)
+	wildlife.setup(self)
 	_update_active_site()
 	_set_dusk(false)
 	if not Game.pending_load.is_empty():
@@ -245,6 +251,8 @@ func _process(_delta: float) -> void:
 	if _pack_check <= 0.0:
 		_pack_check = 0.5
 		_wake_packs()
+		if spawn_packs:
+			wildlife.update(0.5)
 	if dev_panel:
 		hud.set_dev(true, _dev_text())
 	if player.global_position.y < -20.0:
@@ -323,7 +331,7 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram" or "warden". A name makes it an elite.
+## Spawns a hostile: "scuttler", "spitter", "ram", "lurker" or "warden". A name makes it an elite.
 func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 	var e: Enemy
 	match kind:
@@ -331,6 +339,8 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 			e = Spitter.new()
 		"ram":
 			e = Ram.new()
+		"lurker":
+			e = Lurker.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)

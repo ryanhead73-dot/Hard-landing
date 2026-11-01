@@ -403,6 +403,59 @@ def warden():
 
 # --- Weapons -------------------------------------------------------------------------------
 
+def lurker():
+    """Mire lurker: a long, low pool ambusher. Flat wet hide, a pale belly, a broad hinged jaw
+    with a row of bone teeth, glowing eye stalks (all that shows above the water while it waits)
+    and a ridge of fin spines that flares teal when it surfaces."""
+    hide = mat("lurker_hide", "1b2420", 0.35, 0.05)
+    belly = mat("lurker_belly", "57574a", 0.6)
+    bone = mat("ram_horn", "8a8170", 0.6)
+    gum = mat("lurker_gum", "5a1f22", 0.5)
+    glow = mat("lurker_glow", MOSS, 0.4, 0.0, 2.0)
+    root = pivot("Lurker")
+    body = pivot("Body", (0, 0.36, 0), root)
+    pod("torso", (0.95, 0.42, 2.1), (0, 0.02, 0.05), body, hide, n=2.4, taper=0.85, taper_axis="z")
+    pod("belly", (0.8, 0.22, 1.9), (0, -0.12, 0.05), body, belly, n=2.2)
+    pod("shoulders", (1.05, 0.36, 0.6), (0, 0.04, -0.6), body, hide, n=2.3)
+    for i in range(7):
+        z = -0.75 + i * 0.26
+        hgt = 0.2 - abs(i - 2.5) * 0.03
+        obox("spine%d" % i, (0.03, hgt, 0.12), (0, 0.24 + hgt * 0.35, z), body, glow, rot=(-35, 0, 0), n=2.2)
+        for side in (-1, 1):
+            obox("scute%d%d" % (i, side), (0.14, 0.06, 0.16), (0.24 * side, 0.2, z + 0.1), body, hide, rot=(0, 0, 18 * side))
+    head = pivot("Head", (0, 0.02, -1.05), body)
+    pod("skull", (0.74, 0.26, 0.78), (0, 0.05, -0.3), head, hide, n=2.6, taper=0.6, taper_axis="z")
+    pod("brow", (0.6, 0.14, 0.3), (0, 0.16, -0.12), head, hide, n=2.4)
+    for side, sx in (("L", -1), ("R", 1)):
+        stalk = pivot("Stalk" + side, (0.22 * sx, 0.18, -0.16), head)
+        obox("stalk" + side, (0.06, 0.22, 0.06), (0, 0.09, 0), stalk, hide, rot=(-15, 0, 12 * sx))
+        ball("eye" + side, 0.055, (0.02 * sx, 0.22, -0.03), stalk, glow, segs=8, rings=5)
+    for i in range(7):
+        x = -0.27 + i * 0.09
+        obox("tooth_u%d" % i, (0.03, 0.08, 0.03), (x, -0.07, -0.58 + abs(x) * 0.55), head, bone, taper=None)
+    jaw = pivot("Jaw", (0, -0.03, -0.02), head)
+    pod("jaw", (0.7, 0.14, 0.78), (0, -0.07, -0.33), jaw, belly, n=2.6, taper=0.6, taper_axis="z")
+    pod("tongue", (0.36, 0.05, 0.5), (0, 0.01, -0.3), jaw, gum, n=2.2)
+    for i in range(6):
+        x = -0.23 + i * 0.09
+        obox("tooth_l%d" % i, (0.03, 0.07, 0.03), (x, 0.02, -0.56 + abs(x) * 0.55), jaw, bone, taper=None)
+    tail = pivot("Tail", (0, 0.0, 1.05), body)
+    pod("tail", (0.5, 0.3, 1.1), (0, 0, 0.5), tail, hide, n=2.3, taper=0.6, taper_axis="z")
+    tip = pivot("TailTip", (0, 0, 1.0), tail)
+    pod("tail_tip", (0.26, 0.18, 1.1), (0, 0, 0.5), tip, hide, n=2.2)
+    obox("tail_fin", (0.03, 0.18, 0.8), (0, 0.1, 0.5), tip, glow, rot=(4, 0, 0), n=2.2)
+    for side, sx in (("L", -1), ("R", 1)):
+        for j, z in enumerate((-0.6, 0.65)):
+            hip = pivot("Leg%s%d" % (side, j + 1), (0.42 * sx, -0.04, z), body)
+            hip.rotation_euler[1] = math.radians(-12 * sx)
+            obox("upper%s%d" % (side, j), (0.4, 0.15, 0.15), (0.19 * sx, 0, 0), hip, hide)
+            knee = pivot("Foot%s%d" % (side, j + 1), (0.38 * sx, 0, 0), hip)
+            knee.rotation_euler[1] = math.radians(65 * sx)
+            obox("lower%s%d" % (side, j), (0.32, 0.12, 0.12), (0.15 * sx, 0, 0), knee, hide)
+            pod("paw%s%d" % (side, j), (0.22, 0.06, 0.24), (0.32 * sx, -0.02, 0), knee, belly, n=2.2)
+    export("lurker")
+
+
 def rifle():
     metal = mat("gun_metal", "24282b", 0.45, 0.6)
     stripe = mat("oxide", OXIDE, 0.6)
@@ -535,7 +588,7 @@ def components():
 
 
 BUILDERS = {
-    "juno": juno, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden,
+    "juno": juno, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker,
     "rifle": rifle, "scattergun": scattergun, "arc_lance": arc_lance,
 }
 

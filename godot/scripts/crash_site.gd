@@ -331,10 +331,11 @@ func _pool_mesh(radius: float) -> ArrayMesh:
 		st.set_normal(Vector3.UP)
 		st.set_uv(Vector2(0.0, 0.0))
 		st.add_vertex(Vector3.ZERO)
-		st.set_uv(Vector2(1.0, 0.0))
-		st.add_vertex(Vector3(cos(a1), 0.0, sin(a1)) * radius)
+		# Clockwise seen from above, so the surface faces up (it was culled before).
 		st.set_uv(Vector2(1.0, 0.0))
 		st.add_vertex(Vector3(cos(a0), 0.0, sin(a0)) * radius)
+		st.set_uv(Vector2(1.0, 0.0))
+		st.add_vertex(Vector3(cos(a1), 0.0, sin(a1)) * radius)
 	return st.commit()
 
 
@@ -415,12 +416,18 @@ func _steam(pos: Vector3, radius: float) -> void:
 	steam.scale_amount_max = 4.0
 	var quad := QuadMesh.new()
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.88, 0.88, 0.08)
+	mat.albedo_color = Color(0.85, 0.88, 0.88, 0.16)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.vertex_color_use_as_albedo = true
+	mat.albedo_texture = Vfx.dot()
 	quad.material = mat
 	steam.mesh = quad
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.25, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	steam.color_ramp = fade
 	add_child(steam)
 
 

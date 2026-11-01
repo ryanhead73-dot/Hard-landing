@@ -408,6 +408,62 @@ def ram_death(v):
     return outdoor(place(2.4, (0, groan), (0.9, fall)), 0.4)
 
 
+
+def big_splash(seconds=0.9, size=1.0):
+    """Something heavy breaking the surface: a low slap, a sheet of water, then falling drops."""
+    slap = place(seconds, (0, lp(white(0.12), 600) * env(0.12, 0.002, 0.1) * 1.2), (0, thud(70, 0.2, 0.5) * 0.8))
+    sheet = bp(white(0.5), 400, 3500) * adsr(0.5, 0.01, 0.1, 0.5, 0.3) * 0.5
+    drops = grains(seconds, 60 * size, lambda i: osc(sweep(dsp.rng.uniform(700, 1800), dsp.rng.uniform(1600, 3000), 0.025), 0.025) *
+                   env(0.025, 0.001, 0.02) * dsp.rng.uniform(0.1, 0.5))
+    drops *= env(seconds, 0.15, seconds * 0.8)
+    return place(seconds, (0, slap), (0.01, sheet), (0.05, drops))
+
+
+@sound("lurker_emerge", 2)
+def lurker_emerge(v):
+    d = 1.6
+    roar = creature(1.0, 120 + 10 * v, 70, "o", 0.6, 0.5, 3.0, 4) * env(1.0, 0.06, 0.8)
+    gurgle = grains(0.8, 30, lambda i: (lambda f: bp(white(0.03), f, f * 2.5))(dsp.rng.uniform(200, 700)) * env(0.03, 0.002, 0.025) * dsp.rng.uniform(0.2, 0.7))
+    x = place(d, (0, big_splash(1.2)), (0.12, sat(roar * 1.4, 2.0)), (0.1, gurgle * 0.6))
+    return outdoor(x, 0.4)
+
+
+@sound("lurker_hiss", 2)
+def lurker_hiss(v):
+    d = 0.6
+    hiss = bp(white(d), 1800, 7000) * adsr(d, 0.12, 0.1, 0.8, 0.2) * 0.5
+    rattle = grains(d, 35, lambda i: modal(0.03, [(900 + dsp.rng.uniform(-200, 200), 0.02, 1.0)], 0.0003)) * 0.4
+    throat = creature(d, 180 + 15 * v, 160, "e", 0.6, 0.5, 1.5, 9) * 0.25 * adsr(d, 0.1, 0.1, 0.7, 0.2)
+    return outdoor(place(0.7, (0, hiss), (0, rattle), (0, throat)), 0.25)
+
+
+@sound("lurker_bite", 2)
+def lurker_bite(v):
+    snap = place(0.5, (0, clack(900 + 120 * v, 0.07, 0.15, 1.2)), (0, thud(110, 0.15, 0.6)),
+                 (0.002, hp(white(0.02), 2000) * env(0.02, 0.0005, 0.015) * 0.8))
+    lunge = bp(pink(0.3), 200, 1200) * adsr(0.3, 0.02, 0.05, 0.5, 0.2) * 0.4
+    return outdoor(place(0.6, (0, lunge), (0.12, snap)), 0.25)
+
+
+@sound("lurker_hurt", 2)
+def lurker_hurt(v):
+    d = 0.4
+    return outdoor(creature(d, 260 + 30 * v, 180, "a", 0.5, 0.7, 2.5, 11) * env(d, 0.01, 0.3), 0.25)
+
+
+@sound("lurker_death")
+def lurker_death(v):
+    d = 1.8
+    wail = creature(d, 200, 60, "o", 0.5, 0.5, 2.2, 5) * env(d, 0.05, 1.4)
+    bubbles = grains(1.4, 25, lambda i: osc(sweep(dsp.rng.uniform(200, 400), dsp.rng.uniform(500, 900), 0.03), 0.03) * env(0.03, 0.002, 0.025) * 0.4)
+    return outdoor(place(2.0, (0, wail), (0.6, bubbles), (0.5, thud(60, 0.4, 0.5))), 0.4)
+
+
+@sound("lurker_dive")
+def lurker_dive(v):
+    return outdoor(place(1.0, (0, big_splash(0.9, 0.7) * 0.8)), 0.3)
+
+
 @sound("warden_roar")
 def warden_roar(v):
     d = 2.6
@@ -562,6 +618,7 @@ PEAKS = {
     "ui_click": 0.5, "warden_slam": 0.95, "spitter_death": 0.7, "ram_death": 0.85, "launch_roar": 0.9, "splash_0": 0.5,
     "splash_1": 0.5, "roll_whoosh": 0.45, "lance_shot": 0.8, "scuttler_lunge": 0.7, "loom_hum": 0.8,
     "ship_hum_loop": 0.5, "spool_loop": 0.5, "player_hurt": 0.8, "rifle_empty": 0.7,
+    "lurker_hurt": 0.7, "lurker_hiss": 0.7, "lurker_dive": 0.7,
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
 }
 
