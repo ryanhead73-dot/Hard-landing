@@ -29,6 +29,7 @@ var _rest := 0.0
 func _init() -> void:
 	max_health = 60.0
 	speed = 5.0
+	stagger_damage = 30.0
 	# The glowing spine ridge along its back.
 	weak_joint = "Body"
 	weak_offset = Vector3(0.0, 0.42, 0.05)
@@ -82,6 +83,17 @@ func _physics_process(delta: float) -> void:
 func _on_hurt(dir: Vector3) -> void:
 	velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 1.5
 	Sfx.play("scuttler_hurt", global_position, -6.0, 0.15)
+
+
+## A bite in the wind-up is cancelled: it reels back and has to start again.
+func _stagger(dir: Vector3) -> bool:
+	if state != State.CHASE and state != State.WINDUP:
+		return false
+	state = State.RECOVER
+	_timer = 0.6
+	velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 4.0 + Vector3.UP * 1.5
+	Sfx.play("scuttler_hurt", global_position, -1.0, 0.2)
+	return true
 
 
 func _on_alert() -> void:
@@ -170,6 +182,12 @@ func _die() -> void:
 	Sfx.play("scuttler_death", global_position, 0.0, 0.1)
 	_glow_mat.emission_energy_multiplier = 0.0
 	var tween := create_tween()
+	# Knocked back along the shot that killed it, rolling as it goes.
+	var push := Vector3(last_hit_dir.x, 0.0, last_hit_dir.z)
+	if push.length() > 0.01:
+		var slide := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+		slide.tween_property(self, "global_position", global_position + push.normalized() * 1.3, 0.3)
+		slide.parallel().tween_property(_visual, "rotation:z", randf_range(-0.6, 0.6), 0.3)
 	tween.tween_property(_visual, "scale", Vector3(1.2, 0.25, 1.2), 0.25)
 	tween.tween_interval(2.5)
 	tween.tween_property(_visual, "position:y", -0.6, 1.0)

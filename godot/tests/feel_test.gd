@@ -18,8 +18,57 @@ func _run() -> void:
 	await _sprint_fov()
 	await _splash()
 	await _damage_arcs()
+	await _staggers()
 	_graphics()
 	finished = true
+
+
+## Heavy fire or a crit breaks a bite or a spit; it can't be chained, and deaths fall away
+## from the shot.
+func _staggers() -> void:
+	_clear_enemies()
+	_place(_ground(ARENA), 0.0)
+	await _frames(5)
+	var at := _ground(ARENA + Vector3(0.0, 0.0, -1.8))
+	var sc: Scuttler = main.spawn_enemy("scuttler", at)
+	await _frames(3)
+	sc.max_health = 500.0
+	sc.health = 500.0
+	sc.state = Scuttler.State.WINDUP
+	sc._timer = 0.4
+	var hp := player.health
+	sc.take_damage(35.0, sc.global_position, Vector3.FORWARD)
+	_check("a heavy hit staggers a scuttler out of its bite", sc.state == Scuttler.State.RECOVER and sc.staggers == 1, "state %d" % sc.state)
+	await get_tree().create_timer(0.5).timeout
+	_check("the bite never lands", player.health == hp, "%.0f -> %.0f" % [hp, player.health])
+	sc.state = Scuttler.State.WINDUP
+	sc._timer = 5.0
+	sc.take_damage(35.0, sc.global_position, Vector3.FORWARD)
+	_check("it can't be staggered again straight away", sc.state == Scuttler.State.WINDUP and sc.staggers == 1)
+	sc.state = Scuttler.State.CHASE
+	await get_tree().create_timer(Enemy.STAGGER_COOLDOWN).timeout
+	sc.take_damage(10.0, sc.global_position, Vector3.FORWARD)
+	_check("a light hit alone doesn't stagger", sc.staggers == 1)
+	var sp: Spitter = main.spawn_enemy("spitter", _ground(ARENA + Vector3(3.0, 0.0, -4.0)))
+	await _frames(3)
+	sp.max_health = 500.0
+	sp.health = 500.0
+	sp.state = Spitter.State.WINDUP
+	sp._timer = 0.6
+	sp.take_damage(30.0, sp.global_position, Vector3.FORWARD)
+	_check("a heavy hit chokes off a spitter's spit", sp.state == Spitter.State.RECOVER and sp.staggers == 1)
+	var ram: Enemy = main.spawn_enemy("ram", _ground(ARENA + Vector3(-4.0, 0.0, -6.0)))
+	await _frames(3)
+	ram.take_damage(60.0, ram.global_position, Vector3.FORWARD)
+	_check("rams don't stagger", ram.staggers == 0)
+	var victim: Scuttler = main.spawn_enemy("scuttler", _ground(ARENA + Vector3(-2.0, 0.0, -3.0)))
+	await _frames(3)
+	var before := victim.global_position
+	victim.take_damage(999.0, victim.global_position, Vector3(1.0, 0.0, 0.0))
+	await get_tree().create_timer(0.4).timeout
+	_check("a kill knocks it back along the shot", victim.global_position.x - before.x > 0.8, "%.2f" % (victim.global_position.x - before.x))
+	_clear_enemies()
+	await _frames(3)
 
 
 func _ground(p: Vector3) -> Vector3:

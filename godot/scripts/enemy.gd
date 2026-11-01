@@ -35,6 +35,21 @@ var weak_offset := Vector3.ZERO
 var weak_radius := 0.0
 ## Whether the last hit taken was on the weak spot.
 var last_hit_crit := false
+## Which way the last shot travelled (zero for a blast): deaths fall away along it.
+var last_hit_dir := Vector3.ZERO
+
+## Stagger: this much damage inside POISE_WINDOW (or any crit) breaks what it was doing.
+## 0 never staggers (rams, lurkers and the Warden have their own answers to being shot).
+var stagger_damage := 0.0
+const POISE_WINDOW := 0.8
+## No second stagger this soon after one, so a stream of fire can't pin it for good.
+const STAGGER_COOLDOWN := 1.2
+## Named elites take this much more to stagger.
+const ELITE_POISE := 2.5
+var staggers := 0
+var _poise := 0.0
+var _poise_at := -10.0
+var _staggered_at := -10.0
 var crits_taken := 0
 var _weak: Node3D
 ## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
@@ -127,6 +142,7 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		crits_taken += 1
 		_crit_effect(point)
 	health -= amount * mult
+	last_hit_dir = dir
 	_on_hurt(dir)
 	_flash()
 	if health > 0.0:
@@ -134,7 +150,34 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 	if health <= 0.0:
 		_die()
 		return true
+	_take_poise(amount * mult, dir)
 	alert(true)
+	return false
+
+
+func _take_poise(amount: float, dir: Vector3) -> void:
+	if stagger_damage <= 0.0:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _poise_at > POISE_WINDOW:
+		_poise = 0.0
+	_poise += amount
+	_poise_at = now
+	var need := stagger_damage * (ELITE_POISE if is_elite() else 1.0)
+	if (_poise < need and not last_hit_crit) or now - _staggered_at < STAGGER_COOLDOWN:
+		return
+	if _stagger(dir):
+		_poise = 0.0
+		_staggered_at = now
+		staggers += 1
+		if is_inside_tree():
+			# A pale spray of chips so the break reads even in a crowd.
+			Vfx.burst(get_parent(), global_position + Vector3.UP * 0.6, Color("e8e4d8"), 12, 4.0, 0.05, 0.3, -dir if dir != Vector3.ZERO else Vector3.UP, 70.0, -8.0)
+
+
+## Breaks off whatever it was doing (a bite, a spit) and reels. Returns false if it can't be
+## staggered right now.
+func _stagger(_dir: Vector3) -> bool:
 	return false
 
 
