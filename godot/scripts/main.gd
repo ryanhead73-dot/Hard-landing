@@ -71,6 +71,8 @@ var inventory: InventoryPanel
 var siege: ShipSiege
 ## Lurkers in the pools and roaming packs on the open basin.
 var wildlife: Wildlife
+## Squalls over the basin.
+var weather: Weather
 var voice: Voice
 var logs_panel: LogPanel
 var finale: Finale
@@ -87,6 +89,9 @@ var _intro_rest: Transform3D
 var _intro_smoke: Array = []
 var _shake := 0.0
 var dusk := false
+## How stormy it is (0 clear .. 1 downpour) and a lightning flash on top; Weather sets them.
+var storm := 0.0
+var flash := 0.0
 ## 0 = full day, 1 = full dusk. The basin drifts between them over DAY_LENGTH seconds.
 var daylight := 0.0
 ## Seconds into the day cycle (saved).
@@ -204,6 +209,10 @@ func _ready() -> void:
 	wildlife.name = "Wildlife"
 	add_child(wildlife)
 	wildlife.setup(self)
+	weather = Weather.new()
+	weather.name = "Weather"
+	add_child(weather)
+	weather.setup(self)
 	_update_active_site()
 	_set_dusk(false)
 	if not Game.pending_load.is_empty():
@@ -905,22 +914,28 @@ func set_daylight(amount: float) -> void:
 	daylight = clampf(amount, 0.0, 1.0)
 	dusk = daylight > 0.5
 	var k := daylight
-	_sky.set_shader_parameter("top_color", Color("6f8590").lerp(Color("232b3d"), k))
-	_sky.set_shader_parameter("horizon_color", Color("c9cfca").lerp(Color("c27a52"), k))
+	# A storm (Weather) drags everything toward low cloud, rain-dark light and thick haze.
+	var w := clampf(storm, 0.0, 1.0)
+	var top := Color("6f8590").lerp(Color("232b3d"), k)
+	var horizon := Color("c9cfca").lerp(Color("c27a52"), k)
+	_sky.set_shader_parameter("top_color", top.lerp(Color("3a4247").lerp(Color("1a1e26"), k), w))
+	_sky.set_shader_parameter("horizon_color", horizon.lerp(Color("737b7c").lerp(Color("4a3a3a"), k), w))
 	_sky.set_shader_parameter("ground_color", Color("2a2f31").lerp(Color("15161a"), k))
 	_sky.set_shader_parameter("sun_tint", Color("fff1dc").lerp(Color("ffab6b"), k))
-	_sky.set_shader_parameter("cloud_light", Color("eeeeea").lerp(Color("e39a6e"), k))
-	_sky.set_shader_parameter("cloud_dark", Color("7b858a").lerp(Color("3a3448"), k))
-	_sky.set_shader_parameter("sun_glow", lerpf(0.8, 1.6, k))
+	_sky.set_shader_parameter("cloud_light", Color("eeeeea").lerp(Color("e39a6e"), k).lerp(Color("8e9597"), w * 0.8))
+	_sky.set_shader_parameter("cloud_dark", Color("7b858a").lerp(Color("3a3448"), k).lerp(Color("2c3134"), w))
+	_sky.set_shader_parameter("cloud_cover", lerpf(0.55, 0.95, w))
+	_sky.set_shader_parameter("sun_glow", lerpf(0.8, 1.6, k) * (1.0 - w * 0.85))
 	_sun.rotation_degrees = Vector3(-38.0, 35.0, 0.0).lerp(Vector3(-8.0, 60.0, 0.0), k)
-	_sun.light_color = Color("fff3e0").lerp(Color("ff9a6a"), k)
-	_sun.light_energy = lerpf(1.0, 0.25, k)
-	_env.ambient_light_energy = lerpf(0.4, 0.3, k)
-	_env.fog_light_color = Color("8f9a9c").lerp(Color("3a3540"), k)
-	_env.fog_density = lerpf(0.002, 0.004, k)
+	_sun.light_color = Color("fff3e0").lerp(Color("ff9a6a"), k).lerp(Color("c9d3d8"), w * 0.6)
+	_sun.light_energy = lerpf(1.0, 0.25, k) * (1.0 - w * 0.6) + flash
+	_env.ambient_light_energy = lerpf(0.4, 0.3, k) * (1.0 - w * 0.25) + flash * 0.3
+	_env.fog_light_color = Color("8f9a9c").lerp(Color("3a3540"), k).lerp(Color("5d6568").lerp(Color("2a2a32"), k), w)
+	_env.fog_density = lerpf(0.002, 0.004, k) + w * 0.011
 	if Game.graphics >= 1:
-		_env.volumetric_fog_density = lerpf(0.0022, 0.007, k)
+		_env.volumetric_fog_density = lerpf(0.0022, 0.007, k) + w * 0.006
 		_env.volumetric_fog_albedo = Color("c9d2d0").lerp(Color("d9a58a"), k)
 	else:
 		_env.volumetric_fog_density = 0.0
 	site.set_glow(k)
+	site.set_rain(w)

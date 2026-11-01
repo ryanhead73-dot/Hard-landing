@@ -14,6 +14,8 @@ const STEER_INTERVAL := 0.2
 @export var max_health := 60.0
 @export var speed := 5.0
 @export var sight_range := 24.0
+## Scales every creature's sight (Weather lowers it in a storm).
+static var sight_scale := 1.0
 @export var leash_range := 70.0
 @export var alert_radius := 14.0
 ## Size of the teal puff it gives off when it dies.
@@ -176,7 +178,7 @@ func _target_alive() -> bool:
 func _can_see_target() -> bool:
 	var eye := global_position + Vector3.UP * 0.6
 	var chest := target.global_position + Vector3.UP * 1.2
-	if eye.distance_to(chest) > sight_range:
+	if eye.distance_to(chest) > sight_range * sight_scale:
 		return false
 	var query := PhysicsRayQueryParameters3D.create(eye, chest, Game.LAYER_WORLD)
 	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()

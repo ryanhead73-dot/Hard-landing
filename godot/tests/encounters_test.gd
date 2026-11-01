@@ -13,6 +13,7 @@ func _run() -> void:
 	_clear_enemies()
 	await _lurker()
 	await _director()
+	await _weather()
 	finished = true
 
 
@@ -171,6 +172,46 @@ func _director() -> void:
 	w.update(0.5)
 	w.update(0.5)
 	_check("a pool's lurker wakes when you come near, once", get_tree().get_nodes_in_group("lurkers").size() == lurkers_before + 1)
+	_clear_enemies()
+
+
+func _weather() -> void:
+	var w: Weather = main.weather
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var env: Environment = main._env
+	var clear_fog := env.fog_density
+	var sc: Scuttler = main.spawn_enemy("scuttler", open + Vector3(0.0, 0.0, -20.0))
+	await _frames(5)
+	_check("in clear weather a scuttler sees you at 20 m", sc._can_see_target())
+	w.start_storm(true)
+	await _frames(3)
+	_check("a storm comes in", w.storm == 1.0 and main.storm == 1.0 and w.state == Weather.State.STORM)
+	_check("the haze closes in", env.fog_density > clear_fog + 0.008, "%.4f -> %.4f" % [clear_fog, env.fog_density])
+	_check("in the storm it can't see you at 20 m", not sc._can_see_target(), "sight x%.2f" % Enemy.sight_scale)
+	_check("rain falls around you outdoors", w._rain.emitting and w._splash.emitting)
+	_check("rock goes wet", main.site._terrain_mat.get_shader_parameter("rain") > 0.9)
+	_check("Juno remarks on it", main.voice.heard("Squall") or main.voice.heard("Rain again") or main.voice.heard("Here it comes"))
+	var sun: DirectionalLight3D = main._sun
+	var dim := sun.light_energy
+	w.strike()
+	await get_tree().create_timer(0.05).timeout
+	_check("lightning flashes", main.flash > 0.5 and sun.light_energy > dim + 0.5, "%.2f -> %.2f" % [dim, sun.light_energy])
+	await get_tree().create_timer(0.8).timeout
+	_check("the flash passes", main.flash == 0.0)
+	player.revive(main.install_point("bunk") + Vector3.UP * 0.2)
+	await _frames(15)
+	_check("no rain inside Kestrel", not w._rain.emitting)
+	w.clear_storm(true)
+	await _frames(3)
+	_check("the storm clears", w.storm == 0.0 and Enemy.sight_scale == 1.0 and not w._rain.emitting)
+	w.enabled = true
+	w._timer = 0.05
+	await _frames(5)
+	_check("storms come round on their own", w.state == Weather.State.BUILDING and w.storm > 0.0)
+	w.enabled = false
+	w.clear_storm(true)
 	_clear_enemies()
 
 

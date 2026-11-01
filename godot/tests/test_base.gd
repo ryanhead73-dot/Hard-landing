@@ -17,6 +17,8 @@ func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
+	# Storms change the light, sight ranges and voice lines; suites that want one start it.
+	main.weather.enabled = false
 	# Missions have their own suite; the others take components straight away.
 	main.missions.bypass = _bypass_missions()
 	main.missions.refresh(false)

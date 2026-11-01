@@ -8,6 +8,8 @@ uniform vec3 deep_color : source_color = vec3(0.03, 0.08, 0.08);
 uniform vec3 shallow_color : source_color = vec3(0.08, 0.22, 0.2);
 uniform vec3 glow_color : source_color = vec3(0.247, 0.82, 0.71);
 uniform float glow = 0.0;
+// Rain stipples the surface with fast, fine ripples.
+uniform float rain = 0.0;
 
 varying vec3 world_pos;
 
@@ -19,7 +21,9 @@ void fragment() {
 	vec2 uv = world_pos.xz * 0.08;
 	vec3 n1 = texture(ripple_noise, uv + TIME * vec2(0.012, 0.007)).rgb;
 	vec3 n2 = texture(ripple_noise, uv * 1.7 - TIME * vec2(0.009, 0.013)).rgb;
-	NORMAL_MAP = normalize(n1 + n2 - 1.0) * 0.5 + 0.5;
+	vec3 n3 = texture(ripple_noise, world_pos.xz * 0.9 + vec2(TIME * 0.7, -TIME * 0.45)).rgb;
+	vec3 n4 = texture(ripple_noise, world_pos.xz * 1.3 - vec2(TIME * 0.5, TIME * 0.8)).rgb;
+	NORMAL_MAP = normalize(n1 + n2 - 1.0 + (n3 + n4 - 1.0) * rain * 1.6) * 0.5 + 0.5;
 	NORMAL_MAP_DEPTH = 0.35;
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
 	// UV.x of the pool disc mesh is the distance from the centre (0) to the rim (1).

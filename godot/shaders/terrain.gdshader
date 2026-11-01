@@ -11,6 +11,8 @@ uniform vec3 slate_color : source_color = vec3(0.17, 0.2, 0.21);
 uniform vec3 moss_color : source_color = vec3(0.035, 0.12, 0.1);
 uniform vec3 glow_color : source_color = vec3(0.247, 0.82, 0.71);
 uniform float glow = 0.0;
+// 0 dry .. 1 soaked: rain darkens the rock and gives everything a wet sheen.
+uniform float rain = 0.0;
 uniform float tile = 0.25;
 
 varying vec3 world_pos;
@@ -48,9 +50,10 @@ void fragment() {
 	vec3 col = mix(rock, moss_color * mix(0.6, 1.2, fine), moss);
 	// Cracks between the cells catch a faint teal from below, stronger at dusk.
 	float crack = smoothstep(0.5, 0.44, cells) * (1.0 - cliff) * smoothstep(0.4, 0.7, big);
-	ALBEDO = col;
-	ROUGHNESS = mix(mix(0.82, 0.18, wet), 0.9, moss);
-	SPECULAR = mix(0.5, 0.7, wet);
+	float soak = rain * (1.0 - cliff * 0.5);
+	ALBEDO = col * mix(1.0, 0.62, soak);
+	ROUGHNESS = mix(mix(mix(0.82, 0.18, wet), 0.9, moss), mix(0.12, 0.45, moss), soak * 0.85);
+	SPECULAR = mix(mix(0.5, 0.7, wet), 0.75, soak);
 	NORMAL_MAP = triplanar(basalt_normal, p, w).rgb;
 	NORMAL_MAP_DEPTH = mix(2.2, 0.4, moss);
 	EMISSION = glow_color * (crack * 0.04) * glow;
