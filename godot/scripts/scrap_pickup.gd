@@ -1,9 +1,9 @@
 class_name ScrapPickup
 extends Node3D
-## Something dropped on the ground: scrap, reserve ammo for a weapon (kind = weapon id) or a stim.
+## Something dropped on the ground: scrap, reserve ammo for a weapon (kind = weapon id) a stim or an arc charge.
 ## Drifts toward the player when close and is collected on touch.
 
-const COLORS := {"scrap": Color("ffb24d"), "scattergun": Color("e0603a"), "arc_lance": Color("7fd6ff"), "stim": Color("7dff9a")}
+const COLORS := {"scrap": Color("ffb24d"), "scattergun": Color("e0603a"), "arc_lance": Color("7fd6ff"), "stim": Color("7dff9a"), "charge": Color("6ff2dc")}
 
 @export var kind := "scrap"
 @export var amount := 5
@@ -57,6 +57,8 @@ func _wanted() -> bool:
 			return true
 		"stim":
 			return Game.stims < Game.max_stims()
+		"charge":
+			return Game.charges < Game.max_charges()
 	return Game.owns_weapon(kind) and Game.ammo_reserve(kind) < int(Weapon.SPECS[kind]["reserve_max"])
 
 
@@ -66,6 +68,9 @@ func _collect() -> void:
 			Game.add_scrap(amount)
 		"stim":
 			Game.add_stims(amount)
+			Sfx.play("scrap_pickup", null, -6.0)
+		"charge":
+			Game.add_charges(amount)
 			Sfx.play("scrap_pickup", null, -6.0)
 		_:
 			Game.add_ammo(kind, amount)

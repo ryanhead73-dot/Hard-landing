@@ -15,6 +15,7 @@ const KINDS := {
 	"spitter": {"legs": "hang", "stride": 1.5, "swing": 26.0, "lift": 0.0, "knee": 38.0, "bob": 0.04},
 	"ram": {"legs": "hang", "stride": 2.6, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
 	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
+	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
 }
 const SHOTS := {"attack": 0.35, "slam": 0.45, "hurt": 0.3}
 
@@ -143,6 +144,19 @@ func _pose_body(st: String) -> void:
 			head.z += sin(_time * 9.0) * 12.0 * _stun
 			body.x += -5.0 * _charge
 			pose.rot("Tail", Vector3(0.0, sin(_time * 5.0 + _seed) * 20.0 * (1.0 - _dead), 0.0))
+		"lurker":
+			# A low, side-to-side crawl; the jaw gapes on the wind-up and snaps shut on the bite.
+			var gape := 48.0 * _windup + (30.0 if st == "emerge" else 0.0) - (40.0 * punch if shot == "attack" else 0.0)
+			pose.rot("Jaw", Vector3(-maxf(gape, 0.0), 0.0, 0.0))
+			head.x += 14.0 * _windup + (10.0 if st == "emerge" else 0.0)
+			head.y += sin(phase) * 10.0 * m
+			body.y = -sin(phase) * 9.0 * m
+			var lash := sin(phase + 1.2) * 22.0 * m + sin(_time * 1.3 + _seed) * 8.0 * (1.0 - m)
+			pose.rot("Tail", Vector3(0.0, lash, 0.0))
+			pose.rot("TailTip", Vector3(0.0, lash * 1.3, 0.0))
+			var peek := sin(_time * 2.2 + _seed) * 12.0 if st == "submerged" else 0.0
+			pose.rot("StalkL", Vector3(peek, 0.0, 0.0))
+			pose.rot("StalkR", Vector3(-peek, 0.0, 0.0))
 		"warden":
 			var raise := 105.0 * _windup if st == "slam_windup" else 0.0
 			var slam := 120.0 * punch if shot == "slam" else 0.0

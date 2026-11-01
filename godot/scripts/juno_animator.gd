@@ -9,7 +9,7 @@ extends Node
 ## back), -x on a shin or forearm bends the knee back / the elbow up.
 
 const STRIDE := 3.2  ## Metres per full walk cycle (two footsteps).
-const ACTIONS := {"install": 1.4, "interact": 0.8, "stim": 0.9}
+const ACTIONS := {"install": 1.4, "interact": 0.8, "stim": 0.9, "throw": 0.75}
 ## Two-handed actions put the weapon away while they play.
 const TWO_HANDED := ["install"]
 
@@ -203,6 +203,15 @@ func _blend_action(p: Dictionary) -> void:
 			target = {
 				"ArmR": Vector3(72.0, 0.0, 0.0), "ForearmR": Vector3(15.0, 0.0, 0.0),
 				"Spine": Vector3(-18.0, 0.0, 0.0), "Head": Vector3(-15.0, 0.0, 0.0),
+			}
+		"throw":
+			# Wind up behind the shoulder, then whip the left arm through.
+			var whip := clampf((_action_t - 0.24) / 0.14, 0.0, 1.0)
+			target = {
+				"ArmL": Vector3(lerpf(150.0, 70.0, whip), 0.0, lerpf(20.0, 6.0, whip)),
+				"ForearmL": Vector3(lerpf(80.0, 10.0, whip), 0.0, 0.0),
+				"Spine": Vector3(lerpf(8.0, -14.0, whip), lerpf(-18.0, 14.0, whip), 0.0),
+				"Chest": Vector3(0.0, lerpf(-10.0, 10.0, whip), 0.0),
 			}
 		"stim":
 			target = {

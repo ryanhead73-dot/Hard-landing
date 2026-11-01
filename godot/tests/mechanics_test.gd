@@ -15,6 +15,7 @@ func _run() -> void:
 	_clear_enemies()
 	await _weapons()
 	await _supplies()
+	await _charges()
 	await _spitter()
 	await _ram()
 	await _warden()
@@ -138,6 +139,66 @@ func _supplies() -> void:
 	main.inventory.close()
 	await _frames(2)
 	_check("inventory closes and resumes", not get_tree().paused)
+
+
+func _charges() -> void:
+	_clear_enemies()
+	player.revive(ARENA)
+	await _frames(5)
+	_place(ARENA, 0.0)
+	Game.charges = 1
+	await _press("throw")
+	await _frames(2)
+	var thrown := get_tree().get_nodes_in_group("arc_charges")
+	_check("G throws an arc charge and spends it", Game.charges == 0 and thrown.size() == 1, "charges=%d thrown=%d" % [Game.charges, thrown.size()])
+	_check("nothing to throw with an empty rack", player.throw_charge() == null)
+	var fused := false
+	for i in 60 * 3:
+		await get_tree().physics_frame
+		if get_tree().get_nodes_in_group("arc_charges").is_empty():
+			fused = true
+			break
+	_check("the charge goes off on its fuse", fused)
+
+	# Blast: full damage near the middle, nothing outside the radius, shoves survivors.
+	var near: Enemy = main.spawn_enemy("ram", ARENA + Vector3(2.0, 0.0, -12.0))
+	var far: Enemy = main.spawn_enemy("scuttler", ARENA + Vector3(-8.0, 0.0, -12.0))
+	for e in [near, far]:
+		e.target = null
+	await _frames(10)
+	var near_hp := near.health
+	var far_hp := far.health
+	var c := ArcCharge.throw(main, ARENA + Vector3(0.0, 0.5, -12.0), Vector3.ZERO)
+	await _frames(1)
+	var hits := c.detonate()
+	_check("blast hurts what's inside the radius", hits == 1 and (near.dead or near.health < near_hp - 30.0), "hits=%d hp %.0f -> %.0f" % [hits, near_hp, near.health])
+	_check("blast spares what's outside it", far.health == far_hp)
+	_check("blast shoves survivors", near.dead or Vector2(near.velocity.x, near.velocity.z).length() > 2.0, str(near.velocity))
+	await _frames(2)
+	_check("blast flashes and sparks", main.get_node_or_null("ChargeFlash") != null or get_tree().get_nodes_in_group("vfx_burst").size() > 0)
+
+	# Close to Juno it stings, but never kills outright.
+	var hp := player.health
+	ArcCharge.throw(main, player.global_position + Vector3.UP * 0.9, Vector3.ZERO).detonate()
+	_check("a charge at your feet stings", player.health < hp and player.health > hp - ArcCharge.SELF_DAMAGE - 0.1, "%.0f -> %.0f" % [hp, player.health])
+	_clear_enemies()
+
+	# Supplies: rack of 3, fabricated, dropped.
+	_check("charges cap at 3", Game.add_charges(9) == 3 and Game.charges == 3)
+	_check("full rack blocks the fabricator", FabricatorMenu.blocker("charge") != "")
+	Game.charges = 0
+	Game.scrap = Game.CHARGE_COST
+	_check("charges can be fabricated", main.fabricator.build("charge") and Game.charges == 1 and Game.scrap == 0)
+	var drop := ScrapPickup.new()
+	drop.kind = "charge"
+	drop.amount = 1
+	drop.target = player
+	main.add_child(drop)
+	drop.global_position = player.global_position
+	await _frames(5)
+	_check("charge pickups refill the rack", Game.charges == 2, str(Game.charges))
+	player.revive(main.SPAWN)
+	await _frames(5)
 
 
 func _spitter() -> void:
@@ -362,6 +423,7 @@ func _save_load() -> void:
 	Game.scrap = 77
 	Game.upgrades["extended_mag"] = true
 	Game.stims = 2
+	Game.charges = 2
 	Game.set_ammo("scattergun", 3, 20)
 	var gear: QuarryCrawler = main.sites["landing_gear"]
 	gear.search_crate(1)
@@ -386,7 +448,7 @@ func _save_load() -> void:
 	player = main.player
 	await _frames(20)
 	_check("load restores repairs", kestrel.is_repaired("canopy") and not kestrel.is_repaired("landing_gear") and Game.current_repair() == "landing_gear")
-	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.carrying == "struts" and Game.phase() == "return")
+	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.carrying == "struts" and Game.phase() == "return")
 	_check("load restores weapons and ammo", Game.owns_weapon("scattergun") and Game.ammo_in_mag("scattergun") == 3 and Game.ammo_reserve("scattergun") == 20 and player.weapon.current == "scattergun")
 	var gear2: QuarryCrawler = main.sites["landing_gear"]
 	_check("load restores site state", not gear2.has_component() and gear2.crate_searched(1) and not gear2.crate_searched(0))

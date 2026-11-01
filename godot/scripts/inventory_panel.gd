@@ -21,7 +21,7 @@ func _refresh() -> void:
 		var mark := "▸ " if player and player.weapon.current == id else "  "
 		_row("%s%s  ·  %d in the magazine, %s in reserve  [%d]" % [mark, Weapon.SPECS[id]["name"], Game.ammo_in_mag(id), "unlimited" if reserve < 0 else str(reserve), Weapon.ORDER.find(id) + 1])
 	_row("SUPPLIES", Color("ffd08a"), 14)
-	_row("Stims %d / %d  [Q]   ·   Scrap %d" % [Game.stims, Game.max_stims(), Game.scrap])
+	_row("Stims %d / %d  [Q]   ·   Arc charges %d / %d  [G]   ·   Scrap %d" % [Game.stims, Game.max_stims(), Game.charges, Game.max_charges(), Game.scrap])
 	if Game.carrying != "":
 		_row("On your back: %s" % Campaign.by_component(Game.carrying)["component_name"])
 	var built: Array = Game.UPGRADE_ORDER.filter(func(id): return Game.has_upgrade(id))

@@ -1,7 +1,7 @@
 class_name FabricatorMenu
 extends UiPanel
 ## The workshop fabricator: every build on one list, with what it does, what it costs and what
-## stops it (power, cooling, engine bleed, scrap). Stims are made here too.
+## stops it (power, cooling, engine bleed, scrap). Stims and arc charges are made here too.
 
 
 func _ready() -> void:
@@ -10,9 +10,16 @@ func _ready() -> void:
 	_toggle_action = "interact"
 
 
-## Builds an upgrade (or "stim"). Returns true if it was made.
+## Builds an upgrade (or "stim" / "charge"). Returns true if it was made.
 func build(id: String) -> bool:
-	var ok := Game.buy_stim() if id == "stim" else Game.buy_upgrade(id)
+	var ok: bool
+	match id:
+		"stim":
+			ok = Game.buy_stim()
+		"charge":
+			ok = Game.buy_charge()
+		_:
+			ok = Game.buy_upgrade(id)
 	if visible:
 		_refresh()
 	return ok
@@ -24,6 +31,10 @@ static func blocker(id: String) -> String:
 		if Game.stims >= Game.max_stims():
 			return "Stim pouch full"
 		return "" if Game.scrap >= Game.STIM_COST else "Needs %d scrap" % Game.STIM_COST
+	if id == "charge":
+		if Game.charges >= Game.max_charges():
+			return "Charge rack full"
+		return "" if Game.scrap >= Game.CHARGE_COST else "Needs %d scrap" % Game.CHARGE_COST
 	var info: Dictionary = Game.UPGRADES[id]
 	if Game.has_upgrade(id):
 		return "Built"
@@ -39,11 +50,12 @@ func _refresh() -> void:
 	_row("Scrap: %d" % Game.scrap, Color("ffd08a"), 18)
 	var ids: Array = Game.listed_upgrades()
 	ids.append("stim")
+	ids.append("charge")
 	for id in ids:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
 		_content.add_child(line)
-		var info: Dictionary = {"name": "Stim", "cost": Game.STIM_COST, "effect": "Heals %d (you carry %d / %d)" % [Game.STIM_HEAL, Game.stims, Game.max_stims()]} if id == "stim" else Game.UPGRADES[id]
+		var info: Dictionary = _consumable(id) if id in ["stim", "charge"] else Game.UPGRADES[id]
 		var text := Label.new()
 		text.text = "%s  ·  %s" % [info["name"], info["effect"]]
 		text.custom_minimum_size = Vector2(430, 0)
@@ -56,3 +68,9 @@ func _refresh() -> void:
 		button.disabled = why != ""
 		button.pressed.connect(build.bind(id))
 		line.add_child(button)
+
+
+static func _consumable(id: String) -> Dictionary:
+	if id == "charge":
+		return {"name": "Arc charge", "cost": Game.CHARGE_COST, "effect": "Thrown discharge that stuns packs (you carry %d / %d)" % [Game.charges, Game.max_charges()]}
+	return {"name": "Stim", "cost": Game.STIM_COST, "effect": "Heals %d (you carry %d / %d)" % [Game.STIM_HEAL, Game.stims, Game.max_stims()]}

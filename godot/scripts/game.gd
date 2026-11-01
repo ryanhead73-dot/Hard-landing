@@ -38,6 +38,7 @@ const UPGRADES := {
 }
 const STIM_COST := 15
 const STIM_HEAL := 55.0
+const CHARGE_COST := 20
 const NEEDS_TEXT := {
 	"cooling": "the fabricator overheats on heavy builds until cooling is fixed",
 	"engine": "top-tier builds need engine bleed power",
@@ -71,6 +72,8 @@ var logs: Array[String] = []
 var weapons: Array[String] = ["rifle"]
 var ammo: Dictionary = {}
 var stims := 1
+## Arc charges carried (thrown with G).
+var charges := 1
 ## Main sets this while the F1 dev panel is open, so number keys toggle repairs, not weapons.
 var dev_panel_open := false
 ## Where the campaign saves. Tests point this elsewhere so they never touch a real save.
@@ -162,6 +165,7 @@ func reset() -> void:
 	weapons = ["rifle"]
 	ammo = {"rifle": [Weapon.SPECS["rifle"]["mag"], -1]}
 	stims = 1
+	charges = 1
 	logs.clear()
 	launch_objective = ""
 	mission_stage.clear()
@@ -206,6 +210,7 @@ func session_state() -> Dictionary:
 		"weapons": weapons.duplicate(),
 		"ammo": ammo.duplicate(true),
 		"stims": stims,
+		"charges": charges,
 		"logs": logs.duplicate(),
 		"mission_stage": mission_stage.duplicate(),
 		"mission_done": mission_done.duplicate(),
@@ -229,6 +234,7 @@ func apply_session(data: Dictionary) -> void:
 		var pair: Array = saved_ammo.get(w, [Weapon.SPECS[w]["mag"], Weapon.SPECS[w]["reserve_max"]])
 		ammo[w] = [int(pair[0]), int(pair[1])]
 	stims = int(data.get("stims", 1))
+	charges = int(data.get("charges", 1))
 	mission_stage.clear()
 	var stages: Dictionary = data.get("mission_stage", {})
 	for id in stages:
@@ -368,6 +374,35 @@ func buy_stim() -> bool:
 	scrap -= STIM_COST
 	scrap_changed.emit(scrap)
 	add_stims(1)
+	Sfx.play("fabricate")
+	return true
+
+
+func max_charges() -> int:
+	return 3
+
+
+func add_charges(n: int) -> int:
+	var before := charges
+	charges = mini(charges + n, max_charges())
+	inventory_changed.emit()
+	return charges - before
+
+
+func take_charge() -> bool:
+	if charges <= 0:
+		return false
+	charges -= 1
+	inventory_changed.emit()
+	return true
+
+
+func buy_charge() -> bool:
+	if scrap < CHARGE_COST or charges >= max_charges():
+		return false
+	scrap -= CHARGE_COST
+	scrap_changed.emit(scrap)
+	add_charges(1)
 	Sfx.play("fabricate")
 	return true
 

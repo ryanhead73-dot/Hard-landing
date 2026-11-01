@@ -5,6 +5,23 @@ extends RefCounted
 ## the drifting moss motes that hang over the basin.
 
 static var _mats: Dictionary = {}
+static var _dot: GradientTexture2D
+
+
+## A soft round sprite (bright core, feathered edge) so particles never read as flat squares.
+static func dot() -> GradientTexture2D:
+	if _dot == null:
+		var g := Gradient.new()
+		g.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+		g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.75), Color(1, 1, 1, 0.18), Color(1, 1, 1, 0)])
+		_dot = GradientTexture2D.new()
+		_dot.gradient = g
+		_dot.fill = GradientTexture2D.FILL_RADIAL
+		_dot.fill_from = Vector2(0.5, 0.5)
+		_dot.fill_to = Vector2(1.0, 0.5)
+		_dot.width = 64
+		_dot.height = 64
+	return _dot
 
 
 ## Unshaded additive glow for particles and flashes, cached per colour.
@@ -19,6 +36,7 @@ static func glow(color: Color, energy := 2.0) -> StandardMaterial3D:
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
 	m.albedo_color = Color(color.r * energy, color.g * energy, color.b * energy, color.a)
+	m.albedo_texture = dot()
 	_mats[key] = m
 	return m
 
@@ -155,6 +173,7 @@ static func soft(color: Color) -> StandardMaterial3D:
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
 	m.albedo_color = color
+	m.albedo_texture = dot()
 	_mats[key] = m
 	return m
 

@@ -25,9 +25,11 @@ void fragment() {
 	// UV.x of the pool disc mesh is the distance from the centre (0) to the rim (1).
 	float edge = smoothstep(0.75, 1.0, UV.x);
 	ALBEDO = mix(deep_color, shallow_color, edge);
-	METALLIC = 0.1;
-	ROUGHNESS = 0.04;
-	SPECULAR = 0.6;
-	ALPHA = mix(0.88, 0.96, fres);
+	// Dark and only glossy at grazing angles: with the surface now facing up, a mirror finish
+	// turned the pools into pale slabs of overcast sky.
+	METALLIC = 0.0;
+	ROUGHNESS = mix(0.22, 0.08, fres);
+	SPECULAR = mix(0.18, 0.5, fres);
+	ALPHA = mix(0.82, 0.95, fres);
 	EMISSION = glow_color * edge * (0.08 + 0.5 * glow) + shallow_color * 0.05;
 }
