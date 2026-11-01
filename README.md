@@ -8,7 +8,7 @@ The whole repair campaign is playable: seven expeditions, each recovering one co
 
 ## The campaign
 
-Each repair is one expedition. Follow the site's beacon (only the site you need flashes bright, and only it pings), then work through the site's mission before the component comes free: throw breakers, close valves, lock winches, restart floodlights, triangulate transponders, find a keycard, hold a machine while waves come in, or kill a named elite. Some objectives need E held for a few seconds and break if you're hit; at the Loom they only work between pulses. Banners mark each stage and the HUD shows the next objective. Then carry the component home on your back (no sprinting) and install it. Taking a component stirs up an ambush. Components found out of order say what Kestrel needs first.
+Each repair is one expedition. Follow the site's beacon (only the site you need flashes bright, and only it pings), then work through the site's mission before the component comes free: throw breakers, close valves, lock winches, restart floodlights, triangulate transponders, hunt a keycard through the graveyard maze by its signal (the visor meter climbs as you close in; the wrong wreckage gives up scrap or a scuttler nest), hold a machine while waves come in, or kill a named elite. Some objectives need E held for a few seconds and break if you're hit; at the Loom they only work between pulses. Banners mark each stage and the HUD shows the next objective. Then carry the component home on your back (no sprinting) and install it. Taking a component stirs up an ambush. Components found out of order say what Kestrel needs first.
 
 | # | Repair | Mission |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Each repair is one expedition. Follow the site's beacon (only the site you need 
 | 3 | Canopy | Climb to the skiff, lock both winch anchors before the glazing comes free |
 | 4 | Landing gear | Restart three floodlights in the dark bay, then defend the crawler's crane as it lowers the struts |
 | 5 | Wing | Find three rescue transponders in the spore fog, kill the bull ram, cut the panel free |
-| 6 | Engine | Find the chief engineer's keycard, kill the yard guardian, hold the engine room while the coil unlocks |
+| 6 | Engine | Search the hull maze for the chief engineer's keycard by signal, kill the yard guardian, hold the engine room while the coil unlocks |
 | 7 | Navigation | Tune three resonators between the Loom's pulses |
 
 

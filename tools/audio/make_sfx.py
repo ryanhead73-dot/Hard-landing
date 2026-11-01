@@ -682,6 +682,13 @@ def skimmer_death(v):
     return outdoor(place(1.2, (0, wail), (0.1, flutter)), 0.35)
 
 
+@sound("signal_ping")
+def signal_ping(v):
+    """The visor's search ping: a short, soft two-tone blip."""
+    blip = place(0.16, (0, osc(1480, 0.05) * env(0.05, 0.002, 0.045)), (0.05, osc(1980, 0.07) * env(0.07, 0.002, 0.06) * 0.7))
+    return blip * 0.6
+
+
 PEAKS = {
     "hit_tick": 0.5, "hit_crit": 0.55, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
@@ -693,7 +700,7 @@ PEAKS = {
     "lurker_hurt": 0.7, "lurker_hiss": 0.7, "lurker_dive": 0.7,
     "thunder": 0.9,
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
-    "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
+    "signal_ping": 0.4, "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).
