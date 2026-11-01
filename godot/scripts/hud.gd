@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · Tab inventory · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -25,6 +25,7 @@ var _ending: ColorRect
 var _scan_marks: Array = []
 var _weapon: Label
 var _stims: Label
+var _charges: Label
 var _bar_back: ColorRect
 var _bar_fill: ColorRect
 var _bar_label: Label
@@ -122,6 +123,8 @@ func _ready() -> void:
 	_weapon.modulate = Color(1, 1, 1, 0.8)
 	_stims = _label(15, Vector2.ZERO)
 	_anchor(_stims, 0.0, 1.0, 16, -98, 300, -76)
+	_charges = _label(15, Vector2.ZERO)
+	_anchor(_charges, 0.0, 1.0, 16, -122, 300, -100)
 
 	# Shared top bar: the Warden's health, or Kestrel's hull during a siege.
 	_bar_back = ColorRect.new()
@@ -321,6 +324,11 @@ func set_health(health: float, max_health: float) -> void:
 
 func set_weapon_info(weapon_name: String, reserve: int) -> void:
 	_weapon.text = "%s  ·  %s" % [weapon_name.to_upper(), "∞" if reserve < 0 else "%d reserve" % reserve]
+
+
+func set_charges(count: int, max_count: int) -> void:
+	_charges.text = "CHARGES %d / %d  [G]" % [count, max_count]
+	_charges.modulate = Color(0.75, 1, 0.95, 0.85 if count > 0 else 0.4)
 
 
 func set_stims(count: int, max_count: int) -> void:

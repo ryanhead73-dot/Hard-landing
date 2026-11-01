@@ -269,6 +269,18 @@ func use_stim() -> bool:
 	return true
 
 
+## Lobs an arc charge where the camera points. Returns the charge, or null if none are left.
+func throw_charge() -> ArcCharge:
+	if dead or is_rolling() or not Game.take_charge():
+		return null
+	var aim := -_camera.global_basis.z
+	var from := global_position + Vector3.UP * 1.45 + Vector3(aim.x, 0.0, aim.z).normalized() * 0.6
+	var c := ArcCharge.throw(get_parent(), from, aim * 15.0 + Vector3.UP * 3.5 + Vector3(velocity.x, 0.0, velocity.z) * 0.5, self)
+	Sfx.play("charge_throw", null, -6.0)
+	anim.play("throw")
+	return c
+
+
 ## Back on your feet at `at`. A loaded game keeps its saved ammo, so it passes refill = false.
 func revive(at: Vector3, refill := true) -> void:
 	dead = false
@@ -308,6 +320,8 @@ func _poll_actions() -> void:
 		return
 	if Input.is_action_just_pressed("stim"):
 		use_stim()
+	if Input.is_action_just_pressed("throw"):
+		throw_charge()
 	if Input.is_action_just_pressed("dodge"):
 		start_roll()
 	for i in Weapon.ORDER.size():

@@ -31,6 +31,7 @@ const KEYS := {
 	"flashlight": [KEY_F],
 	"reload": [KEY_R],
 	"stim": [KEY_Q],
+	"throw": [KEY_G],
 	"weapon_1": [KEY_1],
 	"weapon_2": [KEY_2],
 	"weapon_3": [KEY_3],
@@ -127,8 +128,10 @@ func _ready() -> void:
 	hud.set_health(player.health, player.max_health())
 	_on_ammo_changed(player.weapon.in_mag, player.weapon.mag_size(), false)
 	Game.inventory_changed.connect(func(): hud.set_stims(Game.stims, Game.max_stims()))
+	Game.inventory_changed.connect(func(): hud.set_charges(Game.charges, Game.max_charges()))
 	Game.upgrades_changed.connect(func(): hud.set_stims(Game.stims, Game.max_stims()))
 	hud.set_stims(Game.stims, Game.max_stims())
+	hud.set_charges(Game.charges, Game.max_charges())
 	hud.set_scrap(Game.scrap)
 	hud.set_objective(Game.objective_text())
 	hud.show_message("Kestrel is dead without power. Follow the red beacon to the relay station and find a power cell.")
@@ -730,6 +733,8 @@ func _on_enemy_died(e: Enemy) -> void:
 		_drop(w, AMMO_DROP[w], e.global_position)
 	if randf() < 0.08:
 		_drop("stim", 1, e.global_position)
+	if randf() < 0.06:
+		_drop("charge", 1, e.global_position)
 
 
 func _drop(kind: String, amount: int, at: Vector3) -> ScrapPickup:

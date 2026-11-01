@@ -211,6 +211,38 @@ def stim(v):
     return indoor(place(1.3, (0, clack(2600, 0.04, 0.08)), (0.03, hiss), (0, beat * 0.9), (0.25, glow)), 0.15)
 
 
+
+@sound("charge_throw")
+def charge_throw(v):
+    """Thumb off the arming collar, a rising capacitor whine, then the air as it leaves the hand."""
+    arm = clack(3200, 0.05, 0.1, 0.7)
+    whine = osc(sweep(1400, 5200, 0.35, 0.5), 0.35) * env(0.35, 0.25, 0.08) * 0.12
+    whoosh = bp(pink(0.3), 500, 2400) * adsr(0.3, 0.08, 0.05, 0.6, 0.15) * 0.6
+    return indoor(place(0.55, (0, arm), (0.02, whine), (0.12, whoosh)), 0.12)
+
+
+@sound("charge_bounce", 3)
+def charge_bounce(v):
+    """The charge's steel shell skipping on basalt."""
+    return outdoor(place(0.18, (0, clack(2100 + 400 * v, 0.06, 0.15, 0.8)), (0, thud(160, 0.06, 0.6) * 0.3)), 0.2)
+
+
+@sound("charge_blast", 2)
+def charge_blast(v):
+    """Discharge: a white crack, a lightning tear across the band, the pressure thump and a long
+    electrical sizzle as the field collapses, all thrown out across the basin."""
+    d = 2.4
+    crack = hp(white(0.02), 1500) * env(0.02, 0.0005, 0.015) * 1.5
+    tear = grains(0.5, 420, lambda i: hp(white(0.003), 1800) * dsp.rng.uniform(0.3, 1.0)) * env(0.5, 0.001, 0.4)
+    zap = fm(sweep(2600 + 200 * v, 140, 0.4), 1.41, 7.0, 0.4) * env(0.4, 0.0005, 0.3) * 0.7
+    thump = place(1.0, (0, thud(52, 1.0, 0.45) * 2.2), (0, lp(white(0.5), 380) * env(0.5, 0.001, 0.4)))
+    sizzle = (grains(1.6, 90, lambda i: hp(white(0.004), 3000) * dsp.rng.uniform(0.05, 0.4))
+              + bp(osc(95, 1.6, "saw"), 200, 3000) * 0.12) * env(1.6, 0.01, 1.3)
+    debris = grains(1.2, 14, lambda i: lp(white(0.04), dsp.rng.uniform(800, 3000)) * env(0.04, 0.001, 0.03) * dsp.rng.uniform(0.1, 0.4))
+    x = place(d, (0, crack), (0, tear), (0, zap), (0.005, sat(thump, 2.2)), (0.12, sizzle), (0.25, debris))
+    return outdoor(x, 0.5)
+
+
 # --- Juno ----------------------------------------------------------------------------------
 
 @sound("footstep_0", 4)
@@ -530,6 +562,7 @@ PEAKS = {
     "ui_click": 0.5, "warden_slam": 0.95, "spitter_death": 0.7, "ram_death": 0.85, "launch_roar": 0.9, "splash_0": 0.5,
     "splash_1": 0.5, "roll_whoosh": 0.45, "lance_shot": 0.8, "scuttler_lunge": 0.7, "loom_hum": 0.8,
     "ship_hum_loop": 0.5, "spool_loop": 0.5, "player_hurt": 0.8, "rifle_empty": 0.7,
+    "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).

@@ -96,6 +96,18 @@ func _juno_upper_body() -> void:
 	_check("the stim goes to her chest", _rot("ForearmL").x > 70.0, "forearm=%.0f" % _rot("ForearmL").x)
 	await get_tree().create_timer(0.6).timeout
 	_check("actions finish", a.action == "")
+	_check("a throw plays its action", a.play("throw") and a.action == "throw")
+	var wound := 0.0
+	var release := 999.0
+	var start := Time.get_ticks_msec()
+	while a.action == "throw":
+		await get_tree().process_frame
+		var arm := _rot("ArmL").x
+		if Time.get_ticks_msec() - start < 260:
+			wound = maxf(wound, arm)
+		elif wound > 0.0:
+			release = minf(release, arm)
+	_check("the throw winds up and whips through", wound > 75.0 and release < wound - 30.0, "wind-up=%.0f release=%.0f" % [wound, release])
 	a.play("install")
 	await get_tree().create_timer(0.6).timeout
 	_check("installing uses both hands, weapon stowed", not w.visible and _rot("ArmR").x > 40.0 and _rot("Spine").x < -10.0)
