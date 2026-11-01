@@ -45,6 +45,15 @@ func set_state(value: State, animate := true) -> void:
 		_play_done(animate)
 
 
+## A search spot turned over and found empty: its lamp goes out.
+func mark_empty() -> void:
+	set_state(State.DONE, false)
+	if _lamp_mat:
+		_lamp_mat.emission = Color("2a2e30")
+		_lamp_mat.emission_energy_multiplier = 0.2
+		_lamp_light.visible = false
+
+
 func _apply() -> void:
 	if _lamp_mat == null:
 		return
@@ -167,6 +176,14 @@ func _build() -> void:
 			crystal.mesh = prism
 			crystal.material_override = _glow(TEAL, 2.0)
 			_moving.add_child(crystal)
+		"remains":
+			# A spacer's last stand: a toppled locker, a pack, a scatter of kit.
+			var locker := _box(Vector3(0.6, 0.45, 1.5), Vector3(0, 0.23, 0), body)
+			locker.rotation.y = 0.3
+			_box(Vector3(0.5, 0.35, 0.3), Vector3(0.55, 0.18, 0.5), trim)
+			for k in 4:
+				var bit := _box(Vector3(0.16, 0.08, 0.22), Vector3(-0.5 + k * 0.28, 0.04, -0.75 + (k % 2) * 0.3), _mat(Color("8c8f86"), 0.5, 0.4))
+				bit.rotation.y = k * 0.9
 		"cradle", "crane":
 			_box(Vector3(1.4, 0.4, 1.0), Vector3(0, 0.2, 0), body)
 			_box(Vector3(0.9, 1.2, 0.2), Vector3(0, 0.9, -0.35), trim)
@@ -176,7 +193,7 @@ func _build() -> void:
 			_box(Vector3(0.8, 1.0, 0.8), Vector3(0, 0.5, 0), body)
 	# Status lamp on top of everything, and the light it throws.
 	_lamp_mat = _glow(AMBER, 3.0)
-	var top := 3.5 if kind == "floodlight" else (2.9 if kind == "transponder" else 1.6)
+	var top := 3.5 if kind == "floodlight" else (2.9 if kind == "transponder" else (0.75 if kind == "remains" else 1.6))
 	var lamp := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = 0.09

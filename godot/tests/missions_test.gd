@@ -122,6 +122,8 @@ func _play_mission(r: Dictionary) -> void:
 				await _defend(id, si, s)
 			"elite":
 				await _elite(id, s)
+			"search":
+				await _search(id, si, s)
 		_check("%s stage %d (%s) completes" % [id, si, s["type"]], runner.stage_index(id) == si + 1, "at %d" % runner.stage_index(id))
 		if id == "cooling" and si == 0:
 			var vents := (site as HaulerWreck).vents()
@@ -165,6 +167,53 @@ func _work_devices(id: String, si: int, s: Dictionary) -> void:
 				await _go_to_device(d)
 			await _hold(hold + 0.4)
 		_check("%s stage %d device %d: worked" % [id, si, i], d.state == MissionDevice.State.DONE or runner.stage_index(id) > si)
+
+
+## A search: the waypoint only finds the area, the signal leads to the find, wrong spots pay
+## scrap or wake a nest, and the right one ends the stage.
+func _search(id: String, si: int, s: Dictionary) -> void:
+	var site: ExpeditionSite = main.sites[id]
+	var list: Array = runner.devices[id][si]
+	var answer := int(s["answer"])
+	var area := site.to_global(s["pos"])
+	player.revive(area + Vector3(0.0, 0.3, MissionRunner.SEARCH_AREA + 12.0))
+	await _frames(5)
+	var far_point = runner.waypoint()
+	_check("%s: from afar the waypoint finds the search area" % id, far_point is Vector3 and (far_point as Vector3).distance_to(area) < 0.1)
+	var unreachable := range(list.size()).filter(func(i): return _stand_spot(list[i]) == Vector3.INF)
+	_check("%s: every search spot can be reached" % id, unreachable.is_empty(), str(unreachable))
+	var cold := 1.0
+	var warm := 0.0
+	for i in list.size():
+		await _go_to_device(list[i])
+		if i == answer:
+			warm = runner.search_signal()
+		else:
+			cold = minf(cold, runner.search_signal())
+	_check("%s: in the area the waypoint goes quiet" % id, runner.waypoint() == null)
+	_check("%s: the signal is strongest at the find" % id, warm > 0.9 and warm > cold, "%.2f vs %.2f" % [warm, cold])
+	_check("%s: the signal meter shows" % id, main.hud.task_visible())
+	var empty := -1
+	for i in list.size():
+		if i != answer and not i in s.get("nests", []):
+			empty = i
+			break
+	var scrap := Game.scrap
+	await _go_to_device(list[empty])
+	_check("%s: search prompt" % id, _label().contains(s["devices"][empty]["label"]), _label())
+	await _hold(float(s["devices"][empty]["hold"]) + 0.4)
+	_check("%s: a wrong spot turns up scrap, not the find" % id, Game.scrap == scrap + 4 and runner.stage_index(id) == si and list[empty].state == MissionDevice.State.DONE)
+	if not s.get("nests", []).is_empty():
+		var nest: int = s["nests"][0]
+		var before := _enemy_count()
+		await _go_to_device(list[nest])
+		var nest_label := _label()
+		await _hold(float(s["devices"][nest]["hold"]) + 0.4)
+		_check("%s: a nested spot wakes the scuttlers" % id, _enemy_count() >= before + 3, "%d -> %d, '%s', state %d, done %s, msg '%s'" % [before, _enemy_count(), nest_label, list[nest].state, Game.mission_done, main.hud._message.text if "_message" in main.hud else "?"])
+		_clear_enemies()
+		await _frames(3)
+	await _go_to_device(list[answer])
+	await _hold(float(s["devices"][answer]["hold"]) + 0.4)
 
 
 ## The Loom pulse during a tune knocks it out.

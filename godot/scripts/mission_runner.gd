@@ -7,6 +7,9 @@ extends Node
 ##   pulse    as activate, but a Loom pulse during the hold knocks it out of tune.
 ##   defend   start the device, then stay within `radius` for `seconds` while waves come in.
 ##   elite    kill a named elite (`kind`, `name`, `pos`).
+##   search   search spots (hold E) for the one thing hidden in one of them (`answer`); a signal
+##            meter climbs as Juno closes on it, the waypoint only points at the area (`pos`)
+##            until she is in it, and the wrong spots turn up scrap or (`nests`) a scuttler nest.
 ## After the last stage comes the implicit "take" stage. Stage index and the devices done in the
 ## current stage live in Game (mission_stage, mission_done) so they save with the session.
 
@@ -16,6 +19,10 @@ const REACH := 2.1
 const HOLD_RANGE := 2.6
 ## Seconds between a defend stage's waves, unless the stage says otherwise.
 const WAVE_EVERY := 10.0
+## A search's signal meter: full at the hidden thing, nothing past this range.
+const SIGNAL_RANGE := 30.0
+## Inside this distance of a search area's centre the waypoint goes quiet.
+const SEARCH_AREA := 20.0
 
 ## Tests that cover other systems skip missions: every component is takeable straight away.
 var bypass := false
@@ -31,6 +38,7 @@ var _defend_progress := 0.0
 var _wave_timer := 0.0
 var _wave_index := 0
 var _elite: Enemy
+var _ping_timer := 0.0
 var _last_text := ""
 var _last_repair := ""
 ## Sites whose opening lines have played this session.
@@ -112,6 +120,9 @@ func objective() -> String:
 			var total: int = devices[id][stage_index(id)].size()
 			if total > 1:
 				text += " (%d/%d)" % [Game.mission_done.size(), total]
+		"search":
+			if not Game.mission_done.is_empty():
+				text += " (%d searched)" % Game.mission_done.size()
 		"defend":
 			if _defend_running:
 				text = s.get("running_text", text)
@@ -145,6 +156,9 @@ func waypoint():
 			if _elite and is_instance_valid(_elite) and not _elite.dead:
 				return _elite.global_position
 			return site.to_global(s["pos"])
+		"search":
+			var area := site.to_global(s["pos"])
+			return area if _flat(area - pos) > SEARCH_AREA else null
 	return null
 
 
@@ -154,7 +168,7 @@ func interaction(pos: Vector3) -> Dictionary:
 	if bypass or id == "" or Game.carrying != "":
 		return {}
 	var s := stage(id)
-	if not s["type"] in ["activate", "pulse", "defend"]:
+	if not s["type"] in ["activate", "pulse", "defend", "search"]:
 		return {}
 	var si := stage_index(id)
 	var list: Array = devices[id][si]
@@ -222,6 +236,8 @@ func _process(delta: float) -> void:
 			_run_defend(id, site, s, delta)
 	if not _channel.is_empty():
 		_run_channel(id, delta)
+	elif s["type"] == "search":
+		_run_search(id, s, delta)
 	elif not _defend_running:
 		hud.set_task(-1.0)
 
@@ -238,6 +254,28 @@ func _run_channel(id: String, delta: float) -> void:
 		_channel = {}
 		main.hud.set_task(-1.0)
 		_complete_device(i)
+
+
+## 0..1: how strong the hidden thing's signal is where Juno stands.
+func search_signal() -> float:
+	var id := Game.current_repair()
+	if id == "" or stage(id)["type"] != "search":
+		return 0.0
+	var hidden: MissionDevice = devices[id][stage_index(id)][int(stage(id)["answer"])]
+	var d := _flat(hidden.global_position - main.player.global_position)
+	return clampf(1.0 - d / SIGNAL_RANGE, 0.0, 1.0)
+
+
+## The signal meter and its ping, faster the closer she gets.
+func _run_search(_id: String, s: Dictionary, delta: float) -> void:
+	var strength := search_signal()
+	main.hud.set_task(strength, "%s  %d%%" % [s.get("signal", "SIGNAL"), int(strength * 100.0)])
+	if strength <= 0.0:
+		return
+	_ping_timer -= delta
+	if _ping_timer <= 0.0:
+		_ping_timer = lerpf(1.6, 0.18, strength)
+		Sfx.play("signal_ping", null, lerpf(-16.0, -6.0, strength), 0.0)
 
 
 func _run_elite(id: String, site: ExpeditionSite, s: Dictionary) -> void:
@@ -364,12 +402,38 @@ func _complete_device(index: int) -> void:
 	var d: MissionDevice = devices[id][si][index]
 	d.set_state(MissionDevice.State.DONE)
 	main.player.anim.play("interact")
+	var s := stage(id)
+	if s["type"] == "search":
+		_searched(id, s, d, index)
+		return
 	Sfx.play("repair_clunk", d.global_position, -4.0)
 	(main.sites[id] as ExpeditionSite).on_device_done(si, index, true)
 	if Game.mission_done.size() >= devices[id][si].size():
 		_advance(id)
 	else:
 		_update_objective()
+
+
+## A search spot turned over: the find ends the stage; anything else is scrap, or a nest.
+func _searched(id: String, s: Dictionary, d: MissionDevice, index: int) -> void:
+	if index == int(s["answer"]):
+		Sfx.play("repair_clunk", d.global_position, -2.0)
+		main.hud.show_message(s.get("found", "Found it."))
+		_advance(id)
+		return
+	d.mark_empty()
+	Sfx.play("scrap_pickup", d.global_position, -4.0)
+	if index in s.get("nests", []):
+		main.hud.show_message("Not here, and something was living in it.")
+		for k in 3:
+			var a := TAU * k / 3.0 + randf() * 0.5
+			var at := d.global_position + Vector3(cos(a), 0.0, sin(a)) * randf_range(4.0, 6.0)
+			main.spawn_enemy("scuttler", at).alert(false)
+		Sfx.play("scuttler_alert", d.global_position, 0.0, 0.1)
+	else:
+		Game.add_scrap(4)
+		main.hud.show_message("Not here. 4 scrap for the trouble.")
+	_update_objective()
 
 
 ## Finishes the current stage and moves to the next (or to the take stage).
