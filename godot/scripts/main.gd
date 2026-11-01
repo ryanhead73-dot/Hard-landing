@@ -366,13 +366,18 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 			e = w
 		_:
 			e = Scuttler.new()
+	e.elite_name = elite_name
+	return spawn_enemy_node(e, at)
+
+
+## Puts a made enemy in the world (a thief comes with its burrows already set).
+func spawn_enemy_node(e: Enemy, at: Vector3) -> Enemy:
 	# Out among the hummocks, start on the ground, not inside it.
 	var ground := site.height_at(at.x, at.z)
 	if at.y < ground + 0.3:
 		at.y = ground + 0.5
 	e.target = player
 	e.home = at
-	e.elite_name = elite_name
 	add_child(e)
 	e.global_position = at
 	e.died.connect(_on_enemy_died)

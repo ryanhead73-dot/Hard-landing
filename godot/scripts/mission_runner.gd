@@ -14,6 +14,7 @@ extends Node
 ## `timer_range` of `pos`: run out and every device comes undone (`slip_text`, `slip_say`, and
 ## the site's `on_slip`), then the clock starts again. `harass` kinds spawn at `harass_pts` when
 ## the clock first starts and top up on each slip.
+##   chase    a thief (`name`) runs from Juno between `burrows` with the thing she needs; kill it.
 ## An activate stage with an `order` must be worked in that order (each device's `reading` shows
 ## in its prompt as the clue); the wrong one undoes the stage (`wrong_text`, `wrong_say`,
 ## `wrong_damage` to Juno, and the site's `on_wrong`).
@@ -47,6 +48,7 @@ var _defend_progress := 0.0
 var _wave_timer := 0.0
 var _wave_index := 0
 var _elite: Enemy
+var _thief: FuseThief
 var _ping_timer := 0.0
 ## A timed stage's seconds left; negative until the clock starts.
 var _clock := -1.0
@@ -170,6 +172,10 @@ func waypoint():
 			if _elite and is_instance_valid(_elite) and not _elite.dead:
 				return _elite.global_position
 			return site.to_global(s["pos"])
+		"chase":
+			if _thief and is_instance_valid(_thief) and not _thief.dead:
+				return _thief.track_point()
+			return site.to_global(s["pos"])
 		"search":
 			var area := site.to_global(s["pos"])
 			return area if _flat(area - pos) > SEARCH_AREA else null
@@ -225,6 +231,10 @@ func elite() -> Enemy:
 	return _elite
 
 
+func thief() -> FuseThief:
+	return _thief
+
+
 # --- Running --------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
@@ -248,6 +258,8 @@ func _process(delta: float) -> void:
 				_advance(id)
 		"elite":
 			_run_elite(id, site, s)
+		"chase":
+			_run_chase(id, site, s)
 		"defend":
 			_run_defend(id, site, s, delta)
 	if s.has("timer"):
@@ -386,6 +398,28 @@ func _run_elite(id: String, site: ExpeditionSite, s: Dictionary) -> void:
 		main.voice.interrupt(s["say"])
 
 
+func _run_chase(id: String, site: ExpeditionSite, s: Dictionary) -> void:
+	if _thief and is_instance_valid(_thief):
+		if _thief.dead:
+			var at := _thief.global_position
+			_thief = null
+			main.hud.show_boss(null)
+			Sfx.play("scrap_pickup", at, 0.0)
+			main.hud.show_message(s.get("found", "Got it back."))
+			_advance(id)
+		return
+	if main.player.global_position.distance_to(site.global_position) > site.wake_radius:
+		return
+	var t := FuseThief.new()
+	t.thief_name = s.get("name", "THIEF")
+	for b in s["burrows"]:
+		t.burrows.append(site.to_global(b))
+	_thief = main.spawn_enemy_node(t, site.to_global(s["pos"]))
+	main.hud.show_boss(_thief)
+	if s.has("start_say"):
+		main.voice.interrupt(s["start_say"])
+
+
 func _run_defend(id: String, site: ExpeditionSite, s: Dictionary, delta: float) -> void:
 	if not _defend_running:
 		return
@@ -470,6 +504,7 @@ func _on_repairs_changed() -> void:
 		_channel = {}
 		_defend_running = false
 		_elite = null
+		_thief = null
 		_stop_clock()
 	refresh(false)
 
@@ -592,6 +627,9 @@ func complete_stage() -> void:
 	if _elite and is_instance_valid(_elite):
 		_elite.queue_free()
 	_elite = null
+	if _thief and is_instance_valid(_thief):
+		_thief.queue_free()
+	_thief = null
 	var site: ExpeditionSite = main.sites[id]
 	var list: Array = devices[id][stage_index(id)]
 	for i in list.size():
@@ -625,6 +663,7 @@ func restore() -> void:
 	_channel = {}
 	_defend_running = false
 	_elite = null
+	_thief = null
 	_stop_clock()
 	refresh(false)
 	for r in Campaign.REPAIRS:
