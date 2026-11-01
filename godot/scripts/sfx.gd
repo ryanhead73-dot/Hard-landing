@@ -22,6 +22,7 @@ const SOUNDS: Array[String] = [
 	"rain_loop", "thunder",
 	"signal_ping",
 	"skimmer_screech", "skimmer_dive", "skimmer_rake", "skimmer_flap", "skimmer_hurt", "skimmer_death",
+	"hull_groan",
 ]
 const MAX_VARIANTS := 8
 

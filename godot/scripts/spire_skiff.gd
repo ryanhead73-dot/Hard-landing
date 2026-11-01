@@ -19,6 +19,10 @@ const ROUTE := [
 	[Vector3(3.79, 3.2, -3.16), Vector3(1.776, 4.8, -7.855)],
 ]
 const TOP := 4.8
+## How far the Lark lurches toward the brink each time the anchor clock runs out.
+const SLIP_STEP := Vector3(-0.12, -0.03, -0.18)
+
+var _skiff: Node3D
 
 
 func _configure() -> void:
@@ -94,6 +98,7 @@ func _build_skiff() -> void:
 	var stripe := _mat(Color("3f6f8a"), 0.6)
 	var dark := _mat(Color("24282b"), 0.5)
 	var skiff := Node3D.new()
+	_skiff = skiff
 	skiff.name = "SkiffLark"
 	skiff.position = Vector3(-2.2, TOP, -14.2)
 	skiff.rotation = Vector3(0.12, 0.7, -0.08)
@@ -134,11 +139,33 @@ func _mission() -> Array:
 		},
 		{
 			"type": "activate", "text": "Lock the Lark's winch anchors before she slides",
+			"pos": Vector3(0.0, TOP, -12.0), "timer": 40.0, "timer_range": 7.0, "timer_bar": "THE LARK IS SLIPPING",
+			"harass": ["skimmer", "skimmer"],
+			"harass_pts": [Vector3(14.0, TOP + 5.0, -16.0), Vector3(-13.0, TOP + 5.0, -6.0)],
 			"devices": [
 				{"pos": Vector3(3.2, TOP, -13.2), "kind": "winch", "label": "Lock the winch anchor", "hold": 2.0, "yaw": 0.6},
 				{"pos": Vector3(-3.4, TOP, -10.2), "kind": "winch", "label": "Lock the winch anchor", "hold": 2.0, "yaw": 0.6},
+				{"pos": Vector3(3.6, TOP, -10.4), "kind": "winch", "label": "Lock the winch anchor", "hold": 2.0, "yaw": -0.4},
 			],
-			"say": [[H, "She's creaking. If that skiff goes over, the glazing goes with her. Lock both winch anchors first."]],
+			"say": [
+				[H, "She's moving! If that skiff goes over, the glazing goes with her. Lock all three winch anchors, fast."],
+				[H, "Forty seconds, maybe. And something's circling the spires."],
+			],
+			"slip_text": "The Lark slid and tore the anchors loose. Lock them again.",
+			"slip_say": [[H, "She slid! Anchors tore out. Again, and faster."]],
 			"done_say": [[H, "Anchors hold. Lift the pane out gently."]],
 		},
 	]
+
+
+## The anchor clock ran out: the Lark lurches toward the brink (never quite over it).
+func on_slip(count: int) -> void:
+	if _skiff == null:
+		return
+	var step := mini(count, 4)
+	var to := Vector3(-2.2, TOP, -14.2) + SLIP_STEP * step
+	var roll := -0.08 - 0.025 * step
+	var tw := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_skiff, "position", to, 0.6)
+	tw.parallel().tween_property(_skiff, "rotation:z", roll, 0.6)
+	Vfx.burst(get_tree().current_scene, to_global(to + Vector3(0.0, 0.3, 0.0)), Color("4a4540"), 28, 2.5, 0.12, 0.9, Vector3.UP, 80.0, -2.0)
