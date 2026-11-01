@@ -791,6 +791,164 @@ def relay():
     export("site_relay")
 
 
+# --- Moss forest: giant fungus and the crashed dropship -------------------------------------
+
+def lathe(name, profile, parent, material, segs=12, bend=(0.0, 0.0), smooth=True):
+    """A surface of revolution round Godot y: profile is (y, radius) from bottom to top, capped.
+    bend=(bx, bz) sways the axis sideways by that much at the top, along a sine."""
+    bm = bmesh.new()
+    top_y = profile[-1][0] or 1.0
+    rings = []
+    for y, r in profile:
+        k = math.sin(0.5 * math.pi * y / top_y)
+        ox, oz = bend[0] * k, bend[1] * k
+        rings.append([bm.verts.new(m.g(ox + math.cos(math.tau * i / segs) * r, y, oz + math.sin(math.tau * i / segs) * r))
+                      for i in range(segs)])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(segs):
+            i2 = (i + 1) % segs
+            bm.faces.new((a[i], a[i2], b[i2], b[i]))
+    bm.faces.new(rings[0])
+    bm.faces.new(list(reversed(rings[-1])))
+    return mesh_obj(name, bm, parent, material, smooth=smooth)
+
+
+def fungus(variant):
+    """A giant moss-fungus, 7 m to the cap, origin at the foot of the stalk: a swaying stalk
+    with root buttresses, a dark dome cap with glowing spots, and lit gills underneath."""
+    rng = random.Random(30 + variant)
+    stalk = m.mat("fungus_stalk", "1d2b26", 0.9)
+    stalk_light = m.mat("fungus_stalk_light", "2c3f37", 0.85)
+    cap_top = m.mat("fungus_cap", "1f4a42", 0.6, 0.0, 0.12)
+    under = m.mat("fungus_under", "10201c", 0.9)
+    gill = m.mat("fungus_gill", "3fd1b5", 0.5, 0.0, 1.4)
+    spot = m.mat("fungus_spot", "9ff2df", 0.4, 0.0, 2.0)
+    root = m.pivot("Fungus%d" % variant)
+    H = 7.0
+    R = (2.4, 2.9, 1.9)[variant]
+    bend = (rng.uniform(-0.5, 0.5), rng.uniform(-0.5, 0.5))
+    profile = [(-0.3, 0.75), (0.0, 0.72), (0.4, 0.5), (1.2, 0.42), (3.0, 0.38), (5.0, 0.36), (6.3, 0.42), (H, 0.55)]
+    lathe("stalk", profile, root, stalk, segs=12, bend=bend)
+    # Ring scars up the stalk.
+    for k in range(4):
+        y = 1.5 + k * 1.3
+        kk = math.sin(0.5 * math.pi * y / H)
+        m.pod("scar%d" % k, (0.84, 0.08, 0.84), (bend[0] * kk, y, bend[1] * kk), root, stalk_light, n=2.0)
+    for k in range(4):
+        a = math.tau * k / 4 + rng.uniform(-0.3, 0.3)
+        m.pod("buttress%d" % k, (0.32, 1.1, 0.9), (math.cos(a) * 0.55, 0.35, math.sin(a) * 0.55), root, stalk, n=2.2,
+              taper=1.6, rot=(0, -math.degrees(a) + 90, math.degrees(0.5)))
+    cx, cz = bend
+    cap = m.pivot("Cap", (cx, H, cz), root)
+    cap.rotation_euler = (math.radians(rng.uniform(-6, 6)), math.radians(rng.uniform(-6, 6)), 0)
+    m.pod("cap_dome", (R * 2, 1.0, R * 2), (0, 0.35, 0), cap, cap_top, n=2.0, segs=28, rings=14)
+    m.pod("cap_under", (R * 1.9, 0.18, R * 1.9), (0, 0.0, 0), cap, under, n=2.2, segs=28, rings=8)
+    for k in range(28):
+        a = math.tau * k / 28
+        L = R * 0.78
+        m.box("gill%d" % k, (0.05, 0.12, L), (math.cos(a) * (0.45 + L * 0.5), -0.06, math.sin(a) * (0.45 + L * 0.5)), cap, gill,
+              bevel=0.0, rot=(0, -math.degrees(a) + 90, 0))
+    for k in range(12):
+        a = rng.uniform(0, math.tau)
+        rr = rng.uniform(0.2, 0.85) * R
+        y = 0.35 + 0.5 * math.sqrt(max(0.0, 1.0 - (rr / R) ** 2))
+        sz = rng.uniform(0.12, 0.28)
+        m.pod("spot%d" % k, (sz, 0.05, sz), (math.cos(a) * rr, y, math.sin(a) * rr), cap, spot, n=2.0, segs=8, rings=4)
+    if variant == 1:
+        # A small second cap on a side shoot.
+        side = m.pivot("Shoot", (bend[0] * 0.6, 3.6, bend[1] * 0.6), root)
+        side.rotation_euler = (0, math.radians(35), 0)
+        lathe("shoot", [(0.0, 0.2), (1.0, 0.14), (1.8, 0.18)], side, stalk, segs=8, bend=(0.9, 0.0))
+        m.pod("shoot_cap", (1.6, 0.45, 1.6), (0.9, 1.95, 0), side, cap_top, n=2.0, segs=16, rings=8)
+        for k in range(10):
+            a = math.tau * k / 10
+            m.box("shoot_gill%d" % k, (0.04, 0.08, 0.5), (0.9 + math.cos(a) * 0.4, 1.78, math.sin(a) * 0.4), side, gill,
+                  bevel=0.0, rot=(0, -math.degrees(a) + 90, 0))
+    export("prop_fungus_%d" % variant)
+
+
+def _fuselage_section(name, length, parent, paint, inner, open_front=True, open_back=False, nose=False):
+    """A dropship fuselage section along Godot z (4 x 3.6 m section), origin at its centre."""
+    shell = se_prism(name, 2.0, 1.8, 0.0, -length * 0.5, length * 0.5, parent, paint, n=3.0,
+                     front_scale=0.45 if nose else 1.0)
+    cuts = []
+    if open_front:
+        cuts.append(se_prism(name + "_h", 1.8, 1.6, 0.0, -length * 0.5 - 0.5, length * 0.5 - 0.3, None, inner, n=3.0))
+    if open_back:
+        cuts.append(se_prism(name + "_h", 1.8, 1.6, 0.0, -length * 0.5 + 0.6, length * 0.5 + 0.5, None, inner, n=3.0,
+                             front_scale=0.5 if nose else 1.0))
+    carve(shell, cuts)
+    return shell
+
+
+def dropship_rear():
+    """The Ferro-9's rear section, 4 x 3.6 x 9 m round its centre: torn open at the front (-z),
+    engine bell and fins at the back."""
+    rng = random.Random(41)
+    paint = m.mat("ferro_paint", "8c9294", 0.65, 0.3)
+    inner = m.mat("ferro_inner", "24282b", 0.8)
+    stripe = m.mat("hazard", HAZARD, 0.7)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.55, 0.55)
+    soot = m.mat("soot", "121212", 0.95)
+    moss = m.mat("moss_growth", "1f5a4c", 0.9, 0.0, 0.08)
+    root = m.pivot("DropshipRear")
+    _fuselage_section("hull", 9.0, root, paint, inner, open_front=True)
+    for k in range(6):
+        m.box("tear%d" % k, (rng.uniform(0.6, 1.1), 0.05, rng.uniform(0.4, 0.8)),
+              (math.cos(k * 1.05) * 1.9, math.sin(k * 1.05) * 1.7, -4.6), root, paint, bevel=0.0,
+              rot=(rng.uniform(-40, 40), math.degrees(k * 1.05), 0))
+    for z in (-2.0, 0.5, 3.0):
+        hole = se_prism("ring_h", 2.02, 1.82, 0.0, z - 0.2, z + 0.2, None, dark, n=3.0)
+        ring = se_prism("ring%d" % int(z * 10), 2.06, 1.86, 0.0, z - 0.1, z + 0.1, root, dark, n=3.0)
+        carve(ring, [hole])
+    m.box("stripe", (4.05, 0.4, 3.0), (0, 0.9, 1.2), root, stripe, bevel=0.0)
+    m.cyl("bell", 1.1, 1.0, (0, 0, 4.9), root, dark, axis="z", verts=20, radius2=1.4)
+    m.cyl("bell_in", 0.95, 1.02, (0, 0, 4.92), root, soot, axis="z", verts=20, radius2=1.25)
+    for a in (90, 210, 330):
+        r = math.radians(a)
+        m.box("fin%d" % a, (0.18, 1.4, 1.8), (math.cos(r) * 2.2, math.sin(r) * 2.0, 3.4), root, paint, bevel=0.03,
+              rot=(0, 0, a - 90), taper=(1.0, 0.6))
+    # Moss creeping over the hull from the ground.
+    for k in range(7):
+        m.pod("moss%d" % k, (rng.uniform(0.8, 1.6), 0.25, rng.uniform(0.8, 1.8)),
+              (rng.uniform(-1.9, 1.9), -1.75 + rng.uniform(0.0, 0.8), rng.uniform(-4.0, 4.0)), root, moss, n=2.0, segs=10, rings=6)
+    export("site_dropship_rear")
+
+
+def dropship_front():
+    """The Ferro-9's nose, 3.8 x 3 x 6 m round its centre: canopy at -z, torn open at +z."""
+    rng = random.Random(42)
+    paint = m.mat("ferro_paint", "8c9294", 0.65, 0.3)
+    inner = m.mat("ferro_inner", "24282b", 0.8)
+    stripe = m.mat("hazard", HAZARD, 0.7)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.55, 0.55)
+    glass = m.mat("cab_glass", GLASS, 0.15, 0.3, 0.25)
+    root = m.pivot("DropshipFront")
+    shell = se_prism("hull", 1.9, 1.5, 0.0, -3.0, 3.0, root, paint, n=3.0, front_scale=0.45)
+    carve(shell, [se_prism("hull_h", 1.7, 1.3, 0.0, -2.2, 3.5, None, inner, n=3.0, front_scale=0.6)])
+    m.box("canopy", (2.0, 0.7, 1.6), (0, 0.85, -1.9), root, glass, bevel=0.0, rot=(-22, 0, 0), taper=(0.6, 0.8))
+    m.box("canopy_frame", (0.1, 0.75, 1.65), (0, 0.88, -1.9), root, dark, bevel=0.0, rot=(-22, 0, 0))
+    m.box("stripe", (3.85, 0.35, 1.2), (0, 0.4, 1.4), root, stripe, bevel=0.0)
+    for k in range(5):
+        m.box("tear%d" % k, (rng.uniform(0.6, 1.0), 0.05, rng.uniform(0.4, 0.7)),
+              (math.cos(k * 1.25) * 1.8, math.sin(k * 1.25) * 1.4, 3.1), root, paint, bevel=0.0,
+              rot=(rng.uniform(-40, 40), math.degrees(k * 1.25), 0))
+    m.cyl("probe", 0.04, 1.0, (0, -0.2, -3.4), root, dark, axis="z", verts=6, bevel=0.0)
+    export("site_dropship_front")
+
+
+def dropship_wing():
+    """The port wing, 6.4 x 0.3 x 2.8 m round its centre, root at +x."""
+    paint = m.mat("ferro_paint", "8c9294", 0.65, 0.3)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.55, 0.55)
+    stripe = m.mat("hazard", HAZARD, 0.7)
+    root = m.pivot("DropshipWing")
+    m.box("wing", (2.8, 0.24, 6.4), (0, 0, 0), root, paint, bevel=0.04, rot=(0, 90, 0), taper=(0.55, 0.6))
+    m.box("flap", (4.0, 0.06, 0.5), (0.6, 0.12, 0.9), root, dark, bevel=0.0)
+    m.box("tipstripe", (0.5, 0.26, 1.4), (-2.9, 0, 0.1), root, stripe, bevel=0.0)
+    export("site_dropship_wing")
+
+
 BUILDERS = {
     "crawler": crawler,
     "rib": lambda: rib(False),
@@ -800,6 +958,12 @@ BUILDERS = {
     "hauler": hauler,
     "hauler_nose": hauler_nose,
     "relay": relay,
+    "fungus_0": lambda: fungus(0),
+    "fungus_1": lambda: fungus(1),
+    "fungus_2": lambda: fungus(2),
+    "dropship_rear": dropship_rear,
+    "dropship_front": dropship_front,
+    "dropship_wing": dropship_wing,
 }
 
 

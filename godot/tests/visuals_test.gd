@@ -20,6 +20,8 @@ const MODELS := {
 	"prop_mast": ["Dish"], "prop_mast_down": ["Dish"], "prop_hull_plate": [],
 	"site_crawler": ["Boom", "Head"], "site_rib": [], "site_rib_broken": [], "site_engine": [],
 	"site_hauler": ["Fin"], "site_hauler_nose": [], "site_relay": ["Dish"], "prop_cargo_case": [],
+	"prop_fungus_0": ["Cap"], "prop_fungus_1": ["Cap", "Shoot"], "prop_fungus_2": ["Cap"],
+	"site_dropship_rear": [], "site_dropship_front": [], "site_dropship_wing": [],
 }
 
 

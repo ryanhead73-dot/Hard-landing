@@ -87,6 +87,8 @@ func _shots() -> Array:
 		["hauler", "cooling", Vector3(10.0, 0.3, 18.0), Vector3(0.0, 3.0, -6.0)],
 		["hauler_hold", "cooling", Vector3(0.0, 1.0, 6.0), Vector3(0.0, 1.6, -10.0)],
 		["moss", "wing", Vector3(3.0, 0.3, 16.0), Vector3(-4.0, 1.5, -5.0)],
+		["moss_dusk", "wing", Vector3(3.0, 0.3, 16.0), Vector3(-4.0, 1.5, -5.0)],
+		["dropship", "wing", Vector3(8.0, 0.3, 2.0), Vector3(-2.0, 1.5, -9.0)],
 		["graveyard", "engine", Vector3(3.0, 0.3, 18.0), Vector3(0.0, 3.0, -15.0)],
 		["loom", "navigation", Vector3(3.0, 0.3, 16.0), Vector3(0.0, 6.0, -6.0)],
 		["ship_aft", "", Vector3(32.0, 0.5, 10.0), Vector3(0.0, 2.0, 0.0)],
