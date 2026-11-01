@@ -13,7 +13,7 @@ import sys
 import numpy as np
 
 import dsp
-from dsp import (RATE, adsr, bp, env, fm, formant, grains, hp, impulse, lp, metal_modes, modal, n, osc,
+from dsp import (RATE, adsr, bp, brown, env, fm, formant, grains, hp, impulse, lp, metal_modes, modal, n, osc,
                  peak, pink, pitch, place, reverb, sat, sweep, t, trim, white, write_wav, VOWELS)
 
 SOUNDS = {}
@@ -299,6 +299,18 @@ def player_hurt(v):
     alarm = place(0.5, (0.1, osc(1250, 0.07, "square") * env(0.07, 0.002, 0.07) * 0.08),
                   (0.2, osc(1250, 0.07, "square") * env(0.07, 0.002, 0.07) * 0.08))
     return indoor(place(0.6, (0, impact), (0, alarm)), 0.1)
+
+
+
+@sound("thunder", 2)
+def thunder(v):
+    """A crack overhead, then the long rolling rumble off the basin walls."""
+    d = 6.0
+    crack = place(d, (0.0, hp(white(0.15), 600) * env(0.15, 0.002, 0.12) * (0.7 if v else 1.0)))
+    roll = lp(brown(d), 160 + 40 * v) * adsr(d, 0.25, 0.4, 0.7, 3.5)
+    rumble = grains(d * 0.7, 6, lambda i: lp(brown(0.6), dsp.rng.uniform(80, 220)) * env(0.6, 0.05, 0.5) * dsp.rng.uniform(0.3, 1.0))
+    x = place(d + 0.5, (0, crack), (0.05, roll * 1.5), (0.3, rumble))
+    return reverb(sat(x * 1.4, 1.5), BASIN, 0.5)
 
 
 # --- Wildlife ------------------------------------------------------------------------------
@@ -619,6 +631,7 @@ PEAKS = {
     "splash_1": 0.5, "roll_whoosh": 0.45, "lance_shot": 0.8, "scuttler_lunge": 0.7, "loom_hum": 0.8,
     "ship_hum_loop": 0.5, "spool_loop": 0.5, "player_hurt": 0.8, "rifle_empty": 0.7,
     "lurker_hurt": 0.7, "lurker_hiss": 0.7, "lurker_dive": 0.7,
+    "thunder": 0.9,
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
 }
 

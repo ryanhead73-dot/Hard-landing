@@ -90,6 +90,13 @@ func set_glow(amount: float) -> void:
 		_water_mat.set_shader_parameter("glow", amount)
 
 
+## Rain on the basin: wet rock and stippled pools (0 dry .. 1 downpour).
+func set_rain(amount: float) -> void:
+	if _terrain_mat:
+		_terrain_mat.set_shader_parameter("rain", amount)
+		_water_mat.set_shader_parameter("rain", amount)
+
+
 # --- Terrain -------------------------------------------------------------------------------
 
 ## How much the ground must stay flat here, 0..1: round the ship, along the crash furrow, at

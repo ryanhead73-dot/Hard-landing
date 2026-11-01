@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ##   godot --headless --path . res://tests/audio_test.tscn
 
 const ARENA := Vector3(45.0, 0.5, 45.0)
-const LOOPS := ["wind_loop", "ship_hum_loop", "music_calm", "music_combat", "music_finale", "amb_springs_loop", "amb_loom_loop",
+const LOOPS := ["wind_loop", "rain_loop", "ship_hum_loop", "music_calm", "music_combat", "music_finale", "amb_springs_loop", "amb_loom_loop",
 	"amb_interior_loop", "amb_moss_loop", "amb_wreck_loop", "spool_loop"]
 
 

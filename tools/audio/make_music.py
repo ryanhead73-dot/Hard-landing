@@ -395,10 +395,32 @@ def amb_wreck_loop():
     return loop_bed(make)
 
 
+
+def rain_loop():
+    """Steady rain on rock and water: a broad hiss, dense close patter, heavier drops and
+    runnels, swelling in slow gusts."""
+    dsp.seed(27)
+
+    def make(d):
+        chans = []
+        for c in range(2):
+            g = gusts(d, 0.05, 0.35, c * 0.9)
+            hiss = bp(pink(d), 600, 9000) * g * 0.5
+            body = lp(pink(d), 900) * g * 0.35
+            chans.append(hiss + body)
+        bed = np.stack(chans, axis=1)
+        patter = scatter(d, 260, lambda: hp(white(0.004), 2500) * env(0.004, 0.0003, 0.003) * dsp.rng.uniform(0.05, 0.35))
+        drops = scatter(d, 25, lambda: osc(sweep(dsp.rng.uniform(900, 1800), dsp.rng.uniform(1800, 3200), 0.02), 0.02) *
+                        env(0.02, 0.001, 0.016) * dsp.rng.uniform(0.05, 0.25))
+        return bed + patter + drops
+    return loop_bed(make)
+
+
 TRACKS = {
     "music_calm": (music_calm, 0.75), "music_combat": (music_combat, 0.85), "music_finale": (music_finale, 0.8),
     "wind_loop": (wind_loop, 0.6), "amb_springs_loop": (amb_springs_loop, 0.5), "amb_loom_loop": (amb_loom_loop, 0.55),
     "amb_interior_loop": (amb_interior_loop, 0.45), "amb_moss_loop": (amb_moss_loop, 0.5), "amb_wreck_loop": (amb_wreck_loop, 0.5),
+    "rain_loop": (rain_loop, 0.5),
 }
 
 

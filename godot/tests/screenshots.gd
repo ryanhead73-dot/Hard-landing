@@ -13,6 +13,7 @@ func _ready() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
+	main.weather.enabled = false
 	await _frames(20)
 	for s in get_tree().get_nodes_in_group("enemies"):
 		s.queue_free()
@@ -22,6 +23,10 @@ func _ready() -> void:
 			continue
 		main.day_cycle = false
 		main.set_daylight(1.0 if String(shot[0]).ends_with("_dusk") else 0.0)
+		if String(shot[0]).ends_with("_storm"):
+			main.weather.start_storm(true)
+		elif main.weather.storm > 0.0:
+			main.weather.clear_storm(true)
 		if String(shot[0]).ends_with("_lit"):
 			main.kestrel.set_repaired("aux_power", true)
 		if shot[1] == "kestrel":
@@ -126,6 +131,8 @@ func _shots() -> Array:
 		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
 		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
 		["basin_dusk", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["basin_storm", "", Vector3(-30.0, 0.5, 38.0), Vector3(0.0, 3.0, 0.0)],
+		["ship_side_storm", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
 		["lurker", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 0.6, 30.0)],
 		["lurker_pool", "pool", Vector3.ZERO, Vector3.ZERO],
