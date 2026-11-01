@@ -93,6 +93,30 @@ func _ready() -> void:
 			var c: Vector3 = lk.global_position + Vector3.UP * 0.4
 			cam.look_at_from_position(c - fwd * 3.2 + side * 2.4 + Vector3.UP * 1.3, c)
 			cam.make_current()
+		if String(shot[0]).begins_with("skimmer"):
+			# Hanging before the dive, belly lit, or (skimmer_dive) stooping with wings swept.
+			var fwd: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
+			var sk: Skimmer = main.spawn_enemy("skimmer", at + fwd * 5.0)
+			sk.target = null
+			await _frames(2)
+			sk.global_position.y += 2.6
+			sk.look_at(Vector3(at.x, sk.global_position.y, at.z), Vector3.UP)
+			if shot[0] == "skimmer_dive":
+				sk.state = Skimmer.State.DIVE
+				sk._dive_dir = (-fwd + Vector3.DOWN * 0.6).normalized()
+				sk.dive_speed = 0.0
+			else:
+				sk.state = Skimmer.State.WINDUP
+			sk._timer = 99.0
+			await _frames(40)
+			beasts.append(sk)
+			cam = Camera3D.new()
+			cam.fov = 45.0
+			main.add_child(cam)
+			var side: Vector3 = fwd.cross(Vector3.UP)
+			var c: Vector3 = sk.global_position
+			cam.look_at_from_position(c - fwd * 2.6 + side * 1.6 - Vector3.UP * 0.6, c)
+			cam.make_current()
 		await _frames(2)
 		for e in beasts:
 			e.process_mode = Node.PROCESS_MODE_DISABLED
@@ -143,6 +167,8 @@ func _shots() -> Array:
 		["lurker", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 0.6, 30.0)],
 		["lurker_pool", "pool", Vector3.ZERO, Vector3.ZERO],
 		["cache", "cache", Vector3.ZERO, Vector3.ZERO],
+		["skimmer", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
+		["skimmer_dive", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],

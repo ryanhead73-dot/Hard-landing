@@ -458,6 +458,47 @@ def lurker():
     export("lurker")
 
 
+def skimmer():
+    """Basin skimmer: a lean glider on two pairs of veined membrane wings, all neck and tail,
+    with a glowing belly sac (its soft spot) that lights up before it dives, and hooked
+    talons it rakes with on the way past."""
+    hide = mat("skimmer_hide", "23292a", 0.55, 0.05)
+    web = mat("skimmer_web", "3a3530", 0.8)
+    bone = mat("ram_horn", "8a8170", 0.6)
+    glow = mat("skimmer_glow", MOSS, 0.4, 0.0, 2.5)
+    root = pivot("Skimmer")
+    body = pivot("Body", (0, 0.0, 0), root)
+    pod("torso", (0.34, 0.26, 0.95), (0, 0, 0.0), body, hide, n=2.3, taper=0.7, taper_axis="z")
+    pod("keel", (0.12, 0.12, 0.6), (0, 0.13, 0.0), body, hide, n=2.2)
+    core = pivot("Core", (0, -0.13, 0.05), body)
+    ball("core", 0.13, (0, 0, 0), core, glow, scale=(1.0, 0.8, 1.4), segs=10, rings=6)
+    head = pivot("Head", (0, 0.03, -0.5), body)
+    pod("neck", (0.14, 0.13, 0.32), (0, 0, -0.08), head, hide, n=2.2)
+    pod("skull", (0.2, 0.15, 0.34), (0, 0.02, -0.3), head, hide, n=2.4, taper=0.45, taper_axis="z")
+    obox("beak", (0.05, 0.05, 0.22), (0, -0.02, -0.52), head, bone, taper=(0.3, 0.3))
+    for s in (-1, 1):
+        ball("eye%d" % s, 0.03, (0.08 * s, 0.06, -0.33), head, glow, segs=6, rings=4)
+    for side, sx in (("L", -1), ("R", 1)):
+        wing = pivot("Wing" + side, (0.15 * sx, 0.06, -0.12), body)
+        obox("arm" + side, (0.5, 0.06, 0.06), (0.25 * sx, 0, -0.02), wing, hide)
+        pod("web" + side, (0.62, 0.02, 0.66), (0.27 * sx, 0, 0.26), wing, web, n=2.8, taper=0.85, taper_axis="z")
+        for k, z in enumerate((0.05, 0.25, 0.45)):
+            obox("vein%s%d" % (side, k), (0.5, 0.025, 0.025), (0.26 * sx, 0.012, z), wing, glow, rot=(0, -12 * sx * k, 0))
+        tip = pivot("WingTip" + side, (0.52 * sx, 0, -0.02), wing)
+        obox("finger" + side, (0.6, 0.045, 0.045), (0.3 * sx, 0, 0.02), tip, hide, rot=(0, 10 * sx, 0))
+        pod("tipweb" + side, (0.66, 0.018, 0.6), (0.3 * sx, 0, 0.26), tip, web, n=2.4, taper=0.55, taper_axis="z")
+        obox("tipvein" + side, (0.5, 0.022, 0.022), (0.28 * sx, 0.01, 0.2), tip, glow, rot=(0, -20 * sx, 0))
+        claw = pivot("Claw" + side, (0.1 * sx, -0.12, -0.05), body)
+        obox("shank" + side, (0.04, 0.2, 0.04), (0, -0.09, 0), claw, hide)
+        obox("talon" + side, (0.03, 0.03, 0.14), (0, -0.19, -0.05), claw, bone, taper=(0.3, 0.3))
+    tail = pivot("Tail", (0, 0.0, 0.46), body)
+    pod("tail", (0.12, 0.1, 0.7), (0, 0, 0.33), tail, hide, n=2.2, taper=0.5, taper_axis="z")
+    tip = pivot("TailTip", (0, 0, 0.68), tail)
+    pod("tail_tip", (0.06, 0.05, 0.5), (0, 0, 0.24), tip, hide, n=2.2)
+    obox("tail_fin", (0.24, 0.015, 0.22), (0, 0, 0.42), tip, glow, n=2.2)
+    export("skimmer")
+
+
 def rifle():
     metal = mat("gun_metal", "24282b", 0.45, 0.6)
     stripe = mat("oxide", OXIDE, 0.6)
@@ -590,7 +631,7 @@ def components():
 
 
 BUILDERS = {
-    "juno": juno, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker,
+    "juno": juno, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer,
     "rifle": rifle, "scattergun": scattergun, "arc_lance": arc_lance,
 }
 

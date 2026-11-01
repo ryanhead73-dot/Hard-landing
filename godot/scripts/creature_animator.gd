@@ -16,6 +16,7 @@ const KINDS := {
 	"ram": {"legs": "hang", "stride": 2.6, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
 	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
 	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
+	"skimmer": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 }
 const SHOTS := {"attack": 0.35, "slam": 0.45, "hurt": 0.3}
 
@@ -37,6 +38,8 @@ var _dead := 0.0
 var _shot_t := 0.0
 var _time := 0.0
 var _seed := 0.0
+## The skimmer's current wing angle, read back by tests.
+var wing_beat := 0.0
 
 
 func setup(e: Enemy, rig: Node3D, kind_name: String) -> void:
@@ -157,6 +160,13 @@ func _pose_body(st: String) -> void:
 			var peek := sin(_time * 2.2 + _seed) * 12.0 if st == "submerged" else 0.0
 			pose.rot("StalkL", Vector3(peek, 0.0, 0.0))
 			pose.rot("StalkR", Vector3(-peek, 0.0, 0.0))
+		"skimmer":
+			_pose_wings(st)
+			head.x += 28.0 * _windup
+			head.y = sin(_time * 0.9 + _seed) * 12.0 * (1.0 if st == "circle" else 0.0)
+			var lash := sin(_time * 2.4 + _seed) * 14.0
+			pose.rot("Tail", Vector3(lash * 0.3, lash, 0.0))
+			pose.rot("TailTip", Vector3(0.0, lash * 1.4, 0.0))
 		"warden":
 			var raise := 105.0 * _windup if st == "slam_windup" else 0.0
 			var slam := 120.0 * punch if shot == "slam" else 0.0
@@ -175,6 +185,49 @@ func _pose_body(st: String) -> void:
 	pose.rot("Body", body)
 	pose.offset("Body", Vector3(0.0, bob - 0.15 * _dead * float(_cfg["bob"]) * 10.0, 0.0))
 	pose.rot("Head", head.lerp(Vector3(-25.0, 0.0, 0.0), ease(_dead, -2.0)))
+
+
+## The skimmer's wings: a hard beat climbing or hanging, a lazy glide circling, swept back in the
+## dive with the talons thrown forward, a flail on the ground, limp when dead.
+func _pose_wings(st: String) -> void:
+	var rate := 3.0
+	var amp := 10.0
+	var sweep := 0.0
+	var fold := 0.0
+	var claws := -40.0
+	match st:
+		"climb":
+			rate = 11.0
+			amp = 42.0
+		"windup":
+			rate = 15.0
+			amp = 48.0
+			claws = 30.0
+		"dive":
+			amp = 3.0
+			sweep = 55.0
+			fold = 35.0
+			claws = 75.0
+		"grounded":
+			rate = 19.0
+			amp = 22.0
+			fold = 30.0
+			claws = 0.0
+		"dead":
+			amp = 0.0
+			fold = 60.0
+			claws = 20.0
+	var beat := sin(_time * rate + _seed) * amp + 6.0
+	if st == "dead":
+		beat = -25.0
+	wing_beat = beat
+	pose.rot("WingL", Vector3(0.0, sweep, -beat))
+	pose.rot("WingR", Vector3(0.0, -sweep, beat))
+	var tip := sin(_time * rate + _seed - 0.3) * amp * 0.35
+	pose.rot("WingTipL", Vector3(0.0, fold, -tip))
+	pose.rot("WingTipR", Vector3(0.0, -fold, tip))
+	pose.rot("ClawL", Vector3(claws, 0.0, 0.0))
+	pose.rot("ClawR", Vector3(claws, 0.0, 0.0))
 
 
 ## Read back by tests: the plate opening angle, 0 shut .. 50 fully open.
