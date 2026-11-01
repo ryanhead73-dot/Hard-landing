@@ -46,6 +46,7 @@ var _component: Node3D
 var _component_light: OmniLight3D
 var _beacon_mat: StandardMaterial3D
 var _beacon_time := 0.0
+static var _column_mesh: Mesh
 var _mats: Dictionary = {}
 
 
@@ -362,6 +363,71 @@ func _slab(from: Vector3, to: Vector3, width: float, thickness: float, mat: Mate
 	body.add_child(shape)
 	add_child(body)
 	return body
+
+
+## Collision only: a box the player can't see, under a modelled set piece.
+func _collider(size: Vector3, pos: Vector3, rot := Vector3.ZERO) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = pos
+	body.rotation = rot
+	var shape := CollisionShape3D.new()
+	var box_shape := BoxShape3D.new()
+	box_shape.size = size
+	shape.shape = box_shape
+	body.add_child(shape)
+	add_child(body)
+	return body
+
+
+## A block of columnar basalt filling a box: the box's collision, with packed hexagonal columns
+## of slightly varied height and lean drawn over it as one MultiMesh. `jitter` is how far the
+## column tops stray from the box top (keep it small where the player can stand on it).
+func _basalt_block(size: Vector3, centre: Vector3, seed_: int, jitter := 0.15) -> StaticBody3D:
+	var body := _collider(size, centre)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_
+	var spacing := 1.5
+	var row_step := spacing * 0.866
+	var long_x := size.x >= size.z
+	var along := size.x if long_x else size.z
+	var across := size.z if long_x else size.x
+	var cols := maxi(1, int(ceil(along / spacing)))
+	var rows := maxi(1, int(ceil(across / row_step)))
+	var xforms: Array[Transform3D] = []
+	for r in rows:
+		for c in cols + (r % 2):
+			var u := -along * 0.5 + (c + (0.0 if r % 2 else 0.5)) * along / cols
+			var v := -across * 0.5 + (r + 0.5) * across / rows
+			var h := size.y + rng.randf_range(-jitter, jitter)
+			var radius := spacing * 0.6 * rng.randf_range(0.95, 1.08)
+			var local := Vector3(u, -size.y * 0.5 + h * 0.5, v) if long_x else Vector3(v, -size.y * 0.5 + h * 0.5, u)
+			var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
+			b = Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.04)) * b
+			xforms.append(Transform3D(b.scaled(Vector3(radius, h, radius)), local))
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _unit_column()
+	mm.instance_count = xforms.size()
+	for i in xforms.size():
+		mm.set_instance_transform(i, xforms[i])
+	var inst := MultiMeshInstance3D.new()
+	inst.multimesh = mm
+	inst.material_override = WorldProps.rock_material()
+	body.add_child(inst)
+	return body
+
+
+## A hexagonal column of radius 1 and height 1 centred on the origin, flat-shaded.
+static func _unit_column() -> Mesh:
+	if _column_mesh == null:
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 1.0
+		cyl.bottom_radius = 1.0
+		cyl.height = 1.0
+		cyl.radial_segments = 6
+		cyl.rings = 1
+		_column_mesh = Bevel.flat(cyl)
+	return _column_mesh
 
 
 ## A modelled prop standing in for a box: the box's collision, with a Blender model

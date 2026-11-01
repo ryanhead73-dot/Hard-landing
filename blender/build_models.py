@@ -229,11 +229,21 @@ def juno():
     pod("collar", (0.3, 0.08, 0.26), (0, 0.35, 0), chest, dark, n=3.5)
     pod("back_plate", (0.36, 0.3, 0.06), (0, 0.18, 0.13), chest, plate, n=3.2)
     pack = pivot("PackMount", (0, 0.12, 0.2), chest)
-    pod("life_support", (0.32, 0.4, 0.16), (0, 0.06, 0.03), pack, dark, n=3.4, taper=0.9)
-    pod("pack_cap", (0.28, 0.06, 0.14), (0, 0.27, 0.03), pack, orange, n=3.0)
+    # Life-support pack: a squared-off dark unit in a cream frame, twin steel bottles set into
+    # its sides, a vent grille and the status lamp. Hard edges, so it reads as kit, not body.
+    pod("life_support", (0.3, 0.38, 0.15), (0, 0.06, 0.03), pack, dark, n=5.0, taper=0.92)
+    pod("pack_frame", (0.34, 0.06, 0.17), (0, 0.25, 0.03), pack, plate, n=5.0)
+    pod("pack_base", (0.32, 0.05, 0.16), (0, -0.13, 0.03), pack, plate, n=5.0)
+    pod("pack_cap", (0.2, 0.025, 0.12), (0, 0.29, 0.03), pack, orange, n=4.0)
+    steel = mat("steel", STEEL, 0.25, 0.85)
     for side, s in (("l", -1), ("r", 1)):
-        pod("tank_" + side, (0.1, 0.34, 0.1), (0.1 * s, 0.05, 0.13), pack, plate, n=2.2)
-    pod("pack_lamp", (0.05, 0.03, 0.02), (0, -0.08, 0.115), pack, lamp, n=3.0)
+        cyl("tank_" + side, 0.042, 0.3, (0.135 * s, 0.05, 0.08), pack, steel, verts=14, bevel=0.004)
+        cyl("tank_band_" + side, 0.045, 0.03, (0.135 * s, 0.12, 0.08), pack, orange, verts=14, bevel=0.0)
+        cyl("tank_valve_" + side, 0.018, 0.04, (0.135 * s, 0.22, 0.08), pack, dark, verts=8, bevel=0.0)
+    for k in range(4):
+        box("vent%d" % k, (0.16, 0.012, 0.01), (0, 0.16 - k * 0.028, 0.108), pack, weave, bevel=0.0)
+    cyl("hose", 0.014, 0.2, (-0.08, 0.27, -0.02), pack, weave, verts=8, bevel=0.0, rot=(60, 0, 20))
+    pod("pack_lamp", (0.05, 0.03, 0.02), (0, -0.04, 0.11), pack, lamp, n=3.0)
     neck = pivot("Neck", (0, 0.36, 0), chest)
     pod("neck_ring", (0.2, 0.06, 0.19), (0, 0.02, 0), neck, weave, n=2.4)
     head = pivot("Head", (0, 0.06, 0), neck)
@@ -242,12 +252,15 @@ def juno():
     pod("visor", (0.27, 0.15, 0.2), (0, 0.13, -0.08), head, visor, n=2.4)
     pod("visor_brow", (0.29, 0.04, 0.18), (0, 0.21, -0.085), head, dark, n=3.0)
     pod("helmet_ridge", (0.05, 0.05, 0.3), (0, 0.3, 0.02), head, orange, n=3.0)
+    # The back of the helmet: a dark seal plate and a rim, so it isn't just a ball from behind.
+    pod("helmet_rear", (0.24, 0.13, 0.08), (0, 0.04, 0.15), head, dark, n=3.2)
+    pod("helmet_rim", (0.31, 0.03, 0.32), (0, -0.015, 0.02), head, dark, n=3.0)
     for s in (-1, 1):
         pod("ear%d" % s, (0.05, 0.1, 0.1), (0.165 * s, 0.12, 0.02), head, dark, n=2.6)
     cyl("antenna", 0.006, 0.16, (0.15, 0.27, 0.07), head, dark, verts=6, bevel=0.0)
     for side, s in (("L", -1), ("R", 1)):
         shoulder = pivot("Arm" + side, (0.27 * s, 0.3, 0), chest)
-        pod("pauldron" + side, (0.17, 0.13, 0.2), (0.01 * s, 0.0, 0), shoulder, plate, n=2.4)
+        pod("pauldron" + side, (0.16, 0.11, 0.19), (0.01 * s, 0.0, 0), shoulder, plate, n=3.4, taper=0.85)
         pod("pauldron_trim" + side, (0.18, 0.03, 0.18), (0.015 * s, -0.055, 0), shoulder, orange, n=3.0)
         pod("upper_arm" + side, (0.11, 0.3, 0.12), (0, -0.15, 0), shoulder, suit, n=2.4, taper=0.85)
         elbow = pivot("Forearm" + side, (0, -0.3, 0), shoulder)

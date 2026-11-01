@@ -59,10 +59,9 @@ func _build_site() -> void:
 	add_child(_fog)
 
 
-## Giant moss: thick stalks with glowing caps. Only the stalks block.
+## Giant moss-fungus (blender/build_sites.py): swaying stalks with lit gills under dark caps.
+## Only the stalks block.
 func _build_stalks() -> void:
-	var stalk := _mat(Color("1d2b26"), 0.9)
-	var cap := _emissive(Color("3fd1b5"), 0.6)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 53
 	var placed := 0
@@ -73,16 +72,20 @@ func _build_stalks() -> void:
 		if _keep_clear(p):
 			continue
 		var h := rng.randf_range(4.0, 9.5)
-		_column(p, rng.randf_range(0.3, 0.6), h, stalk, 8)
-		var top := MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		var r := rng.randf_range(1.4, 3.0)
-		sphere.radius = r
-		sphere.height = r * 0.8
-		top.mesh = sphere
-		top.material_override = cap
-		top.position = p + Vector3(0.0, h, 0.0)
-		add_child(top)
+		var spread := rng.randf_range(0.8, 1.2)
+		var fungus := Rig.spawn("prop_fungus_%d" % (placed % 3), self)
+		fungus.position = p
+		fungus.rotation.y = rng.randf_range(0.0, TAU)
+		fungus.scale = Vector3(spread, h / 7.0, spread)
+		var body := StaticBody3D.new()
+		var shape := CollisionShape3D.new()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = 0.5 * spread
+		cyl.height = h
+		shape.shape = cyl
+		body.add_child(shape)
+		body.position = p + Vector3(0.0, h * 0.5, 0.0)
+		add_child(body)
 		placed += 1
 
 
@@ -100,23 +103,18 @@ func _keep_clear(p: Vector3) -> bool:
 
 func _build_dropship() -> void:
 	var paint := _mat(Color("8c9294"), 0.7, 0.3)
-	var stripe := _mat(Color("e0b420"), 0.7)
-	var dark := _mat(Color("24282b"), 0.6)
 	# Rear section with the port wing still attached, dug in at an angle.
 	var rear := Node3D.new()
 	rear.name = "Ferro9Rear"
 	rear.position = Vector3(-3.0, 0.0, -6.0)
 	rear.rotation = Vector3(0.0, 0.25, 0.08)
 	add_child(rear)
-	_static_box(Vector3(4.0, 3.6, 9.0), Vector3(0.0, 1.8, 0.0), paint, rear)
-	_mesh_box(Vector3(4.04, 0.4, 9.04), Vector3(0.0, 2.6, 0.0), stripe, rear)
-	_mesh_box(Vector3(3.2, 2.8, 0.1), Vector3(0.0, 1.6, -4.52), dark, rear)
-	var wing := _static_box(Vector3(6.4, 0.3, 2.8), Vector3(-5.0, 1.4, -0.4), paint, rear)
-	wing.rotation.z = 0.18
-	# Front section, nose down a little way off.
-	var front := _static_box(Vector3(3.8, 3.0, 6.0), Vector3(4.5, 1.3, -13.0), paint)
-	front.rotation = Vector3(0.3, -0.5, 0.1)
-	_mesh_box(Vector3(2.4, 0.9, 0.1), Vector3(4.2, 2.2, -10.2), _emissive(Color("1c2a30"), 0.3))
+	# Modelled sections (blender/build_sites.py) fitted over the boxes they collide as.
+	var hull := _prop("site_dropship_rear", Vector3(4.0, 3.6, 9.0), Vector3.ZERO)
+	hull.transform = rear.transform * Transform3D(Basis(), Vector3(0.0, 1.8, 0.0))
+	var wing := _prop("site_dropship_wing", Vector3(6.4, 0.3, 2.8), Vector3.ZERO)
+	wing.transform = rear.transform * Transform3D(Basis(Vector3.BACK, 0.18), Vector3(-5.0, 1.4, -0.4))
+	_prop("site_dropship_front", Vector3(3.8, 3.0, 6.0), Vector3(4.5, 1.3, -13.0), Vector3(0.3, -0.5, 0.1))
 	# Torn panels and cargo spilled between the halves.
 	for i in 5:
 		var plate := _mesh_box(Vector3(1.6, 0.06, 1.1), Vector3(1.0 + i * 0.6, 0.05, -9.0 + i * 0.4), paint)

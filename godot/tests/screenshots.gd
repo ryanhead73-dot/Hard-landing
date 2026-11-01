@@ -22,6 +22,8 @@ func _ready() -> void:
 			continue
 		main.day_cycle = false
 		main.set_daylight(1.0 if String(shot[0]).ends_with("_dusk") else 0.0)
+		if String(shot[0]).ends_with("_lit"):
+			main.kestrel.set_repaired("aux_power", true)
 		if shot[1] == "kestrel":
 			var k: Kestrel = main.kestrel
 			shot = [shot[0], "", k.to_global(k.plan(shot[2].x, shot[2].y, shot[2].z)), k.to_global(k.plan(shot[3].x, shot[3].y, shot[3].z))]
@@ -80,7 +82,13 @@ func _shots() -> Array:
 		["spires_top", "canopy", Vector3(2.0, 5.1, -9.5), Vector3(-1.0, 5.5, -14.0)],
 		["quarry", "landing_gear", Vector3(3.0, 0.3, 18.0), Vector3(0.0, 2.0, -8.0)],
 		["quarry_bay", "landing_gear", Vector3(0.0, 1.4, -3.0), Vector3(0.0, 2.0, -13.0)],
+		["crawler", "landing_gear", Vector3(14.0, 0.3, 4.0), Vector3(0.0, 2.5, -9.0)],
+		["engine_room", "engine", Vector3(0.5, 0.3, -14.0), Vector3(0.0, 3.0, -26.0)],
+		["hauler", "cooling", Vector3(10.0, 0.3, 18.0), Vector3(0.0, 3.0, -6.0)],
+		["hauler_hold", "cooling", Vector3(0.0, 1.0, 6.0), Vector3(0.0, 1.6, -10.0)],
 		["moss", "wing", Vector3(3.0, 0.3, 16.0), Vector3(-4.0, 1.5, -5.0)],
+		["moss_dusk", "wing", Vector3(3.0, 0.3, 16.0), Vector3(-4.0, 1.5, -5.0)],
+		["dropship", "wing", Vector3(8.0, 0.3, 2.0), Vector3(-2.0, 1.5, -9.0)],
 		["graveyard", "engine", Vector3(3.0, 0.3, 18.0), Vector3(0.0, 3.0, -15.0)],
 		["loom", "navigation", Vector3(3.0, 0.3, 16.0), Vector3(0.0, 6.0, -6.0)],
 		["ship_aft", "", Vector3(32.0, 0.5, 10.0), Vector3(0.0, 2.0, 0.0)],
@@ -88,6 +96,8 @@ func _shots() -> Array:
 		["ship_front", "", Vector3(-30.0, 0.5, -8.0), Vector3(0.0, 2.5, 0.0)],
 		["ship_side", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["workshop", "kestrel", Vector3(13.0, 0.3, 14.5), Vector3(22.0, 1.4, 12.0)],
+		["workshop_lit", "kestrel", Vector3(13.0, 0.3, 14.5), Vector3(22.0, 1.4, 12.0)],
+		["cabin_lit", "kestrel", Vector3(11.0, 0.3, 13.0), Vector3(8.5, 1.2, 10.5)],
 		["cockpit", "kestrel", Vector3(7.6, 1.5, 13.0), Vector3(3.6, 2.4, 13.0)],
 		["basin_out", "", Vector3(10.0, 0.5, 22.0), Vector3(-50.0, 4.0, 60.0)],
 		["pool", "pool", Vector3.ZERO, Vector3.ZERO],
@@ -95,6 +105,8 @@ func _shots() -> Array:
 		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
+		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
+		["relay_inside", "aux_power", Vector3(-3.0, 0.5, -3.0), Vector3(2.0, 1.5, -8.0)],
 	]
 
 

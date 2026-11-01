@@ -41,20 +41,29 @@ func cell_point() -> Vector3:
 
 func _build_pad_and_building() -> void:
 	_static_box(Vector3(26.0, 0.2, 24.0), Vector3(0.0, 0.0, -1.0), _mat(Color("4a4f52"), 0.95))
-	var shell := CSGCombiner3D.new()
-	shell.name = "Building"
-	shell.use_collision = true
-	add_child(shell)
+	# The hut and mast are modelled in this site's coordinates (blender/build_sites.py): a 10 x 4
+	# x 7 m prefab round (0, 2, -5.5) with 0.2 m walls, a front door and two windows facing +z, a
+	# side door in the east wall and a hole in the roof. Collision is boxes matching its walls.
+	Rig.spawn("site_relay", self)
 	var wall := _mat(Color("8a8f86"), 0.9)
-	var inner := _mat(Color("5c615c"), 0.9)
-	_csg(shell, Vector3(10.0, 4.0, 7.0), Vector3(0.0, 2.0, -5.5), wall)
-	_csg(shell, Vector3(9.6, 3.7, 6.6), Vector3(0.0, 1.95, -5.5), inner, true)
-	_csg(shell, Vector3(2.0, 2.5, 0.8), Vector3(0.0, 1.35, -2.0), inner, true)
-	_csg(shell, Vector3(2.0, 1.0, 0.8), Vector3(3.2, 1.9, -2.0), inner, true)
-	_csg(shell, Vector3(2.0, 1.0, 0.8), Vector3(-3.2, 1.9, -2.0), inner, true)
-	_csg(shell, Vector3(0.8, 2.3, 1.5), Vector3(5.0, 1.25, -5.8), inner, true)
-	# Collapsed roof section lets a shaft of daylight onto the cell.
-	_csg(shell, Vector3(3.0, 0.8, 3.0), Vector3(1.5, 4.0, -6.8), inner, true)
+	_collider(Vector3(10.0, 4.0, 0.2), Vector3(0.0, 2.0, -8.9))
+	_collider(Vector3(0.2, 4.0, 7.0), Vector3(-4.9, 2.0, -5.5))
+	# East wall either side of the side door (z -6.55..-5.05, up to y 2.4), and over it.
+	_collider(Vector3(0.2, 4.0, 2.45), Vector3(4.9, 2.0, -7.775))
+	_collider(Vector3(0.2, 4.0, 3.05), Vector3(4.9, 2.0, -3.525))
+	_collider(Vector3(0.2, 1.6, 1.5), Vector3(4.9, 3.2, -5.8))
+	# Front wall: the door (x +-1, up to 2.6) and windows (2.2 < |x| < 4.2, y 1.4..2.4).
+	for side in [-1.0, 1.0]:
+		_collider(Vector3(0.8, 4.0, 0.2), Vector3(side * 4.6, 2.0, -2.1))
+		_collider(Vector3(1.2, 4.0, 0.2), Vector3(side * 1.6, 2.0, -2.1))
+		_collider(Vector3(2.0, 1.4, 0.2), Vector3(side * 3.2, 0.7, -2.1))
+		_collider(Vector3(2.0, 1.6, 0.2), Vector3(side * 3.2, 3.2, -2.1))
+	_collider(Vector3(2.0, 1.4, 0.2), Vector3(0.0, 3.3, -2.1))
+	# Roof, round the hole over the cell (x 0..3, z -8.3..-5.3).
+	_collider(Vector3(5.0, 0.2, 7.0), Vector3(-2.5, 3.9, -5.5))
+	_collider(Vector3(2.0, 0.2, 7.0), Vector3(4.0, 3.9, -5.5))
+	_collider(Vector3(3.0, 0.2, 0.7), Vector3(1.5, 3.9, -8.65))
+	_collider(Vector3(3.0, 0.2, 3.3), Vector3(1.5, 3.9, -3.65))
 	var slab := _static_box(Vector3(3.0, 0.2, 2.6), Vector3(2.4, 0.9, -4.6), wall)
 	slab.rotation = Vector3(0.5, 0.2, 0.3)
 	_static_box(Vector3(0.6, 1.0, 3.0), Vector3(-4.4, 0.6, -6.0), _mat(Color("24282b"), 0.5))
@@ -71,9 +80,8 @@ func _build_cover() -> void:
 	_prop("prop_container", Vector3(6.0, 2.6, 2.4), Vector3(-10.0, 1.3, -5.0), Vector3(0.0, 0.3, 0.08))
 	_prop("prop_generator", Vector3(2.4, 1.6, 1.3), Vector3(5.6, 0.9, -12.2), Vector3(0.0, 0.1, 0.0))
 	_prop("prop_pipes", Vector3(4.0, 0.9, 1.3), Vector3(-8.5, 0.55, -12.0))
-	for p in [Vector3(3.0, 0.6, 4.5), Vector3(9.0, 0.6, -3.0), Vector3(-5.5, 0.6, 9.0), Vector3(4.2, 0.6, 9.5)]:
-		var crate := _static_box(Vector3(1.1, 1.1, 1.1), p, _mat(Color("6b6a52"), 0.9))
-		crate.rotation.y = p.x
+	for p in [Vector3(3.0, 0.65, 4.5), Vector3(9.0, 0.65, -3.0), Vector3(-5.5, 0.65, 9.0), Vector3(4.2, 0.65, 9.5)]:
+		_prop("prop_cargo_case", Vector3(1.1, 1.1, 1.1), p, Vector3(0.0, p.x, 0.0))
 
 
 ## The backup generator comes back: the station's lamps light, and the mast blinks.
@@ -84,9 +92,9 @@ func on_stage_done(stage: int, _animate: bool) -> void:
 		_station_lights.append(_light(Vector3(6.0, 15.0, -8.0), Color("ff4030"), 1.0, 10.0))
 
 
+## The mast is part of the station model; its lattice collides as one slim box.
 func _build_mast() -> void:
-	_static_box(Vector3(0.3, 16.0, 0.3), Vector3(6.0, 8.0, -8.0), _mat(Color("3a3f43"), 0.5))
-	_static_box(Vector3(2.0, 0.1, 0.1), Vector3(6.0, 14.0, -8.0), _mat(Color("3a3f43"), 0.5))
+	_collider(Vector3(0.9, 16.0, 0.9), Vector3(6.0, 8.0, -8.0))
 
 ## The relay's mission: restart the backup generator, then hold the station while the charging
 ## cradle lets go of the cell.

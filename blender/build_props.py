@@ -316,11 +316,33 @@ def mast_down():
     m.export("prop_mast_down")
 
 
+def cargo_case():
+    """A 1.1 m supply case: olive body with ribs, a dark lid, straps and corner guards."""
+    body = m.mat("case_olive", "6b6a52", 0.85)
+    dark = m.mat("dark_metal", m.DARK_METAL, 0.45, 0.6)
+    strap = m.mat("case_strap", "c4622d", 0.7)
+    root = m.pivot("CargoCase")
+    S = 1.1
+    m.box("body", (S - 0.06, S - 0.16, S - 0.06), (0, (S - 0.16) * 0.5, 0), root, body, bevel=0.03)
+    m.box("lid", (S, 0.16, S), (0, S - 0.08, 0), root, dark, bevel=0.03)
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            m.box("guard%d%d" % (sx, sz), (0.14, S - 0.2, 0.14), (sx * (S * 0.5 - 0.05), (S - 0.2) * 0.5, sz * (S * 0.5 - 0.05)), root, dark, bevel=0.02)
+    for k, x in enumerate((-0.25, 0.25)):
+        m.box("strap%d" % k, (0.08, 0.02, S + 0.02), (x, S + 0.005, 0), root, strap, bevel=0.0)
+        for sz in (-1, 1):
+            m.box("strap_side%d%d" % (k, sz), (0.08, S - 0.1, 0.02), (x, (S - 0.1) * 0.5, sz * (S * 0.5 + 0.005)), root, strap, bevel=0.0)
+    for sx in (-1, 1):
+        m.box("handle%d" % sx, (0.03, 0.06, 0.3), (sx * (S * 0.5 + 0.01), S * 0.6, 0), root, dark, bevel=0.0)
+    m.export("prop_cargo_case")
+
+
 BUILDERS = {
     "container": container,
     "barrier": barrier,
     "generator": generator,
     "pipes": pipes,
+    "cargo_case": cargo_case,
     "gear": gear,
     "gear_broken": gear_broken,
     "mast": mast,

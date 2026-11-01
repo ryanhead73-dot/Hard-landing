@@ -61,33 +61,27 @@ func _build_pool() -> void:
 	_disc(Vector3(0.0, 0.0, 3.0), 13.3, 0.03, water)
 
 
+## The hull is modelled in this site's coordinates (blender/build_sites.py): a 6 x 4.5 x 20 m
+## shell round (0, 2, -6) with the cargo door open at +z, a breach in the starboard side and the
+## nose torn off. Collision is plain boxes matching its walls.
 func _build_hull() -> void:
-	var paint := _mat(Color("5d6b73"), 0.75)
-	var inner := _mat(Color("3a4247"), 0.85)
-	var hull := CSGCombiner3D.new()
-	hull.name = "Hull"
-	hull.use_collision = true
-	add_child(hull)
-	_csg(hull, Vector3(6.0, 4.5, 20.0), Vector3(0.0, 2.0, -6.0), paint)
-	_csg(hull, Vector3(5.4, 3.9, 19.4), Vector3(0.0, 1.95, -6.0), inner, true)
-	# Open cargo door at the back, cut down through the floor so the threshold is flush with the ground.
-	_csg(hull, Vector3(4.6, 3.6, 1.0), Vector3(0.0, 1.6, 4.0), inner, true)
-	# Breach in the starboard side, a second way in, clear of the fallen container.
-	_csg(hull, Vector3(1.0, 2.4, 3.0), Vector3(3.0, 1.4, -10.5), inner, true)
-	# Torn-off nose: the front of the hold is open to the sky and the pool.
-	_csg(hull, Vector3(5.0, 2.0, 1.0), Vector3(0.0, 3.3, -16.0), inner, true)
-
-	var hazard := _mat(Color("e0b420"), 0.7)
-	var black := _mat(Color("1a1a1a"), 0.7)
-	for i in 6:
-		for side in [-3.03, 3.03]:
-			_mesh_box(Vector3(0.04, 0.5, 0.9), Vector3(side, 3.6, 3.4 - i * 0.9), hazard if i % 2 == 0 else black)
-	# Tail fin and strobe: the landmark seen from Kestrel.
-	var fin := _static_box(Vector3(0.4, 5.5, 3.5), Vector3(0.0, 6.9, 1.6), paint)
-	fin.rotation.z = 0.12
-	# The nose section, broken off and half sunk ahead of the hull.
-	var nose := _static_box(Vector3(5.2, 3.6, 5.0), Vector3(1.5, 0.9, -20.5), paint)
-	nose.rotation = Vector3(0.35, 0.4, 0.2)
+	Rig.spawn("site_hauler", self)
+	# Port wall, and the starboard wall around the breach (z -12..-9, up to y 2.6).
+	_collider(Vector3(0.3, 4.5, 20.0), Vector3(-2.85, 2.0, -6.0))
+	_collider(Vector3(0.3, 4.5, 4.0), Vector3(2.85, 2.0, -14.0))
+	_collider(Vector3(0.3, 4.5, 13.0), Vector3(2.85, 2.0, -2.5))
+	_collider(Vector3(0.3, 1.65, 3.0), Vector3(2.85, 3.425, -10.5))
+	_collider(Vector3(6.0, 0.35, 20.0), Vector3(0.0, 4.075, -6.0))
+	# Rear wall either side of the cargo door, and its lintel.
+	for side in [-1.0, 1.0]:
+		_collider(Vector3(0.7, 4.5, 0.3), Vector3(side * 2.65, 2.0, 3.85))
+		# The front wall stands to y 2.3; above that the nose is torn open between two posts.
+		_collider(Vector3(0.5, 1.95, 0.3), Vector3(side * 2.75, 3.275, -15.85))
+	_collider(Vector3(4.6, 0.85, 0.3), Vector3(0.0, 3.825, 3.85))
+	_collider(Vector3(6.0, 2.55, 0.3), Vector3(0.0, 1.025, -15.85))
+	# Tail fin, and the nose section broken off and half sunk ahead of the hull.
+	_collider(Vector3(0.4, 5.5, 3.5), Vector3(0.0, 6.9, 1.6), Vector3(0.0, 0.0, 0.12))
+	_prop("site_hauler_nose", Vector3(5.2, 3.6, 5.0), Vector3(1.5, 0.9, -20.5), Vector3(0.35, 0.4, 0.2))
 
 
 func _build_hold() -> void:
