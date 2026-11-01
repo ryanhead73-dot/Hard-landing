@@ -63,6 +63,7 @@ A new game opens with Kestrel's crash (E, Space or Esc skips it).
 | 1 / 2 / 3, mouse wheel | Rifle / scattergun / arc lance (the ones you own) |
 | Q | Use a stim (heals 55; carry 3, or 5 with the stim pouch) |
 | G | Throw an arc charge: bounces, then discharges after 1.6 s or on hitting a creature. 5.5 m blast that ignores armour plates and shoves survivors; it stings you up close. Carry 3. |
+| M | Survey map: the basin in relief, Kestrel, every site (mended, next, to come), drift caches you've spotted, lurker pools you've found, your heading and where you're bound |
 | Tab or I | Inventory: weapons, ammo, stims, arc charges, upgrades, components |
 | L | Logs: read the newest data slate, or the list of all of them |
 | Shift / Space / C | Sprint / jump / crouch (crawlways need crouch) |

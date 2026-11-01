@@ -17,6 +17,7 @@ func _run() -> void:
 	await _weak_spots()
 	await _caches()
 	await _skimmer()
+	await _map()
 	finished = true
 
 
@@ -148,9 +149,13 @@ func _director() -> void:
 	away.y = main.site.height_at(away.x, away.z) + 0.3
 	player.revive(away)
 	await _frames(5)
+	var before_cull := w.roamers.size()
 	w.update(0.5)
 	await _frames(3)
-	_check("stragglers left far behind wander off", w.roamers.is_empty(), str(w.roamers.size()))
+	var far_left := w.roamers.filter(func(e): return _flat_distance(e.global_position, player.global_position) > Wildlife.ROAM_DESPAWN)
+	_check("stragglers left far behind wander off", far_left.is_empty() and w.roamers.size() < before_cull, "%d far, %d of %d left" % [far_left.size(), w.roamers.size(), before_cull])
+	_clear_enemies()
+	w.roamers.clear()
 	player.revive(main.SPAWN)
 	await _frames(5)
 
@@ -425,6 +430,32 @@ func _skimmer() -> void:
 	for i in 60:
 		early = early or "skimmer" in main.wildlife.pack_kinds()
 	_check("but not before", not early)
+
+
+func _map() -> void:
+	var mp: MapPanel = main.map_panel
+	var w: Wildlife = main.wildlife
+	Game.caches_seen.clear()
+	var c: BasinCache = w.caches[5]
+	player.revive(c.global_position + Vector3(0.0, 0.3, 40.0))
+	await _frames(5)
+	var t0 := Time.get_ticks_msec()
+	mp.open()
+	_check("M opens the survey map and pauses", mp.is_open() and get_tree().paused)
+	_check("the basin relief draws", MapPanel._relief != null and MapPanel._relief.get_width() == MapPanel.RES, "%d ms" % (Time.get_ticks_msec() - t0))
+	var marks := mp.marks()
+	var sites := marks.filter(func(m): return m["kind"] == "site")
+	_check("it shows Kestrel, every site and Juno", marks.any(func(m): return m["kind"] == "ship") and sites.size() == Campaign.REPAIRS.size() and marks.any(func(m): return m["kind"] == "player"))
+	_check("the next site stands out", sites.filter(func(m): return m["state"] == "next").size() == 1)
+	_check("caches not yet spotted stay off it", not marks.any(func(m): return m["kind"] == "cache" and not m["opened"]))
+	mp.close()
+	_check("and closes again", not mp.is_open() and not get_tree().paused)
+	w.update(0.5)
+	_check("walking near a cache spots it", c.index in Game.caches_seen)
+	_check("a spotted cache goes on the map", mp.marks().any(func(m): return m["kind"] == "cache" and m["pos"].distance_to(c.global_position) < 0.1))
+	var p := MapPanel.to_map(Vector3(-MapPanel.HALF, 0.0, MapPanel.HALF))
+	_check("map corners line up with the basin", p.is_equal_approx(Vector2(0.0, MapPanel.VIEW)), str(p))
+	_check("spotted caches are saved", (Game.session_state()["caches_seen"] as Array).has(c.index))
 
 
 func _ray(from: Vector3, to: Vector3) -> Vector3:

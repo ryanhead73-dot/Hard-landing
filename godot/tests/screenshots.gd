@@ -93,6 +93,12 @@ func _ready() -> void:
 			var c: Vector3 = lk.global_position + Vector3.UP * 0.4
 			cam.look_at_from_position(c - fwd * 3.2 + side * 2.4 + Vector3.UP * 1.3, c)
 			cam.make_current()
+		if shot[0] == "map":
+			for c in main.wildlife.caches:
+				if c.index % 2 == 0:
+					Game.caches_seen.append(c.index)
+			main.wildlife.caches[2].set_opened()
+			main.map_panel.open()
 		if String(shot[0]).begins_with("skimmer"):
 			# Hanging before the dive, belly lit, or (skimmer_dive) stooping with wings swept.
 			var fwd: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
@@ -127,6 +133,8 @@ func _ready() -> void:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s.png" % [out, shot[0]])
 		print("shot ", shot[0])
+		if main.map_panel.is_open():
+			main.map_panel.close()
 		if cam:
 			cam.queue_free()
 		for e in beasts:
@@ -167,6 +175,7 @@ func _shots() -> Array:
 		["lurker", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 0.6, 30.0)],
 		["lurker_pool", "pool", Vector3.ZERO, Vector3.ZERO],
 		["cache", "cache", Vector3.ZERO, Vector3.ZERO],
+		["map", "", Vector3(30.0, 0.5, -20.0), Vector3(40.0, 1.0, -40.0)],
 		["skimmer", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
 		["skimmer_dive", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
