@@ -63,6 +63,8 @@ var master_volume := 0.8
 var music_volume := 0.7
 ## Sound effects (the SFX bus: weapons, creatures, machines, UI).
 var sfx_volume := 1.0
+## The frame-rate readout (F3).
+var show_fps := false
 var difficulty := 1
 ## Camera shake strength (0 turns it off).
 var screen_shake := 1.0
@@ -131,6 +133,10 @@ func is_pad_back(event: InputEvent) -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
+		show_fps = not show_fps
+		apply_settings()
+		save_settings()
 	var pad := using_pad
 	if event is InputEventJoypadButton and event.pressed:
 		pad = true
@@ -147,6 +153,7 @@ func _input(event: InputEvent) -> void:
 
 func _ready() -> void:
 	load_settings()
+	add_child(FpsOverlay.new())
 
 
 func load_settings() -> void:
@@ -157,6 +164,7 @@ func load_settings() -> void:
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
+		show_fps = cfg.get_value("video", "show_fps", show_fps)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
@@ -227,6 +235,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("audio", "sfx_volume", sfx_volume)
+	cfg.set_value("video", "show_fps", show_fps)
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.set_value("game", "screen_shake", screen_shake)
 	cfg.set_value("video", "graphics", graphics)

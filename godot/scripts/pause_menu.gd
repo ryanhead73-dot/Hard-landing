@@ -81,6 +81,15 @@ func _ready() -> void:
 		Game.graphics_changed.emit())
 	_row_label("Graphics")
 	_grid.add_child(gfx)
+	var fps := CheckBox.new()
+	fps.text = "Show frame rate (F3)"
+	fps.button_pressed = Game.show_fps
+	fps.toggled.connect(func(on: bool):
+		Game.show_fps = on
+		Game.apply_settings())
+	Game.settings_changed.connect(func(): fps.set_pressed_no_signal(Game.show_fps))
+	_row_label("")
+	_grid.add_child(fps)
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 12)

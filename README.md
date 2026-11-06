@@ -46,6 +46,21 @@ godot --headless --path godot --export-release "Windows" ../build/windows/HardLa
 
 A new game opens with Kestrel's crash (E, Space or Esc skips it).
 
+### Benchmark
+
+**Benchmark** on the title screen runs a fixed one-minute route with vsync off:
+- the crash site;
+- a flight over the basin;
+- a fight at the relay;
+- the lit workshop;
+- a storm.
+
+It then shows each segment's average fps, 1% low, worst frame, hitches over 50 ms and draw calls. The same report is saved as text and JSON in the `benchmarks` folder of the user folder above.
+
+To run it straight from a shell on a chosen preset: `HardLanding.exe -- --benchmark medium` (or `low` or `high`).
+
+The target is a GTX 1660-class card at 1080p on Medium: at least 60 fps on average, with 1% lows of at least 45 fps. F3, or **Show frame rate** in the pause menu, shows a live readout.
+
 ## Open it
 
 - **Godot 4.7.2:** Import `godot/project.godot`, then press F5. The ship and terrain also show in the editor.
@@ -58,7 +73,8 @@ A new game opens with Kestrel's crash (E, Space or Esc skips it).
 | Key | Action |
 | --- | --- |
 | WASD / mouse | Move / look (click to capture the mouse) |
-| Esc | Pause menu: mouse sensitivity, invert Y, volume, music volume, difficulty, screen shake, graphics preset (Low / Medium / High; Medium targets a GTX 1660-class card at 1080p60); save and quit to title |
+| Esc | Pause menu: mouse sensitivity, invert Y, volume, music and effects volume, difficulty, screen shake, graphics preset (Low / Medium / High; Medium targets a GTX 1660-class card at 1080p60), frame-rate readout; save and quit to title |
+| F3 | Frame-rate readout |
 | Right mouse / left mouse / R | Aim / fire / reload |
 | 1 / 2 / 3, mouse wheel | Rifle / scattergun / arc lance (the ones you own) |
 | Q | Use a stim (heals 55; carry 3, or 5 with the stim pouch) |
@@ -139,7 +155,7 @@ Juno Vale's salvage ship *Kestrel* is down on HD-4471 b, "the Kettle", pulled ou
 - Creatures with keyframed Blender clips (scuttler, spitter, ram and Warden: idle, walk, a clip per state such as windup, paw, charge, stunned, slam_windup and open, attack/slam/hurt one-shots, die) are built by `blender/build_creature_anims.py`, which animates the rigid-part pivots directly (hard shells need no skin) and exports the model with its clips; `creature_animator.gd` plays them with an AnimationTree, the walk matched to ground speed and state clips crossfaded in. The lurker and skimmer are still posed procedurally in code (`rig_pose.gd` sets joint rotations on top of each rest pose). `creature_animator.gd` (`enemy.anim`) walks six legs in a tripod gait and four in diagonal pairs, poses each creature's states from `anim_state()` (jaws, the spitter's neck and sac, the ram's head, the Warden's arms and opening carapace), plays `attack` / `slam` / `hurt` one-shots and curls the legs on death. Installing a part springs it into place with sparks (`Repairable.play_repair`), the wing turret sweeps while idle, and a new game opens with the crash intro (`main.play_intro`, skipped with E, Space or Esc).
 - `godot/scripts/surfaces.gd` generates the hull panelling, basalt and grime textures at startup (greyscale albedo plus normal map, applied triplanar, so CSG needs no UVs). `vfx.gd` builds the particles: death puffs, acid splashes, the muzzle star, Kestrel's engine exhaust and the moss motes around the player.
 - `blender/kestrel_blockout.py` builds the same layout in Blender: a single boolean shell (`Shell-col`), floors, fixtures, the exterior, and one mount empty per repair with placeholder volumes for both states. Model the real parts inside those empties.
-- `godot/tests/` holds the headless tests. `smoke_test.tscn` plays the slice (audio, pause, ship routes, combat, the first two repair loops, fabricator, vents, death and respawn). `campaign_test.tscn` checks every site's layout and routes, every hazard, each repair loop in order with its benefit, and the launch. `mechanics_test.tscn` covers weapons, ammo, stims, arc charges, the fabricator and inventory, every enemy, sieges, difficulty, balance numbers, save/load and the title screen. `story_test.tscn` checks the story data, where logs are found and that they save, when HOB and Juno speak, and the whole finale through to the ending card. `audio_test.tscn` checks every sound and loop, the music stems, buses, adaptive music, ambience zones, the spool whine and story sounds. `animation_test.tscn` checks Juno's poses and actions, every creature's gait and state poses, the repair spring, the turret sweep and the crash intro. `missions_test.tscn` plays every mission stage, including holds, interrupts, defends, elites and a save in the middle of a mission. `encounters_test.tscn` covers the lurker's ambush, bite, dive and heal and the roaming packs. `feel_test.tscn` checks the roll, shake, recoil, sprint FOV, splashes, damage arcs and the graphics setting. `visuals_test.tscn` checks every model and its joints, that the player, weapons, wildlife, components and crates use them, hit flashes, particles, surfaces, the engine exhaust and the compass. Run one with `godot --headless --path godot res://tests/smoke_test.tscn`; GitHub Actions runs every `*_test.tscn` on each pull request. `screenshots.tscn` renders review shots (see the script header).
+- `godot/tests/` holds the headless tests. `smoke_test.tscn` plays the slice (audio, pause, ship routes, combat, the first two repair loops, fabricator, vents, death and respawn). `campaign_test.tscn` checks every site's layout and routes, every hazard, each repair loop in order with its benefit, and the launch. `mechanics_test.tscn` covers weapons, ammo, stims, arc charges, the fabricator and inventory, every enemy, sieges, difficulty, balance numbers, save/load and the title screen. `story_test.tscn` checks the story data, where logs are found and that they save, when HOB and Juno speak, and the whole finale through to the ending card. `audio_test.tscn` checks every sound and loop, the music stems, buses, adaptive music, ambience zones, the spool whine and story sounds. `animation_test.tscn` checks Juno's poses and actions, every creature's gait and state poses, the repair spring, the turret sweep and the crash intro. `missions_test.tscn` plays every mission stage, including holds, interrupts, defends, elites and a save in the middle of a mission. `encounters_test.tscn` covers the lurker's ambush, bite, dive and heal and the roaming packs. `feel_test.tscn` checks the roll, shake, recoil, sprint FOV, splashes, damage arcs and the graphics setting. `visuals_test.tscn` checks every model and its joints, that the player, weapons, wildlife, components and crates use them, hit flashes, particles, surfaces, the engine exhaust, the compass and the type scale. `perf_test.tscn` runs the benchmark short and checks its report and the frame-rate readout. Run one with `godot --headless --path godot res://tests/smoke_test.tscn`; GitHub Actions runs every `*_test.tscn` on each pull request. `screenshots.tscn` renders review shots (see the script header).
 
 ## Known gaps
 

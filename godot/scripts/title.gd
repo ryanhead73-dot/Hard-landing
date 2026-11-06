@@ -17,6 +17,13 @@ func _ready() -> void:
 	Sfx.loop_flat("wind_loop", self, -14.0, "Ambience")
 	Sfx.loop_flat("music_calm", self, -10.0, "Music")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# `-- --benchmark [low|medium|high]` runs the benchmark straight away.
+	var args := OS.get_cmdline_user_args()
+	if "--benchmark" in args:
+		for i in Game.GRAPHICS_NAMES.size():
+			if Game.GRAPHICS_NAMES[i].to_lower() in args:
+				Game.graphics = i
+		get_tree().change_scene_to_file.call_deferred("res://scenes/benchmark.tscn")
 
 
 func _process(delta: float) -> void:
@@ -100,6 +107,8 @@ func _build_menu() -> void:
 		Game.save_settings())
 	row.add_child(_difficulty)
 	box.add_child(row)
+	var bench := _button(box, "Benchmark", func(): get_tree().change_scene_to_file("res://scenes/benchmark.tscn"))
+	bench.tooltip_text = "A one-minute run through the slice that measures frame times and saves a report."
 	_button(box, "Quit", func(): get_tree().quit())
 	# Anchor once the contents give it a size: left edge, centred vertically at any resolution.
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
