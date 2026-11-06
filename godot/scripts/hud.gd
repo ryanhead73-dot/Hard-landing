@@ -59,6 +59,9 @@ var _banner_time := 0.0
 var _hit_time := 0.0
 var _hit_killed := false
 var _hit_crit := false
+var _hit_armor := false
+## Glancing-hit markers shown (tests).
+var armor_shown := 0
 var crits_shown := 0
 ## Recent hits on Juno: [world position of the source, seconds left], drawn as red arcs.
 var _hurt_marks: Array = []
@@ -400,6 +403,7 @@ func hitmarker(killed: bool) -> void:
 	_hit_time = 0.15
 	_hit_killed = killed
 	_hit_crit = false
+	_hit_armor = false
 
 
 ## The hit marker for a weak-spot hit: bigger, amber, and it lingers a touch.
@@ -407,6 +411,14 @@ func crit_marker() -> void:
 	_hit_time = 0.22
 	_hit_crit = true
 	crits_shown += 1
+
+
+## The hit marker for a shot that glanced off armour: short, grey ticks over a flat bar, so it
+## reads as "that did little" next to the white hit and the amber crit.
+func armor_marker() -> void:
+	_hit_time = 0.18
+	_hit_armor = true
+	armor_shown += 1
 
 
 ## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
@@ -618,7 +630,12 @@ func _draw_crosshair() -> void:
 			var a := -PI * 0.5 + off
 			var alpha := clampf(m[1], 0.0, 1.0)
 			_crosshair.draw_arc(c, 96.0, a - 0.32, a + 0.32, 14, Color(1.0, 0.22, 0.12, 0.75 * alpha), 5.0, true)
-	if _hit_time > 0.0:
+	if _hit_time > 0.0 and _hit_armor:
+		var grey := Color(0.68, 0.74, 0.8, clampf(_hit_time / 0.18, 0.0, 1.0) * 0.5 + 0.5)
+		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+			_crosshair.draw_line(c + d * 8.0, c + d * 11.0, grey, 2.0)
+		_crosshair.draw_line(c + Vector2(-9.0, 16.0), c + Vector2(9.0, 16.0), grey, 2.0)
+	elif _hit_time > 0.0:
 		var hit_col := Color("ff5a3a") if _hit_killed else (Color("ffc84a") if _hit_crit else Color.WHITE)
 		var reach := 19.0 if _hit_crit else 15.0
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:

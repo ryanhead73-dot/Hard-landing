@@ -11,7 +11,7 @@ const DUCK_ATTACK := 60.0
 const DUCK_RELEASE := 9.0
 
 const SOUNDS: Array[String] = [
-	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "kill_tick",
+	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "hit_armor", "kill_tick",
 	"scuttler_alert", "scuttler_lunge", "scuttler_hurt", "scuttler_death",
 	"player_hurt", "scrap_pickup", "cell_pickup", "power_up", "fabricate",
 	"beacon_ping", "footstep_0", "footstep_1", "steam_hiss", "steam_burst", "manifold_pickup",

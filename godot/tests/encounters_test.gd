@@ -15,6 +15,7 @@ func _run() -> void:
 	await _director()
 	await _weather()
 	await _weak_spots()
+	await _armor()
 	await _caches()
 	await _skimmer()
 	await _map()
@@ -281,6 +282,69 @@ func _weak_spots() -> void:
 		await _frames(2)
 	_check("aimed at the glowing ridge, the rifle lands a crit", crits[0] > 0 and sc.crits_taken > 0)
 	_check("the HUD shows a crit marker", main.hud.crits_shown > shown)
+	_clear_enemies()
+
+
+## Shots that glance off armour say so: sparks and a knock at the plate, a grey marker on the HUD,
+## and once, a hint to flank. Side shots, crits, blasts and an open Warden don't glance.
+func _armor() -> void:
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var at := open + Vector3(0.0, 0.0, -8.0)
+	at.y = main.site.height_at(at.x, at.z) + 0.2
+	var ram: Ram = main.spawn_enemy("ram", at)
+	ram.max_health = 9999.0
+	ram.health = 9999.0
+	await _frames(10)
+	ram.set_physics_process(false)
+	var to_player := player.global_position - ram.global_position
+	ram.rotation.y = atan2(-to_player.x, -to_player.z)
+	await get_tree().physics_frame
+	var head := ram.global_position + Vector3.UP * 0.9 - ram._forward() * -1.2
+	var glances := [0]
+	player.weapon.deflected.connect(func(): glances[0] += 1)
+	var shown: int = main.hud.armor_shown
+	var sparks := get_tree().get_nodes_in_group("vfx_burst").size()
+	var hints_before: Array[String] = Game.hints_seen.duplicate()
+	Game.hints_seen.assign(Onboarding.HINTS.keys().filter(func(k): return k != "armor"))
+	main.onboarding.enabled = true
+	main.onboarding.finish()
+	main.onboarding._quiet = 0.0
+	for i in 6:
+		player.aim_at(head)
+		await get_tree().physics_frame
+		player.weapon._cooldown = 0.0
+		player.weapon.in_mag = maxi(player.weapon.in_mag, 2)
+		player.weapon.try_fire(true)
+		await _frames(2)
+	_check("rifle shots into a ram's head plate glance off", ram.armored_hits > 0 and glances[0] > 0, "%d glances, %d signals" % [ram.armored_hits, glances[0]])
+	_check("the HUD shows the grey glance marker", main.hud.armor_shown > shown)
+	_check("sparks fly off the plate", get_tree().get_nodes_in_group("vfx_burst").size() > sparks)
+	await _frames(3)
+	_check("the first glance brings up the flanking hint", main.onboarding.current == "armor", main.onboarding.current)
+	var side := ram.global_basis.x
+	var hp := ram.health
+	ram.take_damage(10.0, ram.global_position + Vector3.UP * 0.6, -side)
+	_check("a shot into the flank does not glance", not ram.last_hit_armored and hp - ram.health >= 9.99)
+	ram.take_damage(10.0, ram.global_position + Vector3.UP * 0.6, Vector3.ZERO)
+	_check("a blast never glances", not ram.last_hit_armored)
+	ram.take_damage(10.0, head, ram._forward() * -1.0)
+	_check("a head-on shot does", ram.last_hit_armored)
+	ram.take_damage(9999.0, ram.global_position, Vector3.ZERO)
+	main.onboarding.finish()
+	Game.hints_seen.assign(hints_before)
+	await _frames(3)
+	_clear_enemies()
+	var w: Warden = main.spawn_enemy("warden", at)
+	await _frames(5)
+	w.set_physics_process(false)
+	w.state = Warden.State.APPROACH
+	w.take_damage(10.0, w.global_position + Vector3.UP, Vector3.FORWARD)
+	_check("the Warden's closed shell glances", w.last_hit_armored)
+	w.state = Warden.State.OPEN
+	w.take_damage(10.0, w.global_position + Vector3.UP, Vector3.FORWARD)
+	_check("but not when it opens up", not w.last_hit_armored)
 	_clear_enemies()
 
 

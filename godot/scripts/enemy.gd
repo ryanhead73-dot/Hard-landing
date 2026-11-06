@@ -46,6 +46,12 @@ var last_hit_crit := false
 var last_hit_dir := Vector3.ZERO
 var last_hit_amount := 0.0
 var crits_taken := 0
+## A shot that does less than this share of its damage glanced off armour (a ram's head plate,
+## the Warden's closed shell). Blasts have no direction and never glance.
+const ARMOR_BELOW := 0.7
+## Whether the last hit glanced off armour.
+var last_hit_armored := false
+var armored_hits := 0
 var _weak: Node3D
 ## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
 ## circle at a distance and wait their turn, so a pack reads as a pack and not a pile-up.
@@ -146,6 +152,10 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		mult = maxf(mult, 1.0) * CRIT_MULT
 		crits_taken += 1
 		_crit_effect(point)
+	last_hit_armored = not last_hit_crit and dir != Vector3.ZERO and mult < ARMOR_BELOW
+	if last_hit_armored:
+		armored_hits += 1
+		_armor_effect(point, dir)
 	health -= amount * mult
 	last_hit_dir = dir
 	last_hit_amount = amount * mult
@@ -181,6 +191,15 @@ func _crit_effect(point: Vector3) -> void:
 	if not is_inside_tree():
 		return
 	Vfx.burst(get_parent(), point, Color("ffd36a"), 14, 5.0, 0.06, 0.3, Vector3.UP, 120.0, -6.0)
+
+
+## Pale sparks kicked back off the plate, and a dull knock with a whine where it hit.
+func _armor_effect(point: Vector3, dir: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var back := (-dir + Vector3.UP * 0.4).normalized()
+	Vfx.burst(get_parent(), point, Color("d8e4f0"), 10, 6.0, 0.04, 0.22, back, 35.0, -9.0)
+	Sfx.play("hit_armor", point, -2.0, 0.12)
 
 
 ## Starts hunting. Nearby wildlife joins in when the alarm spreads.

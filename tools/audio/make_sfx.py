@@ -659,6 +659,14 @@ def hit_crit(v):
     return place(0.22, (0, crack * 0.8), (0, ping * 0.4))
 
 
+@sound("hit_armor", 3)
+def hit_armor(v):
+    """A shot glancing off a plate: a dull knock and a short metallic whine, no flesh."""
+    knock = place(0.3, (0, click(0.006, 1200, 6000) * 0.7), (0, clack(620 + 70 * v, 0.06, 0.12, 0.8)))
+    whine = osc(sweep(3900 + 300 * v, 2100 + 200 * v, 0.16), 0.16) * env(0.16, 0.004, 0.13) * 0.18
+    return place(0.3, (0, knock), (0.012, whine))
+
+
 @sound("skimmer_screech", 2)
 def skimmer_screech(v):
     """A thin rising scream as it hangs before the dive."""
@@ -729,7 +737,7 @@ def hull_groan(v):
 
 
 PEAKS = {
-    "hit_tick": 0.5, "hit_crit": 0.55, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
+    "hit_tick": 0.5, "hit_crit": 0.55, "hit_armor": 0.5, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
     "stim": 0.6, "acid_splash": 0.7, "spitter_charge": 0.6, "spitter_spit": 0.7, "ram_paw": 0.8, "ram_charge": 0.85,
     "ram_stun": 0.9, "warden_roar": 0.9, "siege_horn": 0.7, "crash_impact": 0.95, "repair_clunk": 0.85, "log_chime": 0.5,

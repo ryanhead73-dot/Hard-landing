@@ -117,6 +117,10 @@
    "source": "synth_sfx",
    "tier": "detail"
   },
+  "hit_armor": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
   "hit_crit": {
    "source": "synth_sfx",
    "tier": "detail"
