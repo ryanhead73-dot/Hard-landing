@@ -37,6 +37,7 @@ const KEYS := {
 	"weapon_3": [KEY_3],
 	"inventory": [KEY_TAB, KEY_I],
 	"logs": [KEY_L],
+	"map": [KEY_M],
 }
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
@@ -75,6 +76,7 @@ var wildlife: Wildlife
 var weather: Weather
 var voice: Voice
 var logs_panel: LogPanel
+var map_panel: MapPanel
 var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
@@ -129,6 +131,7 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	player.weapon.ammo_changed.connect(_on_ammo_changed)
 	player.weapon.hit_confirmed.connect(hud.hitmarker)
+	player.weapon.crit_landed.connect(hud.crit_marker)
 	Game.scrap_changed.connect(hud.set_scrap)
 	Game.objective_changed.connect(hud.set_objective)
 	Game.message.connect(hud.show_message)
@@ -155,6 +158,9 @@ func _ready() -> void:
 	add_child(inventory)
 	logs_panel = LogPanel.new()
 	add_child(logs_panel)
+	map_panel = MapPanel.new()
+	map_panel.main = self
+	add_child(map_panel)
 	voice = Voice.new()
 	voice.hud = hud
 	add_child(voice)
@@ -254,6 +260,8 @@ func _process(_delta: float) -> void:
 		inventory.open()
 	elif Input.is_action_just_pressed("logs") and not player.dead and not Game.launched:
 		logs_panel.open_latest()
+	elif Input.is_action_just_pressed("map") and not player.dead and not Game.launched:
+		map_panel.open()
 	hud.set_waypoint(_waypoint())
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta
@@ -340,7 +348,7 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram", "lurker" or "warden". A name makes it an elite.
+## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer" or "warden". A name makes it an elite.
 func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 	var e: Enemy
 	match kind:
@@ -350,19 +358,26 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 			e = Ram.new()
 		"lurker":
 			e = Lurker.new()
+		"skimmer":
+			e = Skimmer.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)
 			e = w
 		_:
 			e = Scuttler.new()
+	e.elite_name = elite_name
+	return spawn_enemy_node(e, at)
+
+
+## Puts a made enemy in the world (a thief comes with its burrows already set).
+func spawn_enemy_node(e: Enemy, at: Vector3) -> Enemy:
 	# Out among the hummocks, start on the ground, not inside it.
 	var ground := site.height_at(at.x, at.z)
 	if at.y < ground + 0.3:
 		at.y = ground + 0.5
 	e.target = player
 	e.home = at
-	e.elite_name = elite_name
 	add_child(e)
 	e.global_position = at
 	e.died.connect(_on_enemy_died)
@@ -380,6 +395,8 @@ func scanner_marks() -> Array:
 		for i in site.crate_count():
 			if not site.crate_searched(i) and site.crate_point(i).distance_to(pos) < SCAN_CRATES:
 				marks.append({"pos": site.crate_point(i), "kind": "crate"})
+	if wildlife:
+		marks.append_array(wildlife.cache_marks(pos, SCAN_CRATES))
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.global_position.distance_to(pos) < SCAN_ENEMIES:
 			marks.append({"pos": e.global_position, "kind": "enemy"})
@@ -431,6 +448,7 @@ func load_state(data: Dictionary) -> void:
 		if site_states.has(id):
 			(sites[id] as ExpeditionSite).set_state(site_states[id])
 	missions.restore()
+	wildlife.restore()
 	var pending := int(data.get("siege_pending", -1))
 	if pending >= 0:
 		siege.arm(pending)
@@ -494,6 +512,9 @@ func _find_interaction() -> Dictionary:
 		for i in site.crate_count():
 			if not site.crate_searched(i) and pos.distance_to(site.crate_point(i)) < INTERACT_RANGE:
 				return {"label": "[E] Search salvage crate", "action": _search_crate.bind(site, i)}
+	var cache := wildlife.cache_interaction(pos, INTERACT_RANGE) if wildlife else {}
+	if not cache.is_empty():
+		return cache
 	if current != "" and _near_install(current):
 		var r := Campaign.get_repair(current)
 		if Game.carrying == r["component"]:

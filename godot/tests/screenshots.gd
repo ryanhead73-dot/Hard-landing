@@ -35,6 +35,12 @@ func _ready() -> void:
 		if shot[1] == "pool" and shot[0] == "lurker_pool":
 			var lp: Array = main.wildlife.lurker_pools[0]
 			shot = [shot[0], "", lp[0] + Vector3(lp[1] + 5.0, 0.8, 3.0), lp[0]]
+		elif shot[1] == "cache":
+			var c: Node3D = main.wildlife.caches[2]
+			var back := 40.0 if shot[0] == "cache_far" else 6.0
+			var from: Vector3 = c.global_position + Vector3(back * 0.8, 0.0, back * 0.6)
+			from.y = main.site.height_at(from.x, from.z) + 0.5
+			shot = [shot[0], "", from, c.global_position + Vector3.UP * (2.0 if back > 10.0 else 0.4)]
 		elif shot[1] == "pool":
 			var pool: Array = main.site.pools[1]
 			shot = [shot[0], "", pool[0] + Vector3(pool[1] + 6.0, 0.5, 4.0), pool[0]]
@@ -87,6 +93,46 @@ func _ready() -> void:
 			var c: Vector3 = lk.global_position + Vector3.UP * 0.4
 			cam.look_at_from_position(c - fwd * 3.2 + side * 2.4 + Vector3.UP * 1.3, c)
 			cam.make_current()
+		if shot[0] == "map":
+			for c in main.wildlife.caches:
+				if c.index % 2 == 0:
+					Game.caches_seen.append(c.index)
+			main.wildlife.caches[2].set_opened()
+			main.map_panel.open()
+		if shot[0] == "thief":
+			# The fuse thief caught in the open, loot glowing, beside a burrow.
+			var t := FuseThief.new()
+			t.thief_name = "FUSE THIEF"
+			main.spawn_enemy_node(t, main.sites["landing_gear"].to_global(Vector3(-11.5, 0.0, 4.5)))
+			main.hud.show_boss(t)
+			await _frames(2)
+			t.look_at(at, Vector3.UP)
+			t.rotate_y(PI * 0.6)
+			beasts.append(t)
+		if String(shot[0]).begins_with("skimmer"):
+			# Hanging before the dive, belly lit, or (skimmer_dive) stooping with wings swept.
+			var fwd: Vector3 = Vector3(flat.x, 0.0, flat.z).normalized()
+			var sk: Skimmer = main.spawn_enemy("skimmer", at + fwd * 5.0)
+			sk.target = null
+			await _frames(2)
+			sk.global_position.y += 2.6
+			sk.look_at(Vector3(at.x, sk.global_position.y, at.z), Vector3.UP)
+			if shot[0] == "skimmer_dive":
+				sk.state = Skimmer.State.DIVE
+				sk._dive_dir = (-fwd + Vector3.DOWN * 0.6).normalized()
+				sk.dive_speed = 0.0
+			else:
+				sk.state = Skimmer.State.WINDUP
+			sk._timer = 99.0
+			await _frames(40)
+			beasts.append(sk)
+			cam = Camera3D.new()
+			cam.fov = 45.0
+			main.add_child(cam)
+			var side: Vector3 = fwd.cross(Vector3.UP)
+			var c: Vector3 = sk.global_position
+			cam.look_at_from_position(c - fwd * 2.6 + side * 1.6 - Vector3.UP * 0.6, c)
+			cam.make_current()
 		await _frames(2)
 		for e in beasts:
 			e.process_mode = Node.PROCESS_MODE_DISABLED
@@ -97,6 +143,8 @@ func _ready() -> void:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s.png" % [out, shot[0]])
 		print("shot ", shot[0])
+		if main.map_panel.is_open():
+			main.map_panel.close()
 		if cam:
 			cam.queue_free()
 		for e in beasts:
@@ -136,6 +184,12 @@ func _shots() -> Array:
 		["creatures", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 1.0, 30.0)],
 		["lurker", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 0.6, 30.0)],
 		["lurker_pool", "pool", Vector3.ZERO, Vector3.ZERO],
+		["cache", "cache", Vector3.ZERO, Vector3.ZERO],
+		["map", "", Vector3(30.0, 0.5, -20.0), Vector3(40.0, 1.0, -40.0)],
+		["skimmer", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
+		["skimmer_dive", "", Vector3(40.0, 0.5, 40.0), Vector3(40.0, 2.0, 30.0)],
+		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
+		["thief", "landing_gear", Vector3(-6.0, 0.5, 9.0), Vector3(-12.5, 0.6, 4.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["route_exit", "", Vector3(-4.0, 0.5, 16.0), Vector3(-60.0, 4.0, 58.0)],
 		["route_hollow", "", Vector3(-25.0, 0.5, 23.0), Vector3(-60.0, 5.0, 58.0)],

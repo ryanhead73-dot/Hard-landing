@@ -141,9 +141,17 @@ func _mission() -> Array:
 	var H := Story.HOB
 	return [
 		{
-			"type": "activate", "text": "Find the chief engineer's keycard in the hull maze",
-			"devices": [{"pos": Vector3(-12.5, 0.0, -12.0), "kind": "keycard", "label": "Take the keycard", "yaw": PI * 0.5}],
-			"say": [[H, "The Long Patience locked her engine room when she came down. Sixty years ago. Her chief engineer died at his post, out in the maze, with the card."]],
+			"type": "search", "text": "Search the hull maze for the chief engineer's keycard",
+			"pos": Vector3(0.0, 0.0, -6.0), "signal": "KEYCARD SIGNAL", "answer": 3, "nests": [2],
+			"found": "The chief engineer's keycard, still on its lanyard.",
+			"devices": [
+				{"pos": Vector3(-3.0, 0.0, 4.0), "kind": "remains", "label": "Search the wreckage", "hold": 1.2},
+				{"pos": Vector3(4.5, 0.0, -2.5), "kind": "remains", "label": "Search the wreckage", "hold": 1.2},
+				{"pos": Vector3(7.0, 0.0, -12.5), "kind": "remains", "label": "Search the wreckage", "hold": 1.2},
+				{"pos": Vector3(-12.5, 0.0, -12.0), "kind": "remains", "label": "Search the wreckage", "hold": 1.2, "yaw": PI * 0.5},
+				{"pos": Vector3(-9.0, 0.0, -20.0), "kind": "remains", "label": "Search the wreckage", "hold": 1.2},
+			],
+			"say": [[H, "The Long Patience locked her engine room when she came down. Sixty years ago. Her chief engineer died at his post, out in the maze, with the card."], [H, "Its chip still answers a ping. I'll put the signal on your visor: warmer, colder."]],
 		},
 		{
 			"type": "elite", "kind": "ram", "name": "YARD GUARDIAN", "pos": Vector3(0.0, 0.3, -12.0),

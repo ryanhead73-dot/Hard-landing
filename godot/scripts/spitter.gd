@@ -27,6 +27,10 @@ func _init() -> void:
 	speed = 4.2
 	sight_range = 30.0
 	drops = Vector2i(1, 2)
+	# The acid sac on its back.
+	weak_joint = "Sac"
+	weak_offset = Vector3(0.0, 0.05, 0.0)
+	weak_radius = 0.4
 
 
 func _setup() -> void:

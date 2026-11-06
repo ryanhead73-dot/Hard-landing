@@ -137,6 +137,14 @@ func on_device_done(stage: int, index: int, _animate: bool) -> void:
 			(_vents[v] as SteamVent).shut()
 
 
+## A valve closed out of order: the line blows and every vent comes back to life.
+func on_wrong(stage: int, _index: int) -> void:
+	if stage != 0:
+		return
+	for v in _vents:
+		(v as SteamVent).reopen()
+
+
 func _build_vents() -> void:
 	if Engine.is_editor_hint():
 		for p in VENT_POINTS:
@@ -155,13 +163,19 @@ func _mission() -> Array:
 	var H := Story.HOB
 	return [
 		{
-			"type": "activate", "text": "Close the spring valves to quiet the steam vents",
+			"type": "activate", "text": "Close the spring valves, highest pressure first",
+			"order": [1, 2, 0], "wrong_damage": 18.0,
 			"devices": [
-				{"pos": Vector3(-11.5, 0.0, 6.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": PI * 0.5},
-				{"pos": Vector3(11.5, 0.0, 8.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": -PI * 0.5},
-				{"pos": Vector3(3.5, 0.0, 17.5), "kind": "valve", "label": "Close the valve", "hold": 1.2},
+				{"pos": Vector3(-11.5, 0.0, 6.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": PI * 0.5, "reading": "180 kPa", "pulse_rate": 2.5},
+				{"pos": Vector3(11.5, 0.0, 8.0), "kind": "valve", "label": "Close the valve", "hold": 1.2, "yaw": -PI * 0.5, "reading": "420 kPa", "pulse_rate": 9.0},
+				{"pos": Vector3(3.5, 0.0, 17.5), "kind": "valve", "label": "Close the valve", "hold": 1.2, "reading": "290 kPa", "pulse_rate": 5.0},
 			],
-			"say": [[H, "The Brightwater's coolant lines run straight through those springs. Every vent is a burst pipe."], [H, "There are shut-off valves round the rim. Close them and the pool should calm down."]],
+			"say": [
+				[H, "The Brightwater's coolant lines run straight through those springs. Every vent is a burst pipe."],
+				[H, "There are shut-off valves round the rim. Close the highest pressure first, or the line backs up and blows. Check each gauge; the fast blinkers are the hot ones."],
+			],
+			"wrong_text": "The line backed up and blew. Every valve sprang open: highest pressure first.",
+			"wrong_say": [[H, "That's the back-pressure! Read the gauges, Juno. Highest first."]],
 		},
 		{
 			"type": "activate", "text": "Cut the manifold free of its clamps",

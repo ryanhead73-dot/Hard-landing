@@ -197,6 +197,27 @@ const LOGS: Array[Dictionary] = [
 		"title": "The cradle", "author": "Ilse Marrow",
 		"text": "The core goes in a ship's nav bay. Any ship mind will understand it. Wait for the beat and fly in the gap. I'm not coming down from the spire the way I came up. When the pulse goes through the top, there's a moment where the Loom reaches all the way to orbit. I think I can ride it. If you're reading this and I was wrong, tell Reyes I'm sorry. If I was right, look up.",
 	},
+	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
+	{
+		"id": "basin_1", "site": "basin", "source": "cache:0",
+		"title": "Cargo tag, seed stock", "author": "Long Patience, hold 4",
+		"text": "Pod 4-17. Seed stock, cold-sealed: barley, beans, two hundred apple pips for the colony orchard. Do not open below four degrees. Do not open in vacuum. Whoever finds this, sixty years late: the barley still grows if you keep it out of the pools.",
+	},
+	{
+		"id": "basin_2", "site": "basin", "source": "cache:2",
+		"title": "Supply drop, three of six", "author": "Lt. Sana Reyes",
+		"text": "Dropping supplies on the walk to the graveyard in case anyone is left behind. Masks, stims, a box of charges. The scuttlers dig in under anything warm, so prise the lid from the side and be ready to run. If you're reading this, we're at the Long Patience. Come and find us.",
+	},
+	{
+		"id": "basin_3", "site": "basin", "source": "cache:5",
+		"title": "Field notes, the pools", "author": "Pell Adair, survey",
+		"text": "Something long lives in the deep pools, with eyes on stalks like a frog's. It waits with only the eyes above the water and it never chases far from home. Shoot it in the water and it barely notices. Get it up on the rock, aim for the eyes, and it remembers it has somewhere else to be.",
+	},
+	{
+		"id": "basin_4", "site": "basin", "source": "cache:7",
+		"title": "Weather, again", "author": "Dace Okoro",
+		"text": "The squalls come over the rim every few hours. In the rain the packs go half blind, so that's when we move the haul trucks. The scuttlers' backs light up when they're hunting, and that glowing ridge is soft. Tell the new hires: shoot the glow, not the shell.",
+	},
 ]
 
 ## The message waiting in orbit.

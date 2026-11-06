@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -51,6 +51,8 @@ var _banner_time := 0.0
 
 var _hit_time := 0.0
 var _hit_killed := false
+var _hit_crit := false
+var crits_shown := 0
 ## Recent hits on Juno: [world position of the source, seconds left], drawn as red arcs.
 var _hurt_marks: Array = []
 var _message_time := 0.0
@@ -363,6 +365,14 @@ func hurt_mark_count() -> int:
 func hitmarker(killed: bool) -> void:
 	_hit_time = 0.15
 	_hit_killed = killed
+	_hit_crit = false
+
+
+## The hit marker for a weak-spot hit: bigger, amber, and it lingers a touch.
+func crit_marker() -> void:
+	_hit_time = 0.22
+	_hit_crit = true
+	crits_shown += 1
 
 
 ## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
@@ -563,9 +573,12 @@ func _draw_crosshair() -> void:
 			var alpha := clampf(m[1], 0.0, 1.0)
 			_crosshair.draw_arc(c, 96.0, a - 0.32, a + 0.32, 14, Color(1.0, 0.22, 0.12, 0.75 * alpha), 5.0, true)
 	if _hit_time > 0.0:
-		var hit_col := Color("ff5a3a") if _hit_killed else Color.WHITE
+		var hit_col := Color("ff5a3a") if _hit_killed else (Color("ffc84a") if _hit_crit else Color.WHITE)
+		var reach := 19.0 if _hit_crit else 15.0
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-			_crosshair.draw_line(c + d * 8.0, c + d * 15.0, hit_col, 2.5)
+			_crosshair.draw_line(c + d * 8.0, c + d * reach, hit_col, 3.0 if _hit_crit else 2.5)
+		if _hit_crit:
+			_crosshair.draw_arc(c, 24.0, 0.0, TAU, 24, Color(1.0, 0.78, 0.29, _hit_time / 0.22 * 0.8), 2.0, true)
 
 
 func _label(size: int, pos: Vector2) -> Label:

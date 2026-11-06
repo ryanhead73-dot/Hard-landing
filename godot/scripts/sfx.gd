@@ -5,7 +5,7 @@ extends Node
 ## A sound can have variants, <id>__1, <id>__2...; each play picks one at random.
 
 const SOUNDS: Array[String] = [
-	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "kill_tick",
+	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "kill_tick",
 	"scuttler_alert", "scuttler_lunge", "scuttler_hurt", "scuttler_death",
 	"player_hurt", "scrap_pickup", "cell_pickup", "power_up", "fabricate",
 	"beacon_ping", "footstep_0", "footstep_1", "steam_hiss", "steam_burst", "manifold_pickup",
@@ -20,6 +20,9 @@ const SOUNDS: Array[String] = [
 	"step_metal", "amb_moss_loop", "amb_wreck_loop", "charge_throw", "charge_bounce", "charge_blast",
 	"lurker_emerge", "lurker_hiss", "lurker_bite", "lurker_hurt", "lurker_death", "lurker_dive",
 	"rain_loop", "thunder",
+	"signal_ping",
+	"skimmer_screech", "skimmer_dive", "skimmer_rake", "skimmer_flap", "skimmer_hurt", "skimmer_death",
+	"hull_groan",
 ]
 const MAX_VARIANTS := 8
 

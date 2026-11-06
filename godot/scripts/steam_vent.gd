@@ -60,6 +60,14 @@ func shut() -> void:
 		_crust.emission_energy_multiplier = 0.05
 
 
+## Opens a shut vent again (its valve was forced back open), starting with a burst.
+func reopen() -> void:
+	if not is_shut():
+		return
+	set_physics_process(true)
+	force_burst()
+
+
 func is_shut() -> bool:
 	return not is_physics_processing()
 

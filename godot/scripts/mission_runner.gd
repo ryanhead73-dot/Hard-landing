@@ -7,6 +7,17 @@ extends Node
 ##   pulse    as activate, but a Loom pulse during the hold knocks it out of tune.
 ##   defend   start the device, then stay within `radius` for `seconds` while waves come in.
 ##   elite    kill a named elite (`kind`, `name`, `pos`).
+##   search   search spots (hold E) for the one thing hidden in one of them (`answer`); a signal
+##            meter climbs as Juno closes on it, the waypoint only points at the area (`pos`)
+##            until she is in it, and the wrong spots turn up scrap or (`nests`) a scuttler nest.
+## An activate stage with a `timer` races a clock that starts when Juno comes within
+## `timer_range` of `pos`: run out and every device comes undone (`slip_text`, `slip_say`, and
+## the site's `on_slip`), then the clock starts again. `harass` kinds spawn at `harass_pts` when
+## the clock first starts and top up on each slip.
+##   chase    a thief (`name`) runs from Juno between `burrows` with the thing she needs; kill it.
+## An activate stage with an `order` must be worked in that order (each device's `reading` shows
+## in its prompt as the clue); the wrong one undoes the stage (`wrong_text`, `wrong_say`,
+## `wrong_damage` to Juno, and the site's `on_wrong`).
 ## After the last stage comes the implicit "take" stage. Stage index and the devices done in the
 ## current stage live in Game (mission_stage, mission_done) so they save with the session.
 
@@ -16,6 +27,12 @@ const REACH := 2.1
 const HOLD_RANGE := 2.6
 ## Seconds between a defend stage's waves, unless the stage says otherwise.
 const WAVE_EVERY := 10.0
+## A search's signal meter: full at the hidden thing, nothing past this range.
+const SIGNAL_RANGE := 30.0
+## Inside this distance of a search area's centre the waypoint goes quiet.
+const SEARCH_AREA := 20.0
+## A timed stage's clock starts this close to its `pos`, unless the stage says otherwise.
+const TIMER_RANGE := 12.0
 
 ## Tests that cover other systems skip missions: every component is takeable straight away.
 var bypass := false
@@ -31,6 +48,12 @@ var _defend_progress := 0.0
 var _wave_timer := 0.0
 var _wave_index := 0
 var _elite: Enemy
+var _thief: FuseThief
+var _ping_timer := 0.0
+## A timed stage's seconds left; negative until the clock starts.
+var _clock := -1.0
+var _slips := 0
+var _harassers: Array[Enemy] = []
 var _last_text := ""
 var _last_repair := ""
 ## Sites whose opening lines have played this session.
@@ -53,6 +76,7 @@ func setup(game_main: Node) -> void:
 				d.kind = spec.get("kind", "breaker")
 				d.position = spec["pos"]
 				d.rotation.y = spec.get("yaw", 0.0)
+				d.pulse_rate = spec.get("pulse_rate", 4.0)
 				d.name = "Mission%s" % d.kind.capitalize()
 				site.add_child(d)
 				list.append(d)
@@ -112,6 +136,9 @@ func objective() -> String:
 			var total: int = devices[id][stage_index(id)].size()
 			if total > 1:
 				text += " (%d/%d)" % [Game.mission_done.size(), total]
+		"search":
+			if not Game.mission_done.is_empty():
+				text += " (%d searched)" % Game.mission_done.size()
 		"defend":
 			if _defend_running:
 				text = s.get("running_text", text)
@@ -145,6 +172,13 @@ func waypoint():
 			if _elite and is_instance_valid(_elite) and not _elite.dead:
 				return _elite.global_position
 			return site.to_global(s["pos"])
+		"chase":
+			if _thief and is_instance_valid(_thief) and not _thief.dead:
+				return _thief.track_point()
+			return site.to_global(s["pos"])
+		"search":
+			var area := site.to_global(s["pos"])
+			return area if _flat(area - pos) > SEARCH_AREA else null
 	return null
 
 
@@ -154,7 +188,7 @@ func interaction(pos: Vector3) -> Dictionary:
 	if bypass or id == "" or Game.carrying != "":
 		return {}
 	var s := stage(id)
-	if not s["type"] in ["activate", "pulse", "defend"]:
+	if not s["type"] in ["activate", "pulse", "defend", "search"]:
 		return {}
 	var si := stage_index(id)
 	var list: Array = devices[id][si]
@@ -165,6 +199,8 @@ func interaction(pos: Vector3) -> Dictionary:
 			continue
 		var spec: Dictionary = specs[i]
 		var label: String = spec.get("label", "Work the device")
+		if spec.has("reading"):
+			label += "  ·  %s" % spec["reading"]
 		if s["type"] == "defend":
 			if _defend_running:
 				return {"label": "%s: %d%%" % [s.get("bar", "WORKING").capitalize(), int(defend_ratio() * 100.0)]}
@@ -195,6 +231,10 @@ func elite() -> Enemy:
 	return _elite
 
 
+func thief() -> FuseThief:
+	return _thief
+
+
 # --- Running --------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
@@ -218,10 +258,18 @@ func _process(delta: float) -> void:
 				_advance(id)
 		"elite":
 			_run_elite(id, site, s)
+		"chase":
+			_run_chase(id, site, s)
 		"defend":
 			_run_defend(id, site, s, delta)
+	if s.has("timer"):
+		_run_clock(id, site, s, delta)
 	if not _channel.is_empty():
 		_run_channel(id, delta)
+	elif s["type"] == "search":
+		_run_search(id, s, delta)
+	elif _clock >= 0.0:
+		hud.set_task(clock_ratio(), "%s  %ds" % [s.get("timer_bar", "TIME"), ceili(_clock)])
 	elif not _defend_running:
 		hud.set_task(-1.0)
 
@@ -240,6 +288,100 @@ func _run_channel(id: String, delta: float) -> void:
 		_complete_device(i)
 
 
+## 0..1: how strong the hidden thing's signal is where Juno stands.
+func search_signal() -> float:
+	var id := Game.current_repair()
+	if id == "" or stage(id)["type"] != "search":
+		return 0.0
+	var hidden: MissionDevice = devices[id][stage_index(id)][int(stage(id)["answer"])]
+	var d := _flat(hidden.global_position - main.player.global_position)
+	return clampf(1.0 - d / SIGNAL_RANGE, 0.0, 1.0)
+
+
+## The signal meter and its ping, faster the closer she gets.
+func _run_search(_id: String, s: Dictionary, delta: float) -> void:
+	var strength := search_signal()
+	main.hud.set_task(strength, "%s  %d%%" % [s.get("signal", "SIGNAL"), int(strength * 100.0)])
+	if strength <= 0.0:
+		return
+	_ping_timer -= delta
+	if _ping_timer <= 0.0:
+		_ping_timer = lerpf(1.6, 0.18, strength)
+		Sfx.play("signal_ping", null, lerpf(-16.0, -6.0, strength), 0.0)
+
+
+## 0..1 of a timed stage's clock left, or -1 when no clock is running.
+func clock_ratio() -> float:
+	var s := stage(Game.current_repair())
+	if _clock < 0.0 or not s.has("timer"):
+		return -1.0
+	return clampf(_clock / float(s["timer"]), 0.0, 1.0)
+
+
+func slips() -> int:
+	return _slips
+
+
+func _run_clock(id: String, site: ExpeditionSite, s: Dictionary, delta: float) -> void:
+	if _clock < 0.0:
+		var at := site.to_global(s["pos"])
+		if main.player.global_position.distance_to(at) > float(s.get("timer_range", TIMER_RANGE)):
+			return
+		_clock = float(s["timer"])
+		_harass(site, s)
+		if s.has("start_say"):
+			main.voice.interrupt(s["start_say"])
+		return
+	var before := _clock
+	_clock -= delta
+	# A creak as the last ten seconds start, so the clock is heard as well as seen.
+	if before > 10.0 and _clock <= 10.0:
+		Sfx.play("hull_groan", site.to_global(s["pos"]), -10.0, 0.05)
+	if _clock <= 0.0:
+		_slip(id, site, s)
+
+
+## The clock ran out: every device in the stage comes undone and the clock starts again.
+func _slip(id: String, site: ExpeditionSite, s: Dictionary) -> void:
+	_slips += 1
+	_interrupt("")
+	var si := stage_index(id)
+	Game.mission_done.clear()
+	for d in devices[id][si]:
+		(d as MissionDevice).set_state(MissionDevice.State.PENDING, true)
+	if site.has_method("on_slip"):
+		site.call("on_slip", _slips)
+	Sfx.play("hull_groan", site.to_global(s["pos"]), 0.0, 0.05)
+	main.player.add_trauma(0.6)
+	main.hud.show_message(s.get("slip_text", "Too slow. It all came undone."))
+	if s.has("slip_say"):
+		main.voice.interrupt(s["slip_say"])
+	_clock = float(s["timer"])
+	_harass(site, s)
+	_update_objective()
+
+
+## Spawns the stage's harassers, topping up to the full set rather than adding to it.
+func _harass(site: ExpeditionSite, s: Dictionary) -> void:
+	var live: Array[Enemy] = []
+	for e in _harassers:
+		if is_instance_valid(e) and not e.dead:
+			live.append(e)
+	_harassers = live
+	var kinds: Array = s.get("harass", [])
+	var pts: Array = s.get("harass_pts", [s["pos"]])
+	for i in range(_harassers.size(), kinds.size()):
+		var at := site.to_global(pts[i % pts.size()])
+		var e: Enemy = main.spawn_enemy(kinds[i], at)
+		e.alert(false)
+		_harassers.append(e)
+
+
+func _stop_clock() -> void:
+	_clock = -1.0
+	_slips = 0
+
+
 func _run_elite(id: String, site: ExpeditionSite, s: Dictionary) -> void:
 	if _elite and is_instance_valid(_elite):
 		if _elite.dead:
@@ -254,6 +396,28 @@ func _run_elite(id: String, site: ExpeditionSite, s: Dictionary) -> void:
 	main.hud.show_boss(_elite)
 	if s.has("say"):
 		main.voice.interrupt(s["say"])
+
+
+func _run_chase(id: String, site: ExpeditionSite, s: Dictionary) -> void:
+	if _thief and is_instance_valid(_thief):
+		if _thief.dead:
+			var at := _thief.global_position
+			_thief = null
+			main.hud.show_boss(null)
+			Sfx.play("scrap_pickup", at, 0.0)
+			main.hud.show_message(s.get("found", "Got it back."))
+			_advance(id)
+		return
+	if main.player.global_position.distance_to(site.global_position) > site.wake_radius:
+		return
+	var t := FuseThief.new()
+	t.thief_name = s.get("name", "THIEF")
+	for b in s["burrows"]:
+		t.burrows.append(site.to_global(b))
+	_thief = main.spawn_enemy_node(t, site.to_global(s["pos"]))
+	main.hud.show_boss(_thief)
+	if s.has("start_say"):
+		main.voice.interrupt(s["start_say"])
 
 
 func _run_defend(id: String, site: ExpeditionSite, s: Dictionary, delta: float) -> void:
@@ -340,11 +504,15 @@ func _on_repairs_changed() -> void:
 		_channel = {}
 		_defend_running = false
 		_elite = null
+		_thief = null
+		_stop_clock()
 	refresh(false)
 
 
 func _on_player_died() -> void:
 	_interrupt("")
+	# The clock waits for her to come back; what she locked stays locked.
+	_clock = -1.0
 	if _defend_running:
 		_defend_running = false
 		_defend_progress = 0.0
@@ -360,16 +528,68 @@ func _complete_device(index: int) -> void:
 	var si := stage_index(id)
 	if index in Game.mission_done:
 		return
+	var s0 := stage(id)
+	if s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index:
+		_wrong_order(id, s0, index)
+		return
 	Game.mission_done.append(index)
 	var d: MissionDevice = devices[id][si][index]
 	d.set_state(MissionDevice.State.DONE)
 	main.player.anim.play("interact")
+	var s := stage(id)
+	if s["type"] == "search":
+		_searched(id, s, d, index)
+		return
 	Sfx.play("repair_clunk", d.global_position, -4.0)
 	(main.sites[id] as ExpeditionSite).on_device_done(si, index, true)
 	if Game.mission_done.size() >= devices[id][si].size():
 		_advance(id)
 	else:
 		_update_objective()
+
+
+## Worked out of order: everything in the stage comes undone, and it hurts.
+func _wrong_order(id: String, s: Dictionary, index: int) -> void:
+	var si := stage_index(id)
+	var d: MissionDevice = devices[id][si][index]
+	Game.mission_done.clear()
+	for dev in devices[id][si]:
+		(dev as MissionDevice).set_state(MissionDevice.State.PENDING, true)
+	var site: ExpeditionSite = main.sites[id]
+	if site.has_method("on_wrong"):
+		site.call("on_wrong", si, index)
+	Sfx.play("steam_burst", d.global_position, 0.0, 0.05)
+	Vfx.burst(get_tree().current_scene, d.global_position + Vector3.UP * 0.8, Color(0.9, 0.92, 0.9, 0.7), 30, 5.0, 0.25, 0.8, Vector3.UP, 50.0, 1.0)
+	var hurt := float(s.get("wrong_damage", 0.0))
+	if hurt > 0.0:
+		main.player.take_damage(hurt, d.global_position)
+	main.player.add_trauma(0.5)
+	main.hud.show_message(s.get("wrong_text", "Wrong order. It all came undone."))
+	if s.has("wrong_say"):
+		main.voice.interrupt(s["wrong_say"])
+	_update_objective()
+
+
+## A search spot turned over: the find ends the stage; anything else is scrap, or a nest.
+func _searched(id: String, s: Dictionary, d: MissionDevice, index: int) -> void:
+	if index == int(s["answer"]):
+		Sfx.play("repair_clunk", d.global_position, -2.0)
+		main.hud.show_message(s.get("found", "Found it."))
+		_advance(id)
+		return
+	d.mark_empty()
+	Sfx.play("scrap_pickup", d.global_position, -4.0)
+	if index in s.get("nests", []):
+		main.hud.show_message("Not here, and something was living in it.")
+		for k in 3:
+			var a := TAU * k / 3.0 + randf() * 0.5
+			var at := d.global_position + Vector3(cos(a), 0.0, sin(a)) * randf_range(4.0, 6.0)
+			main.spawn_enemy("scuttler", at).alert(false)
+		Sfx.play("scuttler_alert", d.global_position, 0.0, 0.1)
+	else:
+		Game.add_scrap(4)
+		main.hud.show_message("Not here. 4 scrap for the trouble.")
+	_update_objective()
 
 
 ## Finishes the current stage and moves to the next (or to the take stage).
@@ -383,6 +603,7 @@ func _advance(id: String) -> void:
 	Game.mission_done.clear()
 	_channel = {}
 	_defend_running = false
+	_stop_clock()
 	site.on_stage_done(si, true)
 	refresh(true)
 	stage_completed.emit(id, si)
@@ -406,6 +627,9 @@ func complete_stage() -> void:
 	if _elite and is_instance_valid(_elite):
 		_elite.queue_free()
 	_elite = null
+	if _thief and is_instance_valid(_thief):
+		_thief.queue_free()
+	_thief = null
 	var site: ExpeditionSite = main.sites[id]
 	var list: Array = devices[id][stage_index(id)]
 	for i in list.size():
@@ -439,6 +663,8 @@ func restore() -> void:
 	_channel = {}
 	_defend_running = false
 	_elite = null
+	_thief = null
+	_stop_clock()
 	refresh(false)
 	for r in Campaign.REPAIRS:
 		var id: String = r["id"]

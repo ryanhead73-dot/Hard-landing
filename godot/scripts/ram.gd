@@ -32,6 +32,10 @@ func _init() -> void:
 	speed = 3.6
 	sight_range = 26.0
 	drops = Vector2i(3, 4)
+	# The glowing vents along its hump.
+	weak_joint = "Body"
+	weak_offset = Vector3(0.0, 0.62, 0.15)
+	weak_radius = 0.7
 
 
 func _setup() -> void:

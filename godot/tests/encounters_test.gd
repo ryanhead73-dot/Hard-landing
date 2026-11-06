@@ -14,6 +14,11 @@ func _run() -> void:
 	await _lurker()
 	await _director()
 	await _weather()
+	await _weak_spots()
+	await _caches()
+	await _skimmer()
+	await _map()
+	await _pack_tactics()
 	finished = true
 
 
@@ -145,9 +150,13 @@ func _director() -> void:
 	away.y = main.site.height_at(away.x, away.z) + 0.3
 	player.revive(away)
 	await _frames(5)
+	var before_cull := w.roamers.size()
 	w.update(0.5)
 	await _frames(3)
-	_check("stragglers left far behind wander off", w.roamers.is_empty(), str(w.roamers.size()))
+	var far_left := w.roamers.filter(func(e): return _flat_distance(e.global_position, player.global_position) > Wildlife.ROAM_DESPAWN)
+	_check("stragglers left far behind wander off", far_left.is_empty() and w.roamers.size() < before_cull, "%d far, %d of %d left" % [far_left.size(), w.roamers.size(), before_cull])
+	_clear_enemies()
+	w.roamers.clear()
 	player.revive(main.SPAWN)
 	await _frames(5)
 
@@ -213,6 +222,283 @@ func _weather() -> void:
 	w.enabled = false
 	w.clear_storm(true)
 	_clear_enemies()
+
+
+func _weak_spots() -> void:
+	var open := _open_point()
+	player.revive(open + Vector3(0.0, 0.0, 30.0))
+	await _frames(5)
+	for kind in ["scuttler", "spitter", "ram", "lurker"]:
+		var at := open + Vector3(0.0, 0.0, -6.0)
+		at.y = main.site.height_at(at.x, at.z) + 0.2
+		var e: Enemy = main.spawn_enemy(kind, at)
+		if e is Lurker:
+			_check("a submerged lurker shows no weak spot", e.weak_spot() == Vector3.INF)
+			e.state = Lurker.State.RECOVER
+			e._timer = 99.0
+		await _frames(30)
+		await get_tree().physics_frame
+		var ws := e.weak_spot()
+		_check("%s has a weak spot" % kind, ws != Vector3.INF)
+		if ws == Vector3.INF:
+			continue
+		# Straight down onto the glowing part, then square into its flank at mid height.
+		var top := _ray(ws + Vector3.UP * 3.0, ws + Vector3.DOWN * 2.0)
+		var mid := e.global_position + Vector3.UP * 0.45
+		var side_dir := e.global_basis.x
+		var flank := _ray(mid + side_dir * 5.0, mid - side_dir * 2.0)
+		_check("%s: a shot onto its weak spot crits" % kind, top != Vector3.INF and e.is_weak_hit(top, Vector3.DOWN), "%s vs %s" % [top, ws])
+		_check("%s: a shot into its flank does not" % kind, flank != Vector3.INF and not e.is_weak_hit(flank, -side_dir), "%s vs %s" % [flank, ws])
+		_check("%s: a blast never crits" % kind, not e.is_weak_hit(ws, Vector3.ZERO))
+		var hp := e.health
+		e.take_damage(10.0, top, Vector3.DOWN)
+		_check("%s: the crit hits harder" % kind, e.last_hit_crit and hp - e.health >= 10.0 * Enemy.CRIT_MULT - 0.01, "%.1f" % (hp - e.health))
+		e.take_damage(9999.0, e.global_position, Vector3.ZERO)
+		await _frames(3)
+	_clear_enemies()
+
+	# End to end: the rifle aimed at a scuttler's back ridge lands crits and the HUD shows them.
+	player.revive(open)
+	await _frames(5)
+	var target := open + Vector3(0.0, 0.0, -7.0)
+	target.y = main.site.height_at(target.x, target.z) + 0.2
+	var sc: Scuttler = main.spawn_enemy("scuttler", target)
+	sc.max_health = 9999.0
+	sc.health = 9999.0
+	await _frames(10)
+	var crits := [0]
+	player.weapon.crit_landed.connect(func(): crits[0] += 1)
+	var shown: int = main.hud.crits_shown
+	for i in 40:
+		if crits[0] > 0 or not is_instance_valid(sc):
+			break
+		var ws := sc.weak_spot()
+		player.aim_at(ws)
+		await get_tree().physics_frame
+		player.weapon._cooldown = 0.0
+		player.weapon.in_mag = maxi(player.weapon.in_mag, 2)
+		player.weapon.try_fire(true)
+		await _frames(2)
+	_check("aimed at the glowing ridge, the rifle lands a crit", crits[0] > 0 and sc.crits_taken > 0)
+	_check("the HUD shows a crit marker", main.hud.crits_shown > shown)
+	_clear_enemies()
+
+
+func _caches() -> void:
+	var w: Wildlife = main.wildlife
+	_check("drift caches lie out on the basin", w.caches.size() == Wildlife.CACHE_COUNT, str(w.caches.size()))
+	var ship: Vector3 = kestrel.global_position
+	var bad: PackedStringArray = []
+	var space := get_viewport().get_world_3d().direct_space_state
+	for c in w.caches:
+		var p := c.global_position
+		if _flat_distance(p, ship) < Wildlife.SHIP_CLEAR + 10.0:
+			bad.append("%d near the ship" % c.index)
+		if main.site.on_path(p.x, p.z) or main.site.in_pool(p):
+			bad.append("%d on a path or in a pool" % c.index)
+		for o in w.caches:
+			if o != c and _flat_distance(p, o.global_position) < Wildlife.CACHE_SPACING - 0.1:
+				bad.append("%d crowds %d" % [c.index, o.index])
+		var q := PhysicsShapeQueryParameters3D.new()
+		var sphere := SphereShape3D.new()
+		sphere.radius = 1.6
+		q.shape = sphere
+		q.transform = Transform3D(Basis(), p + Vector3.UP * 2.0)
+		q.collision_mask = Game.LAYER_WORLD
+		q.exclude = [(c.get_node("DriftCache") as CollisionObject3D).get_rid()]
+		if not space.intersect_shape(q, 4).is_empty():
+			bad.append("%d inside rock" % c.index)
+	_check("each sits on open ground, apart, clear of rock, paths and pools", bad.is_empty(), ", ".join(bad))
+	_check("a locator beam shows where each one is", w.caches.all(func(c): return c.get_node("Locator").visible))
+	_check("some have a nest under them", w.caches.filter(func(c): return c.guarded).size() == Wildlife.CACHE_GUARDED.size())
+
+	# The scanner picks them up once the canopy is back.
+	var plain: BasinCache = w.caches[0]
+	player.revive(plain.global_position + Vector3(0.0, 0.3, 6.0))
+	await _frames(5)
+	Game.repaired["canopy"] = true
+	_check("the scanner shows a nearby cache", main.scanner_marks().any(func(m): return m["kind"] == "crate" and m["pos"].distance_to(plain.global_position) < 0.1))
+	Game.repaired.clear()
+
+	# Prising one open.
+	player.revive(plain.global_position + Vector3(0.0, 0.3, 1.5))
+	await _frames(5)
+	var offer: Dictionary = main._find_interaction()
+	_check("up close it offers to prise the cache open", String(offer.get("label", "")).contains("drift cache"), str(offer.get("label", "")))
+	var scrap := Game.scrap
+	if offer.has("action"):
+		offer["action"].call()
+	await _frames(3)
+	_check("it pays out scrap", Game.scrap >= scrap + 12, "%d -> %d" % [scrap, Game.scrap])
+	_check("opened, it goes dark", plain.opened and not plain.get_node("Locator").visible and 0 in Game.caches_opened)
+	_check("its log is found", Story.get_log("basin_1") != {} and "basin_1" in Game.logs)
+	_check("an opened cache offers nothing more", not String(main._find_interaction().get("label", "")).contains("drift cache"))
+	_check("an opened cache drops off the scanner", w.cache_marks(plain.global_position, 5.0).is_empty())
+
+	# A nest under one.
+	var nest: BasinCache = w.caches[Wildlife.CACHE_GUARDED[0]]
+	player.revive(nest.global_position + Vector3(0.0, 0.3, 1.5))
+	await _frames(5)
+	var guards := w.open_cache(nest.index)
+	await _frames(3)
+	_check("opening a nested cache brings the pack up", guards.size() >= 3 and guards.all(func(e): return e.hunting), str(guards.size()))
+	_check("they come up round it, close", guards.all(func(e): return _flat_distance(e.global_position, nest.global_position) < 9.0))
+	_check("Juno sees it coming", Wildlife.CACHE_LINES.any(func(l): return main.voice.heard(String(l[1]).left(12))))
+	_clear_enemies()
+
+	# Saved and restored.
+	var data := Game.session_state()
+	_check("opened caches are saved", (data["caches_opened"] as Array).has(nest.index))
+	Game.caches_opened.append(3)
+	w.restore()
+	_check("loading a save darkens the caches already opened", w.caches[3].opened and not w.caches[3].get_node("Locator").visible)
+
+
+func _skimmer() -> void:
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var at := open + Vector3(0.0, 0.0, -12.0)
+	var sk: Skimmer = main.spawn_enemy("skimmer", at)
+	sk.alert(false)
+	var ground: float = main.site.height_at(open.x, open.z)
+	var top := 0.0
+	var beats := {}
+	var states := {}
+	for i in 60 * 9:
+		await get_tree().physics_frame
+		top = maxf(top, sk.global_position.y - ground)
+		states[sk.anim_state()] = true
+		beats[int(sk.anim.wing_beat / 8.0)] = true
+		if sk.state == Skimmer.State.WINDUP:
+			break
+	_check("a skimmer takes off and climbs to cruise height", top > sk.cruise_height - 1.5, "%.1f m" % top)
+	_check("it wheels overhead before it commits", states.has("circle"))
+	_check("its wings beat", beats.size() >= 4, str(beats.size()))
+	_check("then it hangs and screams", sk.state == Skimmer.State.WINDUP)
+	var before := player.health
+	var raked := false
+	var lowest := 99.0
+	for i in 60 * 3:
+		await get_tree().physics_frame
+		lowest = minf(lowest, sk.global_position.y - ground)
+		if player.health < before:
+			raked = true
+			break
+	_check("it dives and rakes Juno on the way past", raked and sk.rakes == 1, "health %.0f -> %.0f, lowest %.1f m" % [before, player.health, lowest])
+	var climbed := false
+	for i in 60 * 3:
+		await get_tree().physics_frame
+		if sk.state == Skimmer.State.CLIMB or sk.state == Skimmer.State.CIRCLE:
+			climbed = true
+			break
+	_check("and climbs away to go round again", climbed, sk.anim_state())
+
+	# Shot out of the air mid-dive, it tumbles to the ground, stunned and soft.
+	sk.state = Skimmer.State.DIVE
+	sk._dive_dir = Vector3.DOWN
+	sk._timer = 1.0
+	sk.health = sk.max_health
+	sk.take_damage(20.0, sk.global_position, Vector3.FORWARD)
+	_check("a solid hit mid-dive knocks it down", sk.is_grounded())
+	var landed := false
+	for i in 60 * 2:
+		await get_tree().physics_frame
+		if sk.is_on_floor():
+			landed = true
+			break
+	_check("it falls to the rock", landed, "%.1f m up" % (sk.global_position.y - main.site.height_at(sk.global_position.x, sk.global_position.z)))
+	var hp := sk.health
+	sk.take_damage(10.0, sk.global_position, Vector3.FORWARD)
+	_check("grounded, it takes extra damage", hp - sk.health >= 14.9, "%.1f" % (hp - sk.health))
+	# The belly sac is its weak spot, shot from below.
+	sk._timer = 99.0
+	await get_tree().physics_frame
+	var ws := sk.weak_spot()
+	_check("its belly sac is a weak spot", ws != Vector3.INF and sk.is_weak_hit(ws + Vector3.DOWN * 0.15, Vector3.UP))
+	sk.take_damage(9999.0, sk.global_position, Vector3.FORWARD)
+	_check("it dies", sk.dead and sk.anim_state() == "dead")
+	_clear_enemies()
+
+	for id in ["aux_power", "cooling", "canopy"]:
+		Game.repaired[id] = true
+	var seen := false
+	for i in 60:
+		seen = seen or "skimmer" in main.wildlife.pack_kinds()
+	_check("skimmers join the packs once three repairs are in", seen)
+	Game.repaired.clear()
+	var early := false
+	for i in 60:
+		early = early or "skimmer" in main.wildlife.pack_kinds()
+	_check("but not before", not early)
+
+
+func _map() -> void:
+	var mp: MapPanel = main.map_panel
+	var w: Wildlife = main.wildlife
+	Game.caches_seen.clear()
+	var c: BasinCache = w.caches[5]
+	player.revive(c.global_position + Vector3(0.0, 0.3, 40.0))
+	await _frames(5)
+	var t0 := Time.get_ticks_msec()
+	mp.open()
+	_check("M opens the survey map and pauses", mp.is_open() and get_tree().paused)
+	_check("the basin relief draws", MapPanel._relief != null and MapPanel._relief.get_width() == MapPanel.RES, "%d ms" % (Time.get_ticks_msec() - t0))
+	var marks := mp.marks()
+	var sites := marks.filter(func(m): return m["kind"] == "site")
+	_check("it shows Kestrel, every site and Juno", marks.any(func(m): return m["kind"] == "ship") and sites.size() == Campaign.REPAIRS.size() and marks.any(func(m): return m["kind"] == "player"))
+	_check("the next site stands out", sites.filter(func(m): return m["state"] == "next").size() == 1)
+	_check("caches not yet spotted stay off it", not marks.any(func(m): return m["kind"] == "cache" and not m["opened"]))
+	mp.close()
+	_check("and closes again", not mp.is_open() and not get_tree().paused)
+	w.update(0.5)
+	_check("walking near a cache spots it", c.index in Game.caches_seen)
+	_check("a spotted cache goes on the map", mp.marks().any(func(m): return m["kind"] == "cache" and m["pos"].distance_to(c.global_position) < 0.1))
+	var p := MapPanel.to_map(Vector3(-MapPanel.HALF, 0.0, MapPanel.HALF))
+	_check("map corners line up with the basin", p.is_equal_approx(Vector2(0.0, MapPanel.VIEW)), str(p))
+	_check("spotted caches are saved", (Game.session_state()["caches_seen"] as Array).has(c.index))
+
+
+func _pack_tactics() -> void:
+	_clear_enemies()
+	await _frames(3)
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var pack: Array[Scuttler] = []
+	for k in 5:
+		var a := TAU * k / 5.0
+		pack.append(main.spawn_enemy("scuttler", open + Vector3(cos(a), 0.0, sin(a)) * 9.0))
+	await _frames(2)
+	for s in pack:
+		s.alert(false)
+	var most := 0
+	var waited := false
+	var ring_ok := true
+	var closest := 99.0
+	var biters := {}
+	for i in 60 * 7:
+		await get_tree().physics_frame
+		player.health = player.max_health()
+		most = maxi(most, Enemy.attackers_on(player))
+		for s in pack:
+			if s.state == Scuttler.State.WINDUP:
+				biters[s.get_instance_id()] = true
+			if s.is_waiting() and _flat_distance(s.global_position, player.global_position) < Scuttler.RING + 1.5:
+				waited = true
+				closest = minf(closest, _flat_distance(s.global_position, player.global_position))
+				ring_ok = closest > 2.2
+	_check("only two close in to bite at once on normal", most > 0 and most <= Enemy.ATTACKERS[1], str(most))
+	_check("the rest circle and wait their turn", waited)
+	_check("waiting ones keep their distance", ring_ok, "closest %.1f m" % closest)
+	_check("they take turns", biters.size() >= 3, "%d biters" % biters.size())
+	_clear_enemies()
+
+
+func _ray(from: Vector3, to: Vector3) -> Vector3:
+	var q := PhysicsRayQueryParameters3D.create(from, to, Game.LAYER_ENEMY)
+	var r := get_viewport().get_world_3d().direct_space_state.intersect_ray(q)
+	return r.position if not r.is_empty() else Vector3.INF
 
 
 ## A point out on the basin where packs roam, found by walking rings round the ship.

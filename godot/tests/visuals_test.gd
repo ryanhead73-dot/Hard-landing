@@ -12,6 +12,7 @@ const MODELS := {
 	"ram": ["Body", "Head", "Tail", "LegFL", "LegFR", "LegBL", "LegBR", "FootFL"],
 	"warden": ["Body", "Core", "Head", "PlateL", "PlateR", "ArmL", "ArmR", "FistL", "FistR", "LegL1", "LegR3"],
 	"lurker": ["Body", "Head", "Jaw", "StalkL", "StalkR", "Tail", "TailTip", "LegL1", "LegR2", "FootL1"],
+	"skimmer": ["Body", "Core", "Head", "WingL", "WingR", "WingTipL", "WingTipR", "ClawL", "ClawR", "Tail", "TailTip"],
 	"rifle": ["Muzzle"],
 	"scattergun": ["Muzzle", "Pump"],
 	"arc_lance": ["Muzzle"],
@@ -190,11 +191,11 @@ func _wildlife() -> void:
 	a.take_damage(9999.0, a.global_position, Vector3.FORWARD)
 	_check("a death gives off a teal puff", _bursts() > before)
 	var kinds_ok := true
-	for kind in ["spitter", "ram", "warden", "lurker"]:
+	for kind in ["spitter", "ram", "warden", "lurker", "skimmer"]:
 		var e: Enemy = main.spawn_enemy(kind, at + Vector3(-10.0, 0.0, 0.0))
 		e.target = null
 		kinds_ok = kinds_ok and e._rig != null and not Rig.meshes(e._rig).is_empty()
-	_check("spitter, ram, Warden and lurker wear their models", kinds_ok)
+	_check("spitter, ram, Warden, lurker and skimmer wear their models", kinds_ok)
 	var sp: Spitter = get_tree().get_nodes_in_group("enemies").filter(func(e): return e is Spitter)[0]
 	_check("the spitter's sac glow is its own", sp._sac != null and sp._sac.resource_name == "acid_sac")
 	var splash := Vfx.acid(main, at)
