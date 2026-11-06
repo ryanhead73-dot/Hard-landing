@@ -58,7 +58,7 @@ A new game opens with Kestrel's crash (E, Space or Esc skips it).
 | Key | Action |
 | --- | --- |
 | WASD / mouse | Move / look (click to capture the mouse) |
-| Esc | Pause menu: mouse sensitivity, invert Y, volume, music volume, difficulty, screen shake, graphics (Performance / Quality); save and quit to title |
+| Esc | Pause menu: mouse sensitivity, invert Y, volume, music volume, difficulty, screen shake, graphics preset (Low / Medium / High; Medium targets a GTX 1660-class card at 1080p60); save and quit to title |
 | Right mouse / left mouse / R | Aim / fire / reload |
 | 1 / 2 / 3, mouse wheel | Rifle / scattergun / arc lance (the ones you own) |
 | Q | Use a stim (heals 55; carry 3, or 5 with the stim pouch) |

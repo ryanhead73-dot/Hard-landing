@@ -61,8 +61,9 @@ func _ready() -> void:
 	gfx_label.text = "Graphics"
 	box.add_child(gfx_label)
 	var gfx := OptionButton.new()
-	gfx.add_item("Performance")
-	gfx.add_item("Quality")
+	for preset in Game.GRAPHICS_NAMES:
+		gfx.add_item(preset)
+	gfx.tooltip_text = "Medium is tuned for a GTX 1660-class card at 1080p, 60 fps."
 	gfx.selected = Game.graphics
 	gfx.item_selected.connect(func(i: int):
 		Game.graphics = i

@@ -1016,11 +1016,34 @@ func _build_environment() -> void:
 	_apply_graphics()
 
 
-## Quality adds screen-space indirect light and the basin haze; Performance drops both.
+## The graphics presets. Medium is the target (a GTX 1660-class card at 1080p60): half-size
+## SSAO, the basin haze, four shadow cascades to 120 m and 2x MSAA. High adds screen-space
+## indirect light, full SSAO, soft sun shadows, longer haze and shadows and 4x MSAA. Low drops
+## the haze and SSAO, uses two cascades to 80 m, FXAA and renders 3D at 85% with FSR.
 func _apply_graphics() -> void:
-	var quality := Game.graphics >= 1
-	_env.ssil_enabled = quality
-	_sun.light_angular_distance = 0.6 if quality else 0.0
+	var g := Game.graphics
+	var low := g == Game.GRAPHICS_LOW
+	var high := g == Game.GRAPHICS_HIGH
+	_env.ssil_enabled = high
+	_env.ssao_enabled = not low
+	RenderingServer.environment_set_ssao_quality(
+		RenderingServer.ENV_SSAO_QUALITY_HIGH if high else RenderingServer.ENV_SSAO_QUALITY_LOW,
+		not high, 0.5, 2, 50.0, 300.0)
+	# Volumetric fog stays on at every level so local FogVolumes (spore fog) still render.
+	_env.volumetric_fog_length = 96.0 if high else (64.0 if not low else 40.0)
+	RenderingServer.environment_set_volumetric_fog_volume_size(96 if high else 64, 96 if high else (64 if not low else 48))
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if low else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_sun.directional_shadow_max_distance = 150.0 if high else (120.0 if not low else 80.0)
+	_sun.light_angular_distance = 0.6 if high else 0.0
+	RenderingServer.directional_shadow_atlas_set_size(4096 if not low else 2048, true)
+	var soft := RenderingServer.SHADOW_QUALITY_SOFT_HIGH if high else (RenderingServer.SHADOW_QUALITY_SOFT_LOW if not low else RenderingServer.SHADOW_QUALITY_HARD)
+	RenderingServer.directional_soft_shadow_filter_set_quality(soft)
+	RenderingServer.positional_soft_shadow_filter_set_quality(soft)
+	var vp := get_viewport()
+	vp.msaa_3d = Viewport.MSAA_4X if high else (Viewport.MSAA_2X if not low else Viewport.MSAA_DISABLED)
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if low else Viewport.SCREEN_SPACE_AA_DISABLED
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if low else Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = 0.85 if low else 1.0
 	if site:
 		set_daylight(daylight)
 
@@ -1055,7 +1078,7 @@ func set_daylight(amount: float) -> void:
 	_env.ambient_light_energy = lerpf(0.4, 0.3, k) * (1.0 - w * 0.25) + flash * 0.3
 	_env.fog_light_color = Color("8f9a9c").lerp(Color("3a3540"), k).lerp(Color("5d6568").lerp(Color("2a2a32"), k), w)
 	_env.fog_density = lerpf(0.002, 0.004, k) + w * 0.011
-	if Game.graphics >= 1:
+	if Game.graphics >= Game.GRAPHICS_MEDIUM:
 		_env.volumetric_fog_density = lerpf(0.0022, 0.007, k) + w * 0.006
 		_env.volumetric_fog_albedo = Color("c9d2d0").lerp(Color("d9a58a"), k)
 	else:
