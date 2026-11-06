@@ -177,13 +177,17 @@ func _graphics() -> void:
 	var vp := get_viewport()
 	Game.graphics = Game.GRAPHICS_HIGH
 	Game.graphics_changed.emit()
+	_check("High shadows every lamp", main.kestrel._aux_lights.all(func(l): return l.shadow_enabled and l.omni_shadow_mode == OmniLight3D.SHADOW_CUBE))
 	_check("High adds indirect light, haze, soft shadows and 4x MSAA", env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.light_angular_distance > 0.0 and vp.msaa_3d == Viewport.MSAA_4X)
 	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()
+	var lit: Array = main.kestrel._aux_lights.filter(func(l): return l.shadow_enabled)
+	_check("Medium shadows only the workshop lamps, two passes each", lit.size() == Kestrel.SHADOW_LAMPS and lit.all(func(l): return l.omni_shadow_mode == OmniLight3D.SHADOW_DUAL_PARABOLOID), "%d shadowed" % lit.size())
 	_check("Medium keeps SSAO and the haze, drops indirect light", not env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.directional_shadow_max_distance == 120.0 and vp.msaa_3d == Viewport.MSAA_2X)
 	Game.graphics = Game.GRAPHICS_LOW
 	Game.graphics_changed.emit()
 	_check("Low drops SSAO, haze and cascades, renders at 85%", not env.ssil_enabled and not env.ssao_enabled and env.volumetric_fog_density == 0.0 and env.volumetric_fog_enabled and main._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS and vp.scaling_3d_scale < 1.0)
+	_check("Low drops the lamps' shadows", main.kestrel._aux_lights.all(func(l): return not l.shadow_enabled))
 	_check("the presets are named Low, Medium, High", Game.GRAPHICS_NAMES == ["Low", "Medium", "High"])
 	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()

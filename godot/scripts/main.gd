@@ -1064,6 +1064,8 @@ func _apply_graphics() -> void:
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if low else Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if low else Viewport.SCALING_3D_MODE_BILINEAR
 	vp.scaling_3d_scale = 0.85 if low else 1.0
+	if kestrel:
+		kestrel.apply_graphics(g)
 	if site:
 		set_daylight(daylight)
 

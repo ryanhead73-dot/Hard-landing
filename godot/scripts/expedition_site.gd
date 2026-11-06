@@ -448,7 +448,9 @@ func _prop(model: String, size: Vector3, pos: Vector3, rot := Vector3.ZERO, coll
 	holder.position = pos
 	holder.rotation = rot
 	add_child(holder)
-	var visual := Rig.spawn(model, holder)
+	# Small props batch into a mesh each (fewer draws). Big multi-part wrecks stay split, so the
+	# parts off screen or outside a shadow cascade are still culled.
+	var visual := Rig.spawn(model, holder) if model.begins_with("site_") or model == "prop_hull_plate" else Rig.spawn_static(model, holder)
 	var box := _model_aabb(visual)
 	if box.size.x > 0.0 and box.size.y > 0.0 and box.size.z > 0.0:
 		var k := size / box.size
@@ -512,7 +514,7 @@ func _build_debris() -> void:
 		piece.rotation = Vector3(rng.randf_range(-0.15, 0.15), rng.randf() * TAU, rng.randf_range(-0.2, 0.2))
 		piece.scale = Vector3.ONE * rng.randf_range(0.7, 1.2)
 		add_child(piece)
-		Rig.spawn(model, piece)
+		Rig.spawn_static(model, piece)
 		placed += 1
 
 

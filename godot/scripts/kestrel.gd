@@ -64,6 +64,8 @@ const AUX_LIGHTS := [
 	Vector3(9.7, 2.4, 10.6), Vector3(9.7, 2.4, 15.4), Vector3(9.6, 3.4, 13.0), Vector3(6.0, 3.4, 13.0),
 	Vector3(25.5, 2.8, 13.0), Vector3(28.5, 2.8, 13.0), Vector3(26.2, 1.2, 9.7), Vector3(26.2, 1.2, 16.3),
 ]
+## Lamps that keep their shadows on Medium: the first four AUX_LIGHTS, over the workshop.
+const SHADOW_LAMPS := 4
 ## The aux power-up: the emergency lights drop out, then the lamps strike one by one outward from
 ## the aux bay between LAMPS_FROM and LAMPS_TO seconds, and the cabin warms. Matches aux_restart.
 const POWER_UP_TIME := 2.9
@@ -140,6 +142,7 @@ func rebuild() -> void:
 	_build_fixtures()
 	_build_exterior()
 	_build_lighting()
+	_batch_static()
 	_build_repairs()
 	_apply_aux(is_repaired("aux_power"))
 	_apply_pose(is_repaired("landing_gear"), false)
@@ -681,6 +684,70 @@ func _box(parent: Node, x: Array, y: Array, z: Array, mat_id: String, collide :=
 	body.add_child(shape)
 	parent.add_child(body)
 	return body
+
+
+## Omni shadows are the interior's biggest cost (each is several extra passes). High: every
+## lamp, full cube maps. Medium: the four workshop lamps and the emergency lights, dual-paraboloid
+## (two passes each). Low: none.
+func apply_graphics(level: int) -> void:
+	var high := level == Game.GRAPHICS_HIGH
+	var low := level == Game.GRAPHICS_LOW
+	for i in _aux_lights.size():
+		_aux_lights[i].shadow_enabled = high or (not low and i < SHADOW_LAMPS)
+		_aux_lights[i].omni_shadow_mode = OmniLight3D.SHADOW_CUBE if high else OmniLight3D.SHADOW_DUAL_PARABOLOID
+	for light in _emergency_lights:
+		light.shadow_enabled = not low
+		light.omni_shadow_mode = OmniLight3D.SHADOW_CUBE if high else OmniLight3D.SHADOW_DUAL_PARABOLOID
+
+
+## Folds the hull's fixed parts (shell, decks, stairs, fixtures, trim) into one mesh with a
+## surface per material: several hundred boxes become a dozen or so draw calls. Lamps and screens
+## (their materials change with aux power) and everything under a moving or swapping node
+## (repairs, the ramp) stay separate. Colliders are untouched.
+func _batch_static() -> void:
+	var keep := {}
+	for m in _lamps:
+		keep[m] = true
+	for m in _screens:
+		keep[m] = true
+	var tools := {}
+	var order: Array = []
+	var originals: Array[MeshInstance3D] = []
+	for child in get_children():
+		var parts: Array = []
+		var base := Transform3D.IDENTITY
+		if child is MeshInstance3D:
+			parts = [child]
+		elif child is StaticBody3D:
+			base = (child as Node3D).transform
+			parts = child.get_children().filter(func(c): return c is MeshInstance3D)
+		for m in parts:
+			var mi := m as MeshInstance3D
+			if keep.has(mi) or mi.get_child_count() > 0 or not mi.visible or mi.mesh == null:
+				continue
+			var xf: Transform3D = base * mi.transform if mi.get_parent() != self else mi.transform
+			for i in mi.mesh.get_surface_count():
+				var mat := mi.get_active_material(i)
+				var key := "%d/%d" % [mat.get_instance_id() if mat else 0, mi.cast_shadow]
+				if not tools.has(key):
+					var st := SurfaceTool.new()
+					tools[key] = [st, mat]
+					order.append(key)
+				(tools[key][0] as SurfaceTool).append_from(mi.mesh, i, xf)
+			originals.append(mi)
+	if originals.size() < 2:
+		return
+	var mesh := ArrayMesh.new()
+	for key in order:
+		(tools[key][0] as SurfaceTool).commit(mesh)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, tools[key][1])
+	var out := MeshInstance3D.new()
+	out.name = "HullBatched"
+	out.mesh = mesh
+	add_child(out)
+	for m in originals:
+		m.get_parent().remove_child(m)
+		m.free()
 
 
 ## Cylinder centred on a plan point, lying along "x", "y" or "z".

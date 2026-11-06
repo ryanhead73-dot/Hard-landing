@@ -65,7 +65,7 @@ func _build_pool() -> void:
 ## shell round (0, 2, -6) with the cargo door open at +z, a breach in the starboard side and the
 ## nose torn off. Collision is plain boxes matching its walls.
 func _build_hull() -> void:
-	Rig.spawn("site_hauler", self)
+	Rig.spawn_static("site_hauler", self)
 	AudioZones.reverb_area(self, Vector3(5.4, 3.9, 19.4), Vector3(0.0, 1.95, -6.0), 0.5)
 	# Port wall, and the starboard wall around the breach (z -12..-9, up to y 2.6).
 	_collider(Vector3(0.3, 4.5, 20.0), Vector3(-2.85, 2.0, -6.0))
