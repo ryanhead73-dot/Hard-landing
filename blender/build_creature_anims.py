@@ -183,7 +183,144 @@ def scuttler_clips(rig):
                       {"Body": (0, -0.15, 0)})])
 
 
-CREATURES = {"scuttler": ("Scuttler", bm.scuttler, scuttler_clips)}
+# --- Walkers: legs that hang and swing (spitter, ram) ----------------------------------------
+
+def _hang_legs(legs, phase, swing, knee):
+    """Hanging legs swing from the hip like a walker's, the knee folding as the foot comes through."""
+    p = {}
+    for name, off, _ in legs:
+        psi = phase + off
+        up = max(0.0, math.cos(psi))
+        p[name] = (math.sin(psi) * swing, 0, 0)
+        p[name.replace("Leg", "Foot")] = (-up * knee, 0, 0)
+    return p
+
+
+def _fold_legs(legs):
+    """Legs folded under a fallen body."""
+    p = {}
+    for name, _, s in legs:
+        p[name] = (55, 0, s * 20)
+        p[name.replace("Leg", "Foot")] = (-95, 0, 0)
+    return p
+
+
+def _cycle(n, frames, fn):
+    """n + 1 keys over `frames` frames, fn(phase) -> (pose, offsets)."""
+    return [(1 + i * frames / n,) + fn(i / n * math.tau) for i in range(n + 1)]
+
+
+SPITTER_LEGS = [("LegL1", 0.0, -1), ("LegL2", math.pi, -1), ("LegR1", math.pi, 1), ("LegR2", 0.0, 1)]
+
+
+def spitter_clips(rig):
+    rig.clip("idle", _cycle(8, 60, lambda t: (
+        {"Body": (math.sin(t) * 2.0, 0, 0), "Neck": (math.sin(t) * 3.0, math.sin(t) * 6.0, 0),
+         "Head": (-math.sin(t) * 2.0, math.sin(t * 2) * 10.0, 0)}, {"Body": (0, math.sin(t) * 0.012, 0)})))
+    rig.clip("walk", _cycle(8, 24, lambda ph: (
+        _merge(_hang_legs(SPITTER_LEGS, ph, 26.0, 38.0), {"Body": (0, 0, math.sin(ph) * 3.0),
+                                                          "Neck": (math.sin(ph * 2) * 4.0, 0, 0)}),
+        {"Body": (0, abs(math.sin(ph)) * 0.04, 0)})))
+    # Wind-up: the neck draws back, head kept level to aim, front legs braced.
+    brace = {"Body": (6, 0, 0), "Head": (-10, 0, 0), "LegL1": (-10, 0, 0), "LegR1": (-10, 0, 0),
+             "FootL1": (-12, 0, 0), "FootR1": (-12, 0, 0)}
+    rig.clip("windup", [(1 + f * 4.5, _merge(brace, {"Neck": (32 + (3 if f % 2 else -1), 0, 0)}), {}) for f in range(5)])
+    # Attack: the neck whips forward and spits.
+    rig.clip("attack", [(1, _merge(brace, {"Neck": (34, 0, 0)}), {}),
+                        (4, {"Neck": (-40, 0, 0), "Head": (8, 0, 0), "Body": (-6, 0, 0)}, {"Body": (0, 0, -0.08)}),
+                        (11, {"Neck": (-20, 0, 0), "Head": (4, 0, 0), "Body": (-3, 0, 0)}, {})])
+    rig.clip("hurt", [(1, {}, {}), (3, {"Body": (0, 0, 8), "Head": (10, 6, 0)}, {}), (6, {"Body": (0, 0, -5)}, {}), (10, {}, {})])
+    rig.clip("die", [(1, {}, {}), (6, _merge(_hang_legs(SPITTER_LEGS, 1.0, 30.0, 30.0), {"Neck": (20, 0, 0)}), {}),
+                     (14, _merge(_fold_legs(SPITTER_LEGS), {"Body": (0, 0, 6), "Neck": (-20, 0, 0), "Head": (-25, 0, 0)}),
+                      {"Body": (0, -0.35, 0)}),
+                     (19, _merge(_fold_legs(SPITTER_LEGS), {"Body": (0, 0, 7), "Neck": (-24, 0, 0), "Head": (-25, 0, 0)}),
+                      {"Body": (0, -0.38, 0)})])
+
+
+RAM_LEGS = [("LegFL", 0.0, -1), ("LegFR", math.pi, 1), ("LegBL", math.pi, -1), ("LegBR", 0.0, 1)]
+
+
+def ram_clips(rig):
+    rig.clip("idle", _cycle(8, 90, lambda t: (
+        {"Body": (math.sin(t) * 1.0, 0, 0), "Head": (math.sin(t * 2) * 3.0, math.sin(t) * 8.0, 0),
+         "Tail": (0, math.sin(t * 3) * 20.0, 0)}, {"Body": (0, math.sin(t) * 0.01, 0)})))
+    rig.clip("walk", _cycle(8, 24, lambda ph: (
+        _merge(_hang_legs(RAM_LEGS, ph, 28.0, 45.0), {"Head": (math.sin(ph * 2) * 4.0, 0, 0),
+                                                      "Tail": (0, math.sin(ph) * 16.0, 0), "Body": (0, 0, math.sin(ph) * 2.0)}),
+        {"Body": (0, abs(math.sin(ph)) * 0.06, 0)})))
+    # Paw: head down, the front hoof scraping the ground twice, tail lashing.
+    rig.clip("paw", _cycle(8, 18, lambda t: (
+        {"Head": (-10, 0, 0), "Body": (-3, 0, 0), "LegFL": (math.sin(t * 2) * 25.0, 0, 0),
+         "FootFL": (-20 - max(0.0, math.cos(t * 2)) * 30.0, 0, 0), "Tail": (10, math.sin(t * 2) * 30.0, 0)}, {})))
+    # Charge: a bounding gallop, front legs together then back, head driven low.
+    gallop = [("LegFL", 0.0, -1), ("LegFR", 0.3, 1), ("LegBL", math.pi, -1), ("LegBR", math.pi + 0.3, 1)]
+    rig.clip("charge", _cycle(8, 15, lambda ph: (
+        _merge(_hang_legs(gallop, ph, 36.0, 50.0), {"Head": (-22, 0, 0), "Body": (-5 + math.sin(ph) * 3.0, 0, 0), "Tail": (20, 0, 0)}),
+        {"Body": (0, abs(math.sin(ph)) * 0.08, 0)})))
+    # Stunned: head hanging and swaying, legs splayed to stay up.
+    splay = {"LegFL": (0, 0, -8), "LegFR": (0, 0, 8), "LegBL": (0, 0, -8), "LegBR": (0, 0, 8)}
+    rig.clip("stunned", _cycle(6, 18, lambda t: (
+        _merge(splay, {"Head": (-26, 0, math.sin(t) * 12.0), "Body": (0, 0, math.sin(t) * 4.0), "Tail": (-10, 0, 0)}),
+        {"Body": (0, -0.05, 0)})))
+    rig.clip("attack", [(1, {"Head": (-22, 0, 0)}, {}), (4, {"Head": (18, 0, 0), "Body": (4, 0, 0)}, {"Body": (0, 0.05, -0.15)}),
+                        (11, {"Head": (4, 0, 0)}, {})])
+    rig.clip("hurt", [(1, {}, {}), (3, {"Body": (0, 0, 6), "Head": (10, 8, 0)}, {}), (6, {"Body": (0, 0, -4)}, {}), (10, {}, {})])
+    rig.clip("die", [(1, {}, {}), (6, _merge(_hang_legs(RAM_LEGS, 1.0, 30.0, 30.0), {"Head": (10, 0, 0)}), {}),
+                     (15, _merge(_fold_legs(RAM_LEGS), {"Body": (0, 0, 16), "Head": (-25, 0, 10), "Tail": (-20, 0, 0)}),
+                      {"Body": (0, -0.42, 0)}),
+                     (20, _merge(_fold_legs(RAM_LEGS), {"Body": (0, 0, 18), "Head": (-25, 0, 12), "Tail": (-20, 0, 0)}),
+                      {"Body": (0, -0.45, 0)})])
+
+
+# --- Warden: six splayed legs, two great arms, a carapace that opens -----------------------
+
+def warden_clips(rig):
+    def legs(ph, swing=16.0, lift=14.0):
+        return _scuttler_legs(ph, swing, lift)
+    rig.clip("idle", _cycle(8, 90, lambda t: (
+        {"Body": (math.sin(t) * 1.5, 0, 0), "Head": (0, math.sin(t) * 10.0, 0),
+         "ArmL": (math.sin(t) * 4.0, 0, 0), "ArmR": (-math.sin(t) * 4.0, 0, 0),
+         "PlateL": (0, 0, -2 - math.sin(t) * 2.0), "PlateR": (0, 0, 2 + math.sin(t) * 2.0)},
+        {"Body": (0, math.sin(t) * 0.02, 0)})))
+    rig.clip("walk", _cycle(8, 24, lambda ph: (
+        _merge(legs(ph), {"Body": (0, 0, math.sin(ph) * 3.0), "ArmL": (math.sin(ph) * 10.0, 0, 0),
+                          "ArmR": (-math.sin(ph) * 10.0, 0, 0), "Head": (0, -math.sin(ph) * 4.0, 0)}),
+        {"Body": (0, abs(math.sin(ph)) * 0.07, 0)})))
+    raised = {"ArmL": (105, 0, 0), "ArmR": (105, 0, 0), "FistL": (-30, 0, 0), "FistR": (-30, 0, 0),
+              "Body": (6, 0, 0), "Head": (6, 0, 0)}
+    rig.clip("slam_windup", [(1 + f * 4.5, _merge(raised, {"ArmL": (2 if f % 2 else -2, 0, 0)}), {"Body": (0, 0.08, 0)}) for f in range(5)])
+    rig.clip("slam", [(1, raised, {"Body": (0, 0.08, 0)}),
+                      (5, {"ArmL": (-15, 0, 0), "ArmR": (-15, 0, 0), "FistL": (10, 0, 0), "FistR": (10, 0, 0),
+                           "Body": (-10, 0, 0), "Head": (-8, 0, 0)}, {"Body": (0, -0.12, -0.1)}),
+                      (10, {"ArmL": (-12, 0, 0), "ArmR": (-12, 0, 0), "Body": (-8, 0, 0)}, {"Body": (0, -0.1, -0.08)}),
+                      (14, {"ArmL": (-6, 0, 0), "ArmR": (-6, 0, 0), "Body": (-4, 0, 0)}, {"Body": (0, -0.05, 0)})])
+    crouch = {"Body": (-8, 0, 0), "Head": (-10, 0, 0), "ArmL": (-20, 0, 0), "ArmR": (-20, 0, 0)}
+    rig.clip("charge_windup", _cycle(4, 15, lambda t: (_merge(crouch, {"Body": (math.sin(t * 2) * 1.0, 0, 0)}), {"Body": (0, -0.15, 0)})))
+    rig.clip("charge", _cycle(8, 15, lambda ph: (
+        _merge(legs(ph, 22.0, 18.0), {"Body": (-6, 0, math.sin(ph) * 3.0), "ArmL": (-25, 0, 0), "ArmR": (-25, 0, 0), "Head": (-8, 0, 0)}),
+        {"Body": (0, abs(math.sin(ph)) * 0.08, 0)})))
+    rig.clip("volley_windup", _cycle(4, 15, lambda t: (
+        {"PlateL": (0, 0, -18 - math.sin(t * 2) * 3.0), "PlateR": (0, 0, 18 + math.sin(t * 2) * 3.0), "Body": (4, 0, 0)}, {})))
+    rig.clip("open", _cycle(6, 30, lambda t: (
+        {"PlateL": (0, 0, -50 - math.sin(t) * 2.0), "PlateR": (0, 0, 50 + math.sin(t) * 2.0), "Body": (4, 0, 0),
+         "ArmL": (0, 0, -15), "ArmR": (0, 0, 15), "Head": (10, 0, math.sin(t * 3) * 3.0)}, {"Body": (0, -0.08, 0)})))
+    rig.clip("attack", [(1, {}, {}), (3, {"Body": (-4, 0, 0), "PlateL": (0, 0, -10), "PlateR": (0, 0, 10)}, {}), (10, {}, {})])
+    rig.clip("hurt", [(1, {}, {}), (3, {"Body": (0, 0, 4), "Head": (8, 6, 0)}, {}), (6, {"Body": (0, 0, -3)}, {}), (10, {}, {})])
+    curl = {}
+    for side, i, s, _ in SCUTTLER_LEGS:
+        curl["Leg%s%d" % (side, i)] = (0, 0, -s * 45)
+        curl["Foot%s%d" % (side, i)] = (0, 0, -s * 40)
+    rig.clip("die", [(1, {}, {}), (8, _merge(legs(1.0, 24.0, 24.0), {"ArmL": (40, 0, 0), "ArmR": (30, 0, 0), "Body": (6, 0, 0)}), {}),
+                     (20, _merge(curl, {"Body": (0, 0, 6), "Head": (-25, 0, 0), "ArmL": (-30, 0, -10), "ArmR": (-30, 0, 10)}),
+                      {"Body": (0, -0.7, 0)}),
+                     (26, _merge(curl, {"Body": (0, 0, 7), "Head": (-25, 0, 0), "ArmL": (-32, 0, -12), "ArmR": (-32, 0, 12)}),
+                      {"Body": (0, -0.75, 0)})])
+
+
+CREATURES = {"scuttler": ("Scuttler", bm.scuttler, scuttler_clips),
+             "spitter": ("Spitter", bm.spitter, spitter_clips),
+             "ram": ("Ram", bm.ram, ram_clips),
+             "warden": ("Warden", bm.warden, warden_clips)}
 
 
 def build(name):

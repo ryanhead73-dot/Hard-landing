@@ -164,7 +164,11 @@ func _wildlife() -> void:
 	var tri: Dictionary = {}
 	for leg in sc.anim.legs:
 		tri[leg[0]] = leg[2]
-	_check("the scuttler plays its keyframed Blender clips", sc.anim.tree != null and sc.anim.tree.active)
+	var clipped := true
+	for kind in made:
+		clipped = clipped and (made[kind] as Enemy).anim.tree != null
+	_check("the scuttler, spitter, ram and Warden play keyframed Blender clips", clipped)
+	_check("their states have clips", "paw" in (made["ram"] as Enemy).anim._state_clips and "open" in (made["warden"] as Enemy).anim._state_clips and "slam" in (made["warden"] as Enemy).anim._shots, str((made["ram"] as Enemy).anim._state_clips))
 	_check("six legs walk a tripod gait", tri["LegL1"] == tri["LegR2"] and tri["LegL1"] == tri["LegL3"] and tri["LegL1"] != tri["LegR1"])
 	var ram: Enemy = made["ram"]
 	var quad: Dictionary = {}

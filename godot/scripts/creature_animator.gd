@@ -10,10 +10,11 @@ extends Node
 ## about the vertical axis, lifting about the long axis; "hang" legs hang down (spitter, ram) and
 ## swing like a walker's. Angles are degrees on top of each joint's rest pose.
 ##
-## Creatures whose model carries keyframed clips from Blender (blender/build_creature_anims.py:
-## idle, walk, windup, attack, hurt, stagger, die) are played by an AnimationTree instead: walk
-## blended in by speed and played at the speed that keeps the feet planted, the wind-up and
-## stagger blended in by state, attack and hurt as one-shots, and the death clip at the end.
+## Creatures whose model carries keyframed clips from Blender (blender/build_creature_anims.py)
+## are played by an AnimationTree instead: idle and walk blended by speed, the walk played at the
+## speed that keeps the feet planted; a clip named after a state (windup, paw, charge, stunned,
+## slam_windup, open...) crossfaded in while the creature is in it; attack, slam and hurt as
+## one-shots; and the die clip at the end.
 
 const KINDS := {
 	"scuttler": {"legs": "splay", "stride": 1.1, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
@@ -36,7 +37,9 @@ var legs: Array = []
 var tree: AnimationTree
 ## Seconds per walk clip cycle at normal speed; one cycle covers the kind's "stride".
 const CYCLE_TIME := 0.8
-const CLIP_LOOPS := ["idle", "walk", "windup", "stagger"]
+const BASE_CLIPS := ["idle", "walk"]
+var _state_clips: Array[String] = []
+var _shots: Array[String] = []
 
 var _cfg: Dictionary
 var _move := 0.0
@@ -208,71 +211,81 @@ func _pose_body(st: String) -> void:
 # --- Clips --------------------------------------------------------------------------------
 
 func _has_shot(shot_name: String) -> bool:
-	return shot_name in ["attack", "hurt"]
+	return _shots.has(shot_name)
 
 
 func _drive_tree(st: String, hv: float) -> void:
 	tree.set("parameters/move/blend_amount", _move)
 	tree.set("parameters/walk_speed/scale", clampf(hv / (float(_cfg["stride"]) / CYCLE_TIME), 0.5, 2.5))
-	tree.set("parameters/wind/blend_amount", _windup)
-	tree.set("parameters/stagger/blend_amount", 1.0 if st == "stagger" else 0.0)
+	# A state with its own clip (windup, paw, charge, stunned, open...) crossfades in over the
+	# walk; any other state walks.
+	var pose_state := st if st in _state_clips else "base"
+	if tree.get("parameters/state/current_state") != pose_state:
+		tree.set("parameters/state/transition_request", pose_state)
 	var dead := st == "dead"
 	if dead != (tree.get("parameters/alive/current_state") == "dead"):
 		tree.set("parameters/alive/transition_request", "dead" if dead else "alive")
+	# Swelling the acid sac and pulsing the Warden's core stay procedural (scale, on top of the clips).
+	var t := shot_progress()
+	var punch := sin(clampf(t, 0.0, 1.0) * PI) if t >= 0.0 else 0.0
+	var sac := pose.node("Sac")
+	if sac:
+		sac.scale = Vector3.ONE * (1.0 + 0.3 * _windup + 0.06 * sin(_time * 3.0 + _seed) - 0.25 * punch)
+	var core := pose.node("Core")
+	if core:
+		core.scale = Vector3.ONE * (1.0 + 0.12 * _open * sin(_time * 8.0) + 0.2 * punch * (1.0 if shot == "attack" else 0.0))
 
 
 func _build_tree(clips: AnimationPlayer) -> void:
-	for clip in CLIP_LOOPS:
-		if not clips.has_animation(clip):
-			continue
-		var a := clips.get_animation(clip)
-		a.loop_mode = Animation.LOOP_LINEAR
-		var last := 0.0
-		for i in a.get_track_count():
-			if a.track_get_key_count(i) > 0:
-				last = maxf(last, a.track_get_key_time(i, a.track_get_key_count(i) - 1))
-		if last > 0.0:
-			a.length = last
 	var bt := AnimationNodeBlendTree.new()
 	var clip_node := func(clip: String) -> AnimationNodeAnimation:
 		var n := AnimationNodeAnimation.new()
 		n.animation = clip
 		return n
-	var shot_node := func(fade_in: float, fade_out: float) -> AnimationNodeOneShot:
-		var n := AnimationNodeOneShot.new()
-		n.fadein_time = fade_in
-		n.fadeout_time = fade_out
-		return n
+	for clip in clips.get_animation_list():
+		var a := clips.get_animation(clip)
+		if clip in BASE_CLIPS or clip in SHOTS or clip == "die":
+			if clip == "idle" or clip == "walk":
+				_loop(a)
+			continue
+		_state_clips.append(clip)
+		_loop(a)
 	bt.add_node("idle", clip_node.call("idle"))
 	bt.add_node("walk", clip_node.call("walk"))
 	bt.add_node("walk_speed", AnimationNodeTimeScale.new())
 	bt.add_node("move", AnimationNodeBlend2.new())
-	bt.add_node("windup", clip_node.call("windup"))
-	bt.add_node("wind", AnimationNodeBlend2.new())
-	bt.add_node("stagger_clip", clip_node.call("stagger"))
-	bt.add_node("stagger", AnimationNodeBlend2.new())
-	bt.add_node("attack_clip", clip_node.call("attack"))
-	bt.add_node("attack", shot_node.call(0.04, 0.12))
-	bt.add_node("hurt_clip", clip_node.call("hurt"))
-	bt.add_node("hurt", shot_node.call(0.03, 0.1))
+	bt.connect_node("walk_speed", 0, "walk")
+	bt.connect_node("move", 0, "idle")
+	bt.connect_node("move", 1, "walk_speed")
+	var state := AnimationNodeTransition.new()
+	state.xfade_time = 0.2
+	state.add_input("base")
+	bt.add_node("state", state)
+	bt.connect_node("state", 0, "move")
+	for i in _state_clips.size():
+		state.add_input(_state_clips[i])
+		bt.add_node("st_" + _state_clips[i], clip_node.call(_state_clips[i]))
+		bt.connect_node("state", i + 1, "st_" + _state_clips[i])
+	var last := "state"
+	for shot_name in SHOTS:
+		if not clips.has_animation(shot_name):
+			continue
+		_shots.append(shot_name)
+		var n := AnimationNodeOneShot.new()
+		n.fadein_time = 0.04
+		n.fadeout_time = 0.12
+		bt.add_node(shot_name + "_clip", clip_node.call(shot_name))
+		bt.add_node(shot_name, n)
+		bt.connect_node(shot_name, 0, last)
+		bt.connect_node(shot_name, 1, shot_name + "_clip")
+		last = shot_name
 	bt.add_node("die", clip_node.call("die"))
 	var alive := AnimationNodeTransition.new()
 	alive.xfade_time = 0.08
 	alive.add_input("alive")
 	alive.add_input("dead")
 	bt.add_node("alive", alive)
-	bt.connect_node("walk_speed", 0, "walk")
-	bt.connect_node("move", 0, "idle")
-	bt.connect_node("move", 1, "walk_speed")
-	bt.connect_node("wind", 0, "move")
-	bt.connect_node("wind", 1, "windup")
-	bt.connect_node("stagger", 0, "wind")
-	bt.connect_node("stagger", 1, "stagger_clip")
-	bt.connect_node("attack", 0, "stagger")
-	bt.connect_node("attack", 1, "attack_clip")
-	bt.connect_node("hurt", 0, "attack")
-	bt.connect_node("hurt", 1, "hurt_clip")
-	bt.connect_node("alive", 0, "hurt")
+	bt.connect_node("alive", 0, last)
 	bt.connect_node("alive", 1, "die")
 	bt.connect_node("output", 0, "alive")
 	tree = AnimationTree.new()
@@ -282,7 +295,19 @@ func _build_tree(clips: AnimationPlayer) -> void:
 	tree.anim_player = tree.get_path_to(clips)
 	tree.root_node = tree.get_path_to(clips.get_node(clips.root_node))
 	tree.set("parameters/alive/transition_request", "alive")
+	tree.set("parameters/state/transition_request", "base")
 	tree.active = true
+
+
+## Loops a clip, cutting the extra frame the exporter adds after the last key.
+func _loop(a: Animation) -> void:
+	a.loop_mode = Animation.LOOP_LINEAR
+	var last := 0.0
+	for i in a.get_track_count():
+		if a.track_get_key_count(i) > 0:
+			last = maxf(last, a.track_get_key_time(i, a.track_get_key_count(i) - 1))
+	if last > 0.0:
+		a.length = last
 
 
 ## The skimmer's wings: a hard beat climbing or hanging, a lazy glide circling, swept back in the
