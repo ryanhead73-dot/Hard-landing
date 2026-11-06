@@ -12,6 +12,7 @@ var _volume: HSlider
 var _music: HSlider
 var _difficulty: OptionButton
 var _controls: Label
+var _grid: GridContainer
 
 
 func _ready() -> void:
@@ -25,33 +26,40 @@ func _ready() -> void:
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(centre)
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(420, 0)
+	_panel.custom_minimum_size = Vector2(640, 0)
 	centre.add_child(_panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 14)
 	_panel.add_child(box)
 
 	var title := Label.new()
 	title.text = "PAUSED"
-	title.add_theme_font_size_override("font_size", 28)
+	UiStyle.apply(title, "banner")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	_sensitivity = _slider(box, "Mouse sensitivity", 0.0005, 0.006, 0.0001, Game.mouse_sensitivity)
+	# Settings as a two-column grid: name on the left, control on the right.
+	_grid = GridContainer.new()
+	_grid.columns = 2
+	_grid.add_theme_constant_override("h_separation", 28)
+	_grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(_grid)
+	_section("CONTROLS")
+	_sensitivity = _slider(_grid, "Mouse sensitivity", 0.0005, 0.006, 0.0001, Game.mouse_sensitivity)
 	_invert = CheckBox.new()
 	_invert.text = "Invert look Y"
 	_invert.button_pressed = Game.invert_y
-	box.add_child(_invert)
-	_volume = _slider(box, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
-	_music = _slider(box, "Music", 0.0, 1.0, 0.05, Game.music_volume)
-	var effects := _slider(box, "Effects", 0.0, 1.0, 0.05, Game.sfx_volume)
+	_row_label("")
+	_grid.add_child(_invert)
+	_section("AUDIO")
+	_volume = _slider(_grid, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
+	_music = _slider(_grid, "Music", 0.0, 1.0, 0.05, Game.music_volume)
+	var effects := _slider(_grid, "Effects", 0.0, 1.0, 0.05, Game.sfx_volume)
 	effects.name = "EffectsVolume"
 	effects.value_changed.connect(func(v: float):
 		Game.sfx_volume = v
 		Game.apply_settings())
-	var diff_label := Label.new()
-	diff_label.text = "Difficulty"
-	box.add_child(diff_label)
+	_section("GAME")
 	_difficulty = OptionButton.new()
 	for d in Game.DIFFICULTY_NAMES:
 		_difficulty.add_item(d)
@@ -59,12 +67,10 @@ func _ready() -> void:
 	_difficulty.item_selected.connect(func(i: int):
 		Game.difficulty = i
 		Game.apply_settings())
-	box.add_child(_difficulty)
-	var shake := _slider(box, "Screen shake", 0.0, 1.0, 0.05, Game.screen_shake)
+	_row_label("Difficulty")
+	_grid.add_child(_difficulty)
+	var shake := _slider(_grid, "Screen shake", 0.0, 1.0, 0.05, Game.screen_shake)
 	shake.value_changed.connect(func(v: float): Game.screen_shake = v)
-	var gfx_label := Label.new()
-	gfx_label.text = "Graphics"
-	box.add_child(gfx_label)
 	var gfx := OptionButton.new()
 	for preset in Game.GRAPHICS_NAMES:
 		gfx.add_item(preset)
@@ -73,25 +79,33 @@ func _ready() -> void:
 	gfx.item_selected.connect(func(i: int):
 		Game.graphics = i
 		Game.graphics_changed.emit())
-	box.add_child(gfx)
+	_row_label("Graphics")
+	_grid.add_child(gfx)
 
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 12)
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(buttons)
 	var resume := Button.new()
 	resume.text = "Resume"
 	resume.pressed.connect(close)
-	box.add_child(resume)
+	buttons.add_child(resume)
 	var title_button := Button.new()
 	title_button.text = "Save and quit to title"
 	title_button.pressed.connect(func():
 		close()
 		quit_to_title.emit())
-	box.add_child(title_button)
+	buttons.add_child(title_button)
 	var quit := Button.new()
 	quit.text = "Quit to desktop"
 	quit.pressed.connect(func(): get_tree().quit())
-	box.add_child(quit)
+	buttons.add_child(quit)
+	for b in [resume, title_button, quit]:
+		b.custom_minimum_size = Vector2(0, 44)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_controls = Label.new()
 	_controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_controls.add_theme_font_size_override("font_size", 13)
+	UiStyle.apply(_controls, "small", UiStyle.DIM)
 	_controls.modulate = Color(1, 1, 1, 0.7)
 	box.add_child(_controls)
 
@@ -102,6 +116,22 @@ func _ready() -> void:
 		Game.music_volume = v
 		Game.apply_settings())
 	visible = false
+
+
+## A section head spanning both columns.
+func _section(text: String) -> void:
+	var head := Label.new()
+	head.text = text
+	UiStyle.apply(head, "label", UiStyle.AMBER)
+	_grid.add_child(head)
+	_grid.add_child(Control.new())
+
+
+func _row_label(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(190, 0)
+	_grid.add_child(label)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -148,12 +178,14 @@ func _on_volume(value: float) -> void:
 func _slider(parent: Node, label_text: String, lo: float, hi: float, step: float, value: float) -> HSlider:
 	var label := Label.new()
 	label.text = label_text
+	label.custom_minimum_size = Vector2(190, 0)
 	parent.add_child(label)
 	var slider := HSlider.new()
 	slider.min_value = lo
 	slider.max_value = hi
 	slider.step = step
 	slider.value = value
-	slider.custom_minimum_size = Vector2(380, 24)
+	slider.custom_minimum_size = Vector2(380, 28)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	parent.add_child(slider)
 	return slider

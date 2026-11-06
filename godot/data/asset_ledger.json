@@ -21,6 +21,12 @@
    "licence": "MIT (Godot Engine); default font Open Sans / Noto under OFL 1.1 via the engine",
    "author": "Godot Engine contributors",
    "url": "https://godotengine.org/license"
+  },
+  "barlow": {
+   "origin": "Barlow and Barlow Condensed by Jeremy Tribby, via https://github.com/google/fonts/tree/main/ofl/barlow (downloaded 2026-11-06)",
+   "licence": "SIL Open Font License 1.1 (fonts/OFL.txt ships beside the fonts)",
+   "author": "The Barlow Project Authors",
+   "url": "https://github.com/jpt/barlow"
   }
  },
  "tiers": {
@@ -388,6 +394,10 @@
   {
    "path": "assets/kestrel_blockout.glb",
    "source": "blender_scripts"
+  },
+  {
+   "path": "fonts/*.ttf",
+   "source": "barlow"
   }
  ]
 }

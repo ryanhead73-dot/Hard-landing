@@ -1,0 +1,42 @@
+[gd_resource type="Theme" format=3]
+
+[ext_resource type="FontFile" path="res://fonts/BarlowCondensed-SemiBold.ttf" id="1_6lx7k"]
+[ext_resource type="FontFile" path="res://fonts/Barlow-SemiBold.ttf" id="2_iqtc0"]
+[ext_resource type="FontFile" path="res://fonts/Barlow-Medium.ttf" id="3_7any1"]
+
+[sub_resource type="FontVariation" id="FontVariation_6lx7k"]
+base_font = ExtResource("1_6lx7k")
+spacing_glyph = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_iqtc0"]
+content_margin_left = 28.0
+content_margin_top = 28.0
+content_margin_right = 28.0
+content_margin_bottom = 28.0
+bg_color = Color(0.05, 0.06, 0.07, 0.94)
+border_width_top = 3
+border_color = Color(1, 0.69803923, 0.3019608, 0.8)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[resource]
+default_font = ExtResource("3_7any1")
+default_font_size = 20
+Button/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+Button/colors/font_focus_color = Color(1, 0.8156863, 0.5411765, 1)
+Button/colors/font_hover_color = Color(1, 0.8156863, 0.5411765, 1)
+Button/colors/font_pressed_color = Color(1, 0.69803923, 0.3019608, 1)
+Button/font_sizes/font_size = 22
+Button/fonts/font = SubResource("FontVariation_6lx7k")
+CheckBox/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+Label/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+LineEdit/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+OptionButton/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+OptionButton/fonts/font = ExtResource("2_iqtc0")
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_iqtc0")
+PopupMenu/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)
+RichTextLabel/colors/default_color = Color(0.9137255, 0.88235295, 0.8, 1)
+RichTextLabel/fonts/bold_font = ExtResource("2_iqtc0")
+TooltipLabel/colors/font_color = Color(0.9137255, 0.88235295, 0.8, 1)

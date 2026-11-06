@@ -68,18 +68,15 @@ var _waypoint_target = null
 
 func _ready() -> void:
 	# Controls reminder, bottom centre and quiet; it fades after the first couple of minutes.
-	_help = _label(13, Vector2.ZERO)
+	_help = _label("small")
 	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_help.text = HELP_TEXT
 	# The full list lives in the pause menu; play teaches through one-at-a-time hints instead.
 	_help.visible = false
 	_help_time = 0.0
-	_hint = _label(17, Vector2.ZERO)
+	_hint = _label("label", UiStyle.AMBER)
 	_anchor(_hint, 0.0, 1.0, 16, -170, 900, -140)
-	_hint.add_theme_color_override("font_color", Color("ffd08a"))
-	_hint.add_theme_constant_override("outline_size", 5)
-	_hint.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
 	_hint.visible = false
 	Game.input_device_changed.connect(_on_device_changed)
 	_help.modulate = Color(1, 1, 1, 0.6)
@@ -91,13 +88,12 @@ func _ready() -> void:
 	_compass.draw.connect(_draw_compass)
 	add_child(_compass)
 
-	_objective = _label(19, Vector2.ZERO)
-	_anchor(_objective, 0.5, 0.0, -400, 34, 400, 64)
+	_objective = _label("heading", UiStyle.AMBER)
+	_anchor(_objective, 0.5, 0.0, -560, 32, 560, 64)
 	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_objective.add_theme_color_override("font_color", Color("ffd08a"))
 
-	_repairs = _label(14, Vector2.ZERO)
-	_anchor(_repairs, 0.5, 0.0, -400, 60, 400, 80)
+	_repairs = _label("small")
+	_anchor(_repairs, 0.5, 0.0, -400, 64, 400, 84)
 	_repairs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_repairs.modulate = Color(1, 1, 1, 0.7)
 	Game.repairs_changed.connect(_update_repairs)
@@ -109,8 +105,7 @@ func _ready() -> void:
 	_scan.draw.connect(_draw_scan)
 	add_child(_scan)
 
-	_waypoint = _label(15, Vector2.ZERO)
-	_waypoint.add_theme_color_override("font_color", Color("ffb24d"))
+	_waypoint = _label("small", UiStyle.ORANGE)
 
 	_crosshair = Control.new()
 	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -127,22 +122,22 @@ func _ready() -> void:
 	_health_fill.position = Vector2(2, 2)
 	_health_fill.size = Vector2(256, 12)
 	_health_back.add_child(_health_fill)
-	_health_text = _label(14, Vector2.ZERO)
+	_health_text = _label("small")
 	_anchor(_health_text, 0.0, 1.0, 16, -72, 300, -50)
 
-	_scrap = _label(18, Vector2.ZERO)
+	_scrap = _label("label")
 	_anchor(_scrap, 1.0, 1.0, -300, -96, -20, -70)
 	_scrap.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_ammo = _label(26, Vector2.ZERO)
-	_anchor(_ammo, 1.0, 1.0, -300, -64, -20, -24)
+	_ammo = _label("readout")
+	_anchor(_ammo, 1.0, 1.0, -300, -70, -20, -22)
 	_ammo.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_weapon = _label(15, Vector2.ZERO)
+	_weapon = _label("small")
 	_anchor(_weapon, 1.0, 1.0, -400, -124, -20, -100)
 	_weapon.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_weapon.modulate = Color(1, 1, 1, 0.8)
-	_stims = _label(15, Vector2.ZERO)
+	_stims = _label("small")
 	_anchor(_stims, 0.0, 1.0, 16, -98, 300, -76)
-	_charges = _label(15, Vector2.ZERO)
+	_charges = _label("small")
 	_anchor(_charges, 0.0, 1.0, 16, -122, 300, -100)
 
 	# Shared top bar: the Warden's health, or Kestrel's hull during a siege.
@@ -155,7 +150,7 @@ func _ready() -> void:
 	_bar_fill.position = Vector2(2, 2)
 	_bar_fill.size = Vector2(596, 10)
 	_bar_back.add_child(_bar_fill)
-	_bar_label = _label(15, Vector2.ZERO)
+	_bar_label = _label("label")
 	_anchor(_bar_label, 0.5, 0.0, -300, 126, 300, 148)
 	_bar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_bar_label.visible = false
@@ -171,24 +166,22 @@ func _ready() -> void:
 	_task_fill.position = Vector2(1, 1)
 	_task_fill.size = Vector2(0, 6)
 	_task_back.add_child(_task_fill)
-	_task_label = _label(14, Vector2.ZERO)
+	_task_label = _label("label", UiStyle.AMBER)
 	_anchor(_task_label, 0.5, 1.0, -300, -208, 300, -188)
 	_task_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_task_label.add_theme_color_override("font_color", Color("ffd08a"))
 	_task_label.visible = false
 
 	# Stage banner: a short title card when a mission stage completes.
-	_banner = _label(30, Vector2.ZERO)
-	_anchor(_banner, 0.5, 0.0, -500, 190, 500, 232)
+	_banner = _label("banner", UiStyle.AMBER)
+	_anchor(_banner, 0.5, 0.0, -600, 180, 600, 230)
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner.add_theme_color_override("font_color", Color("ffd08a"))
 	_banner.visible = false
-	_banner_sub = _label(17, Vector2.ZERO)
-	_anchor(_banner_sub, 0.5, 0.0, -500, 232, 500, 256)
+	_banner_sub = _label("body")
+	_anchor(_banner_sub, 0.5, 0.0, -600, 230, 600, 258)
 	_banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner_sub.visible = false
 
-	_prompt = _label(21, Vector2.ZERO)
+	_prompt = _label("prompt")
 	_anchor(_prompt, 0.5, 1.0, -400, -150, 400, -118)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -198,8 +191,10 @@ func _ready() -> void:
 	_voice.fit_content = true
 	_voice.scroll_active = false
 	_voice.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_voice.add_theme_font_size_override("normal_font_size", 19)
-	_voice.add_theme_font_size_override("bold_font_size", 19)
+	_voice.add_theme_font_override("normal_font", UiStyle.font("body"))
+	_voice.add_theme_font_override("bold_font", UiStyle.font("heading"))
+	_voice.add_theme_font_size_override("normal_font_size", UiStyle.size("body") + 1)
+	_voice.add_theme_font_size_override("bold_font_size", UiStyle.size("body") + 3)
 	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	_voice.add_theme_constant_override("shadow_offset_x", 1)
 	_voice.add_theme_constant_override("shadow_offset_y", 1)
@@ -211,12 +206,11 @@ func _ready() -> void:
 	_voice.visible = false
 	add_child(_voice)
 
-	_log_toast = _label(16, Vector2.ZERO)
+	_log_toast = _label("label", UiStyle.TEAL)
 	_anchor(_log_toast, 0.0, 0.5, 16, 40, 520, 90)
-	_log_toast.add_theme_color_override("font_color", Color("9fe8d8"))
 	_log_toast.visible = false
 
-	_message = _label(18, Vector2.ZERO)
+	_message = _label("body")
 	_anchor(_message, 0.5, 0.0, -560, 88, 560, 140)
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -227,13 +221,13 @@ func _ready() -> void:
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_vignette)
 
-	_death = _label(30, Vector2.ZERO)
+	_death = _label("banner")
 	_anchor(_death, 0.5, 0.5, -400, -30, 400, 30)
 	_death.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_death.text = "You went down. Hauling back to Kestrel..."
 	_death.visible = false
 
-	_dev = _label(14, Vector2.ZERO)
+	_dev = _label("small")
 	_anchor(_dev, 1.0, 0.0, -360, 34, -16, 300)
 	_dev.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_dev.visible = false
@@ -244,7 +238,7 @@ func _ready() -> void:
 	_ending.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ending.visible = false
 	add_child(_ending)
-	_ending_text = _label(22, Vector2.ZERO)
+	_ending_text = _label("lead")
 	_ending_text.reparent(_ending)
 	_ending_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ending_text.offset_left = 160
@@ -351,7 +345,7 @@ func set_ammo(in_mag: int, mag_size: int, reloading: bool) -> void:
 		_ammo.text = "%d / %d" % [in_mag, mag_size]
 	# Amber once a quarter of the magazine (or less) is left, so the reload never surprises.
 	var low := in_mag <= maxi(2, mag_size / 4)
-	_ammo.add_theme_color_override("font_color", Color("ffb24d") if reloading or low else Color.WHITE)
+	_ammo.add_theme_color_override("font_color", UiStyle.ORANGE if reloading or low else UiStyle.CREAM)
 
 
 func set_health(health: float, max_health: float) -> void:
@@ -575,7 +569,7 @@ func _draw_compass() -> void:
 	var w := COMPASS_HALF_WIDTH
 	_compass.draw_rect(Rect2(0, 0, w * 2.0, 24), Color(0.04, 0.05, 0.06, 0.45))
 	_compass.draw_line(Vector2(w, 0), Vector2(w, 24), Color("ffd08a", 0.9), 1.5)
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.font("heading")
 	for deg in range(0, 360, 15):
 		var off := wrapf(deg - heading, -180.0, 180.0)
 		if absf(off) > COMPASS_SPAN:
@@ -584,7 +578,8 @@ func _draw_compass() -> void:
 		var fade := 1.0 - absf(off) / COMPASS_SPAN
 		if deg % 90 == 0:
 			var letter: String = ["N", "E", "S", "W"][deg / 90]
-			_compass.draw_string(font, Vector2(x - 5, 18), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("e9e1cc", fade))
+			var lw := font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+			_compass.draw_string(font, Vector2(x - lw * 0.5, 20), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(UiStyle.CREAM, fade))
 		else:
 			_compass.draw_line(Vector2(x, 14 if deg % 45 else 10), Vector2(x, 22), Color("e9e1cc", 0.6 * fade), 1.0)
 	if _waypoint_target is Vector3:
@@ -632,13 +627,10 @@ func _draw_crosshair() -> void:
 			_crosshair.draw_arc(c, 24.0, 0.0, TAU, 24, Color(1.0, 0.78, 0.29, _hit_time / 0.22 * 0.8), 2.0, true)
 
 
-func _label(size: int, pos: Vector2) -> Label:
+## A HUD label in one of UiStyle's type roles.
+func _label(role: String, color := UiStyle.CREAM) -> Label:
 	var label := Label.new()
-	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.position = pos
+	UiStyle.apply(label, role, color)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(label)
 	return label

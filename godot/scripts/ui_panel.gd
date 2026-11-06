@@ -35,8 +35,7 @@ func _ready() -> void:
 	_box.add_theme_constant_override("separation", 10)
 	panel.add_child(_box)
 	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", 26)
-	_title.add_theme_color_override("font_color", Color("ffd08a"))
+	UiStyle.apply(_title, "banner", UiStyle.AMBER)
 	_box.add_child(_title)
 	_content = VBoxContainer.new()
 	_content.add_theme_constant_override("separation", 6)
@@ -92,8 +91,11 @@ func _clear() -> void:
 func _row(text: String, color := Color.WHITE, size := 16) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	# Short all-caps rows are section heads: the display face, a step up.
+	var head := size <= 14 and text == text.to_upper()
+	l.add_theme_font_override("font", UiStyle.font("heading" if head else "body"))
+	l.add_theme_font_size_override("font_size", 19 if head else size + 2)
+	l.add_theme_color_override("font_color", UiStyle.CREAM if color == Color.WHITE else color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_content.add_child(l)
 	return l
