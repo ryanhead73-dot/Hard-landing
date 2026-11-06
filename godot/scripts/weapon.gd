@@ -30,6 +30,8 @@ const SPECS := {
 	},
 }
 const SWITCH_TIME := 0.35
+## Switching dips the muzzle this far (radians) as the old gun goes down and the new one comes up.
+const SWITCH_DIP := 0.5
 ## Sustained fire blooms the spread (radians added per shot, and the most it can add); it settles
 ## once the trigger is let go.
 const BLOOM := {"rifle": 0.0022, "scattergun": 0.0, "arc_lance": 0.0}
@@ -63,6 +65,9 @@ var move_penalty := 0.0
 var bloom := 0.0
 var _since_shot := 9.0
 var _shots := 0
+## Seconds left in a weapon switch, and the gun being put away.
+var _swap_left := 0.0
+var _swap_from := ""
 
 
 func _ready() -> void:
@@ -88,6 +93,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	_since_shot += delta
+	if _swap_left > 0.0:
+		_swap_left = maxf(_swap_left - delta, 0.0)
+		_show_model()
 	if _since_shot > 0.12:
 		bloom = move_toward(bloom, 0.0, BLOOM_SETTLE * delta)
 	if reloading:
@@ -145,9 +153,11 @@ func spread(aiming: bool) -> float:
 func equip(id: String) -> bool:
 	if id == current or not Game.owns_weapon(id):
 		return false
+	_swap_from = current if _swap_left <= SWITCH_TIME * 0.5 else _swap_from
 	current = id
 	reloading = false
 	_cooldown = SWITCH_TIME
+	_swap_left = SWITCH_TIME
 	_show_model()
 	Sfx.play("weapon_switch", null, -8.0, 0.0)
 	switched.emit(id)
@@ -313,9 +323,27 @@ func _model(id: String) -> Node3D:
 	return n
 
 
+## 0 normally; rises to 1 halfway through a switch (old gun down, new one about to come up).
+func swap_dip() -> float:
+	if _swap_left <= 0.0:
+		return 0.0
+	var k := 1.0 - _swap_left / SWITCH_TIME
+	return 1.0 - absf(2.0 * k - 1.0)
+
+
+## The gun in her hands: the old one until halfway through a switch, then the new one, each
+## tipped muzzle-down by the dip.
+func shown_model() -> String:
+	return _swap_from if _swap_left > SWITCH_TIME * 0.5 and _swap_from != "" else current
+
+
 func _show_model() -> void:
+	var shown := shown_model()
+	var dip := ease(swap_dip(), -2.0) * SWITCH_DIP
 	for id in _models:
-		_models[id].visible = id == current
+		var m: Node3D = _models[id]
+		m.visible = id == shown
+		m.rotation.x = -dip if id == shown else 0.0
 
 
 func _glow_mat(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:

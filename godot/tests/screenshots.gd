@@ -70,6 +70,14 @@ func _ready() -> void:
 			var target := at + Vector3(0.0, 1.05, 0.0)
 			cam.look_at_from_position(target + front * 3.0 + side * 1.2 + Vector3(0.0, 0.3, 0.0), target)
 			cam.make_current()
+		if shot[0] == "juno_swap":
+			# Frozen just before halfway through switching from the rifle to the scattergun.
+			var w: Weapon = main.player.weapon
+			Game.give_weapon("scattergun")
+			w.equip("scattergun")
+			w._swap_left = Weapon.SWITCH_TIME * 0.56
+			w._show_model()
+			w.set_process(false)
 		var beasts: Array = []
 		if shot[0] == "creatures":
 			# A line-up a few metres ahead, frozen once they've settled into their idle pose.
@@ -224,6 +232,7 @@ func _shots() -> Array:
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
 		["thief", "landing_gear", Vector3(-6.0, 0.5, 9.0), Vector3(-12.5, 0.6, 4.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
+		["juno_swap", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
 		["hud", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],

@@ -19,6 +19,7 @@ func _run() -> void:
 	await _splash()
 	await _damage_arcs()
 	await _rifle()
+	await _weapon_swap()
 	_graphics()
 	finished = true
 
@@ -191,3 +192,26 @@ func _graphics() -> void:
 	_check("the presets are named Low, Medium, High", Game.GRAPHICS_NAMES == ["Low", "Medium", "High"])
 	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()
+
+
+## Switching weapons tips the old gun muzzle-down, swaps it at the bottom and brings the new one
+## up, instead of popping.
+func _weapon_swap() -> void:
+	var w: Weapon = player.weapon
+	Game.give_weapon("scattergun")
+	w.equip("rifle")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.1).timeout
+	_check("no dip at rest", w.swap_dip() == 0.0 and w._models["rifle"].rotation.x == 0.0)
+	w.equip("scattergun")
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.3).timeout
+	_check("early in a switch the rifle is still in her hands, tipping down",
+		w.shown_model() == "rifle" and w._models["rifle"].visible and not w._models["scattergun"].visible and w._models["rifle"].rotation.x < -0.05,
+		"%s %.2f" % [w.shown_model(), w._models["rifle"].rotation.x])
+	_check("it can't fire mid-switch", not w.try_fire(false))
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.4).timeout
+	_check("past halfway the scattergun has replaced it, coming up", w.shown_model() == "scattergun" and w._models["scattergun"].visible and not w._models["rifle"].visible,
+		w.shown_model())
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.5).timeout
+	_check("and the switch settles level", w.swap_dip() == 0.0 and w._models["scattergun"].rotation.x == 0.0, "%.2f" % w._models["scattergun"].rotation.x)
+	w.equip("rifle")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.1).timeout
