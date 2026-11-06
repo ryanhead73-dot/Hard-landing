@@ -42,7 +42,7 @@ func _ready() -> void:
 	_content.add_theme_constant_override("separation", 6)
 	_box.add_child(_content)
 	var hint := Label.new()
-	hint.text = "Esc to close"
+	hint.text = "Esc / B to close"
 	hint.modulate = Color(1, 1, 1, 0.6)
 	_box.add_child(hint)
 	visible = false
@@ -51,7 +51,7 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
-	if event.is_action_pressed("ui_cancel") or (_toggle_action != "" and event.is_action_pressed(_toggle_action)):
+	if event.is_action_pressed("ui_cancel") or Game.is_pad_back(event) or (_toggle_action != "" and event.is_action_pressed(_toggle_action)):
 		close()
 		get_viewport().set_input_as_handled()
 

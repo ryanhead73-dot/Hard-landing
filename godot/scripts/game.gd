@@ -49,6 +49,16 @@ const SAVE_VERSION := 1
 
 var mouse_sensitivity := 0.0025
 var invert_y := false
+## True after the last input came from a gamepad; prompts and look follow it.
+var using_pad := false
+signal input_device_changed(pad: bool)
+## Right-stick look speed in radians per second at full deflection (the settings slider scales it).
+var pad_look_speed := 3.2
+## Key or button names shown in prompts, keyboard first, then gamepad.
+const PROMPT_KEYS := {
+	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"],
+	"map": ["M", "D-pad down"], "inventory": ["Tab", "View"], "reload": ["R", "X"], "dodge": ["V", "B"],
+}
 var master_volume := 0.8
 var music_volume := 0.7
 var difficulty := 1
@@ -91,6 +101,39 @@ var mission_done: Array = []
 var mission_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
 var intro_pending := false
+
+
+## The name to show for an action's key on the current device.
+func key_name(action: String) -> String:
+	var names: Array = PROMPT_KEYS.get(action, [action, action])
+	return names[1 if using_pad else 0]
+
+
+## Rewrites keyboard prompts ("[E] ...", "[Hold E] ...") for the current device.
+func device_text(text: String) -> String:
+	if not using_pad:
+		return text
+	return text.replace("[Hold E]", "[Hold %s]" % key_name("interact")).replace("[E]", "[%s]" % key_name("interact"))
+
+
+## True for the B button press that backs out of a menu.
+func is_pad_back(event: InputEvent) -> bool:
+	return event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
+
+
+func _input(event: InputEvent) -> void:
+	var pad := using_pad
+	if event is InputEventJoypadButton and event.pressed:
+		pad = true
+	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.4:
+		pad = true
+	elif event is InputEventKey or event is InputEventMouseButton:
+		pad = false
+	elif event is InputEventMouseMotion and event.relative.length() > 4.0:
+		pad = false
+	if pad != using_pad:
+		using_pad = pad
+		input_device_changed.emit(pad)
 
 
 func _ready() -> void:

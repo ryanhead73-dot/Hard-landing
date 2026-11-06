@@ -96,7 +96,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Another panel (fabricator, inventory) owns the pause while it's open.
 	if get_tree().paused and not visible:
 		return
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_cancel") or (visible and Game.is_pad_back(event)):
 		if visible:
 			close()
 		else:

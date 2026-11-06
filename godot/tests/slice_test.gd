@@ -27,6 +27,7 @@ func _run() -> void:
 	await _stagger()
 	await _death()
 	await _arrival()
+	await _gamepad()
 	finished = true
 
 
@@ -173,3 +174,74 @@ func _arrival() -> void:
 	await _frames(20)
 	var text := Game.objective_text()
 	_check("at the relay the objective is the breakers", text.contains("breaker"), text)
+
+
+func _pad_axis(axis: JoyAxis, value: float) -> void:
+	var ev := InputEventJoypadMotion.new()
+	ev.axis = axis
+	ev.axis_value = value
+	Input.parse_input_event(ev)
+
+
+func _pad_button(button: JoyButton, pressed: bool) -> void:
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = button
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+
+## Everything Juno can do is on the pad, the right stick looks, prompts name pad buttons, and B
+## dodges rather than opening the pause menu.
+func _gamepad() -> void:
+	var missing: Array = []
+	for action in main.KEYS.keys() + main.BUTTONS.keys():
+		if action.begins_with("weapon_") and action != "weapon_next":
+			continue
+		if not InputMap.action_get_events(action).any(func(e): return e is InputEventJoypadButton or e is InputEventJoypadMotion):
+			missing.append(action)
+	_check("every play action has a pad binding", missing.is_empty(), str(missing))
+	var b_cancels := InputMap.action_get_events("ui_cancel").any(func(e): return e is InputEventJoypadButton and e.button_index == JOY_BUTTON_B)
+	var start_pauses := InputMap.action_get_events("ui_cancel").any(func(e): return e is InputEventJoypadButton and e.button_index == JOY_BUTTON_START)
+	_check("B is not cancel in play; Start pauses", not b_cancels and start_pauses)
+	_place(_ground(ARENA), 0.0)
+	await _frames(5)
+	var yaw: float = player._yaw.rotation.y
+	_pad_axis(JOY_AXIS_RIGHT_X, 1.0)
+	await get_tree().create_timer(0.3).timeout
+	_pad_axis(JOY_AXIS_RIGHT_X, 0.0)
+	await _frames(2)
+	var turned := wrapf(yaw - player._yaw.rotation.y, -PI, PI)
+	_check("the right stick turns the view", turned > 0.4, "%.2f rad" % turned)
+	_check("pad input switches prompts to the pad", Game.using_pad and Game.device_text("[E] Take it") == "[Y] Take it", Game.device_text("[E] Take it"))
+	# A small nudge near the centre turns far less than proportionally (response curve).
+	yaw = player._yaw.rotation.y
+	_pad_axis(JOY_AXIS_RIGHT_X, 0.3)
+	await get_tree().create_timer(0.3).timeout
+	_pad_axis(JOY_AXIS_RIGHT_X, 0.0)
+	await _frames(2)
+	var fine := wrapf(yaw - player._yaw.rotation.y, -PI, PI)
+	_check("small stick moves aim finely", fine > 0.0 and fine < turned * 0.2, "%.3f vs %.3f" % [fine, turned])
+	# Right trigger fires.
+	player.weapon.refill()
+	var before := Game.ammo_in_mag("rifle")
+	_pad_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	await _frames(10)
+	_pad_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
+	await _frames(2)
+	_check("the right trigger fires", Game.ammo_in_mag("rifle") < before, "%d -> %d" % [before, Game.ammo_in_mag("rifle")])
+	# B rolls.
+	await get_tree().physics_frame
+	_pad_button(JOY_BUTTON_B, true)
+	await _frames(2)
+	_pad_button(JOY_BUTTON_B, false)
+	_check("B dodges", player.is_rolling() and not get_tree().paused)
+	await _frames(40)
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_W
+	key.pressed = true
+	Input.parse_input_event(key)
+	key = key.duplicate()
+	key.pressed = false
+	Input.parse_input_event(key)
+	await _frames(2)
+	_check("a key press switches back to keyboard prompts", not Game.using_pad)

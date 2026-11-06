@@ -339,6 +339,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		weapon.cycle(-1)
 
 
+## Right-stick look: a power-1.6 response curve for fine aim near the centre, full speed at the
+## edge. Slower while aiming, like the mouse, and scaled by the sensitivity setting.
+func _pad_look(delta: float) -> void:
+	if dead or Game.dev_panel_open or get_tree().paused:
+		return
+	var v := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	if v == Vector2.ZERO:
+		return
+	v *= pow(v.length(), 0.6)
+	var speed := Game.pad_look_speed * (Game.mouse_sensitivity / 0.0025) * (aim_fov / fov if aiming else 1.0)
+	var look_y := -v.y if Game.invert_y else v.y
+	_yaw.rotate_y(-v.x * speed * delta)
+	_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * speed * 0.7 * delta, deg_to_rad(-70.0), deg_to_rad(50.0))
+
+
 ## Keyboard actions are polled so they also respond to simulated presses (tests, remapping).
 func _poll_actions() -> void:
 	if dead or Game.dev_panel_open or get_tree().paused:
@@ -356,6 +371,7 @@ func _poll_actions() -> void:
 
 func _process(delta: float) -> void:
 	_poll_actions()
+	_pad_look(delta)
 	var t := clampf(delta * 12.0, 0.0, 1.0)
 	var want_fov := aim_fov if aiming else fov + (sprint_fov_boost if _sprinting else 0.0)
 	_camera.fov = lerpf(_camera.fov, want_fov, clampf(delta * (12.0 if aiming else 5.0), 0.0, 1.0))
@@ -422,7 +438,7 @@ func _physics_process(delta: float) -> void:
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
 	if _hold_fire and not Input.is_action_pressed("fire"):
 		_hold_fire = false
-	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or DisplayServer.get_name() == "headless"
+	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Game.using_pad or DisplayServer.get_name() == "headless"
 	var firing := can_fire and not _hold_fire and Input.is_action_pressed("fire")
 	if firing and weapon.try_fire(aiming):
 		_combat_face = 0.6
