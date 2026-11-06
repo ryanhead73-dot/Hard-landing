@@ -409,6 +409,7 @@ func power_up() -> void:
 	powering_up = true
 	var bay: Vector3 = (repairs["aux_power"] as Node3D).global_position if repairs.has("aux_power") else global_position
 	Sfx.play("aux_restart", bay, 0.0, 0.0)
+	Sfx.duck(-12.0, POWER_UP_TIME)
 	var tw := create_tween().set_parallel(true)
 	_power_tween = tw
 	for light in _emergency_lights:

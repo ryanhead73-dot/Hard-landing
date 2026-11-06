@@ -44,6 +44,11 @@ func _ready() -> void:
 	box.add_child(_invert)
 	_volume = _slider(box, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
 	_music = _slider(box, "Music", 0.0, 1.0, 0.05, Game.music_volume)
+	var effects := _slider(box, "Effects", 0.0, 1.0, 0.05, Game.sfx_volume)
+	effects.name = "EffectsVolume"
+	effects.value_changed.connect(func(v: float):
+		Game.sfx_volume = v
+		Game.apply_settings())
 	var diff_label := Label.new()
 	diff_label.text = "Difficulty"
 	box.add_child(diff_label)

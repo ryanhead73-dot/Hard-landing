@@ -19,6 +19,8 @@ func _run() -> void:
 	_library()
 	await _variants()
 	_buses()
+	await _ducking()
+	_ledger()
 	await _music()
 	await _ambience()
 	await _spool()
@@ -72,6 +74,118 @@ func _buses() -> void:
 	_check("music volume sets the Music bus", absf(AudioServer.get_bus_volume_db(music) - linear_to_db(0.25)) < 0.01)
 	Game.music_volume = before
 	Game.apply_settings()
+
+
+## M13.7 mix: effects have their own bus and volume, the beds duck under gunfire (a compressor
+## keyed off the SFX bus) and under story beats (Sfx.duck), and dialogue ducks the music.
+func _ducking() -> void:
+	main.voice.clear()
+	var sfx := AudioServer.get_bus_index("SFX")
+	_check("an SFX bus feeds Master", sfx > 0 and AudioServer.get_bus_send(sfx) == "Master")
+	Game.sfx_volume = 0.5
+	Game.apply_settings()
+	_check("effects volume sets the SFX bus", absf(AudioServer.get_bus_volume_db(sfx) - linear_to_db(0.5)) < 0.01)
+	Game.sfx_volume = 1.0
+	Game.apply_settings()
+	Sfx.play("ui_click")
+	Sfx.play("ui_click", Vector3.ZERO)
+	var shots := Sfx.get_children().filter(func(c): return (c is AudioStreamPlayer or c is AudioStreamPlayer3D) and c.stream == Sfx.stream("ui_click"))
+	_check("one-shots play on the SFX bus", shots.size() >= 2 and shots.all(func(c): return c.bus == "SFX"))
+	for bus in ["Music", "Ambience"]:
+		var side := Game.bus_effect(bus, "Sidechain") as AudioEffectCompressor
+		_check("%s ducks under the effects" % bus, side != null and side.sidechain == &"SFX" and side.ratio > 1.0)
+	var duck := Game.bus_effect("Music", "Duck") as AudioEffectAmplify
+	var amb := Game.bus_effect("Ambience", "Duck") as AudioEffectAmplify
+	Sfx.duck(-10.0, 0.6)
+	await get_tree().create_timer(0.4).timeout
+	_check("a story duck pulls the music down", duck.volume_db < -8.0 and amb.volume_db < -4.0 and amb.volume_db > duck.volume_db, "%.1f / %.1f dB" % [duck.volume_db, amb.volume_db])
+	await get_tree().create_timer(2.0).timeout
+	_check("and lets it back up", duck.volume_db > -0.5, "%.1f dB" % duck.volume_db)
+	main.voice.say([[Story.HOB, "Testing, one two."]])
+	await get_tree().create_timer(0.4).timeout
+	_check("dialogue ducks the music", duck.volume_db < -3.0, "%.1f dB" % duck.volume_db)
+	main.voice.clear()
+
+
+## The licence ledger: every sound shipped has a row naming a known source, and every sound sits in
+## its tier's loudness range (the loudest 100 ms of the file), so a replacement recording can't
+## arrive far too hot or too quiet.
+func _ledger() -> void:
+	var ledger: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/asset_ledger.json"))
+	var audio: Dictionary = ledger["audio"]
+	var sources: Dictionary = ledger["sources"]
+	var tiers: Dictionary = ledger["tiers"]
+	var unlisted: PackedStringArray = []
+	var out_of_range: PackedStringArray = []
+	var checked := 0
+	for file in DirAccess.get_files_at("res://audio"):
+		if file.ends_with(".import"):
+			continue
+		var id := file.get_basename().get_slice("__", 0)
+		var row: Dictionary = audio.get(id, {})
+		if row.is_empty() or not sources.has(row.get("source", "")) or not tiers.has(row.get("tier", "")) and row.get("tier", "") != "music":
+			unlisted.append(file)
+			continue
+		if file.ends_with(".wav") and tiers.has(row["tier"]):
+			var level := _loudest_window_db("res://audio/" + file)
+			var span: Array = tiers[row["tier"]]
+			checked += 1
+			if level < span[0] or level > span[1]:
+				out_of_range.append("%s %.1f dB (%s)" % [file, level, row["tier"]])
+	for id in Sfx.SOUNDS:
+		if not audio.has(id):
+			unlisted.append(id)
+	_check("every sound has a licence row", unlisted.is_empty(), ", ".join(unlisted))
+	_check("every sound sits in its tier's loudness range", checked > 60 and out_of_range.is_empty(), "%d checked; %s" % [checked, ", ".join(out_of_range)])
+	var missing_files: PackedStringArray = []
+	for row in ledger["files"]:
+		var dir: String = "res://" + String(row["path"]).get_base_dir()
+		if not sources.has(row["source"]) or not DirAccess.dir_exists_absolute(dir):
+			missing_files.append(row["path"])
+	_check("the ledger's file rows name known sources", missing_files.is_empty(), ", ".join(missing_files))
+
+
+## Loudest RMS over 100 ms (in 25 ms steps) of a 16-bit PCM WAV, in dBFS.
+func _loudest_window_db(path: String) -> float:
+	var bytes := FileAccess.get_file_as_bytes(path)
+	var at := 12
+	var channels := 1
+	var bits := 16
+	var rate := 44100
+	var data_at := -1
+	var data_len := 0
+	while at + 8 <= bytes.size():
+		var tag := bytes.slice(at, at + 4).get_string_from_ascii()
+		var size := bytes.decode_u32(at + 4)
+		if tag == "fmt ":
+			channels = bytes.decode_u16(at + 10)
+			rate = bytes.decode_u32(at + 12)
+			bits = bytes.decode_u16(at + 22)
+		elif tag == "data":
+			data_at = at + 8
+			data_len = mini(size, bytes.size() - data_at)
+			break
+		at += 8 + size + (size & 1)
+	if data_at < 0 or bits != 16:
+		return 99.0
+	var frames := data_len / (2 * channels)
+	var block := rate / 40
+	var sums := PackedFloat64Array()
+	sums.resize(frames / block + 1)
+	for f in frames:
+		var v := 0.0
+		for c in channels:
+			v += bytes.decode_s16(data_at + (f * channels + c) * 2)
+		v /= 32768.0 * channels
+		sums[f / block] += v * v
+	var best := 0.0
+	for k in maxi(1, sums.size() - 3):
+		var e := 0.0
+		for j in 4:
+			if k + j < sums.size():
+				e += sums[k + j]
+		best = maxf(best, e)
+	return linear_to_db(sqrt(best / (block * 4.0)) + 1e-9)
 
 
 func _music() -> void:

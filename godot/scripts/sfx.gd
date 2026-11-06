@@ -4,6 +4,12 @@ extends Node
 ## (tools/audio/make_music.py), so a recorded file with the same name replaces a generated one.
 ## A sound can have variants, <id>__1, <id>__2...; each play picks one at random.
 
+## One-shots and machine loops play on the SFX bus (see Game.ensure_buses).
+const BUS := "SFX"
+## How fast a duck pulls the beds down and lets them back up, in dB per second.
+const DUCK_ATTACK := 60.0
+const DUCK_RELEASE := 9.0
+
 const SOUNDS: Array[String] = [
 	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "kill_tick",
 	"scuttler_alert", "scuttler_lunge", "scuttler_hurt", "scuttler_death",
@@ -28,6 +34,11 @@ const MAX_VARIANTS := 8
 
 var _streams: Dictionary = {}
 var _variants: Dictionary = {}
+## Active ducks: key -> [depth dB (negative), end time in ms]. Unkeyed ducks get unique keys.
+var _ducks: Dictionary = {}
+var _duck_serial := 0
+## The current duck on the Music bus, in dB (0 = none). Ambience takes half of it.
+var duck_db := 0.0
 
 
 func _ready() -> void:
@@ -103,6 +114,39 @@ static func loops(s: AudioStream) -> bool:
 	return false
 
 
+## Pulls music (fully) and ambience (by half) down by `depth_db` for `seconds`, so a story beat
+## or a line of dialogue sits on top. Overlapping ducks take the deepest; a keyed duck replaces
+## the last one with the same key (see end_duck).
+func duck(depth_db: float, seconds: float, key := "") -> void:
+	if key == "":
+		_duck_serial += 1
+		key = "_%d" % _duck_serial
+	_ducks[key] = [minf(depth_db, 0.0), Time.get_ticks_msec() + int(seconds * 1000.0)]
+
+
+func end_duck(key: String) -> void:
+	_ducks.erase(key)
+
+
+func _process(delta: float) -> void:
+	var now := Time.get_ticks_msec()
+	var target := 0.0
+	for key in _ducks.keys():
+		if _ducks[key][1] <= now:
+			_ducks.erase(key)
+		else:
+			target = minf(target, _ducks[key][0])
+	if is_equal_approx(target, duck_db):
+		return
+	duck_db = move_toward(duck_db, target, (DUCK_ATTACK if target < duck_db else DUCK_RELEASE) * delta)
+	var music := Game.bus_effect("Music", "Duck") as AudioEffectAmplify
+	if music:
+		music.volume_db = duck_db
+	var amb := Game.bus_effect("Ambience", "Duck") as AudioEffectAmplify
+	if amb:
+		amb.volume_db = duck_db * 0.5
+
+
 ## Plays a one-shot. Pass a position for a 3D sound, or leave it out for a flat UI-style sound.
 func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06) -> void:
 	if not _streams.has(id):
@@ -115,6 +159,7 @@ func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06
 		p3.unit_size = 8.0
 		p3.max_distance = 80.0
 		p3.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+		p3.bus = BUS
 		add_child(p3)
 		p3.global_position = at
 		p3.play()
@@ -124,6 +169,7 @@ func play(id: String, at: Variant = null, volume_db := 0.0, pitch_jitter := 0.06
 		p.stream = chosen
 		p.volume_db = volume_db
 		p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+		p.bus = BUS
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)
@@ -142,6 +188,7 @@ func loop(id: String, parent: Node3D, volume_db := 0.0) -> Node:
 	p3.volume_db = volume_db
 	p3.unit_size = 6.0
 	p3.max_distance = 40.0
+	p3.bus = BUS
 	parent.add_child(p3)
 	p3.play()
 	if s is AudioStreamWAV and (s as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_DISABLED:
