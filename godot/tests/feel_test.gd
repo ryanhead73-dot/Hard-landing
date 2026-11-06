@@ -20,6 +20,7 @@ func _run() -> void:
 	await _damage_arcs()
 	await _rifle()
 	await _weapon_swap()
+	await _hit_stop()
 	_graphics()
 	finished = true
 
@@ -215,3 +216,24 @@ func _weapon_swap() -> void:
 	_check("and the switch settles level", w.swap_dip() == 0.0 and w._models["scattergun"].rotation.x == 0.0, "%.2f" % w._models["scattergun"].rotation.x)
 	w.equip("rifle")
 	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.1).timeout
+
+
+## Hit-stop always lets go: overlapping stops, a pause mid-stop and the player being freed
+## mid-stop (quitting to the title) all come back to full speed. (Jake saw it stick.)
+func _hit_stop() -> void:
+	Game.hit_stop(0.1, true)
+	Game.hit_stop(0.05, true)
+	_check("a hit-stop slows time", Engine.time_scale == Game.HIT_STOP_SCALE)
+	await get_tree().create_timer(0.3, true, false, true).timeout
+	_check("overlapping stops end on time", Engine.time_scale == 1.0, str(Engine.time_scale))
+	Game.hit_stop(5.0, true)
+	await get_tree().create_timer(Game.HIT_STOP_MAX + 0.15, true, false, true).timeout
+	_check("no stop lasts longer than the cap", Engine.time_scale == 1.0, str(Engine.time_scale))
+	Game.hit_stop(0.2, true)
+	get_tree().paused = true
+	await get_tree().create_timer(0.05, true, false, true).timeout
+	_check("pausing mid-stop restores full speed", Engine.time_scale == 1.0, str(Engine.time_scale))
+	get_tree().paused = false
+	Engine.time_scale = 0.3
+	await get_tree().create_timer(0.05, true, false, true).timeout
+	_check("a stray slow-down is put right", Engine.time_scale == 1.0, str(Engine.time_scale))

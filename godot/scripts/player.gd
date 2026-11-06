@@ -93,7 +93,6 @@ var _shake_noise := FastNoiseLite.new()
 var _shake_t := 0.0
 var _airborne_speed := 0.0
 var _sprinting := false
-var _stop_until := 0
 ## Where the last hit came from (world space), for the HUD's damage arcs.
 var last_hit_from := Vector3.ZERO
 ## Camera boom eased back out after a squeeze (see BOOM_RECOVER), and the node that carries it.
@@ -267,15 +266,11 @@ func start_roll() -> bool:
 	return true
 
 
-## Freezes time for a beat (a kill landing). Skipped headless, where tests count frames.
+## Freezes time for a beat (a kill landing). Game owns the clock (see Game.hit_stop).
 func hit_stop(seconds: float) -> void:
-	if DisplayServer.get_name() == "headless" or get_tree().paused:
+	if get_tree().paused:
 		return
-	_stop_until = maxi(_stop_until, Time.get_ticks_msec() + int(seconds * 1000.0))
-	Engine.time_scale = 0.05
-	get_tree().create_timer(seconds, true, false, true).timeout.connect(func():
-		if Time.get_ticks_msec() >= _stop_until - 5:
-			Engine.time_scale = 1.0)
+	Game.hit_stop(seconds)
 
 
 func big_kill() -> void:

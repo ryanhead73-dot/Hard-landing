@@ -151,7 +151,36 @@ func _input(event: InputEvent) -> void:
 		input_device_changed.emit(pad)
 
 
+## Hit-stop: time runs at HIT_STOP_SCALE until this wall-clock tick (msec), 0 when none.
+const HIT_STOP_SCALE := 0.05
+## A hit-stop never lasts longer than this, whatever asked for it.
+const HIT_STOP_MAX := 0.3
+var stop_until := 0
+
+
+## Freezes time for a beat. Game restores it from its own _process against the wall clock, so
+## nothing (a scene change, a freed player, a pause, a lost timer) can leave the game in slow
+## motion. Skipped headless, where tests count frames.
+func hit_stop(seconds: float, force := false) -> void:
+	if DisplayServer.get_name() == "headless" and not force:
+		return
+	stop_until = maxi(stop_until, Time.get_ticks_msec() + int(minf(seconds, HIT_STOP_MAX) * 1000.0))
+	Engine.time_scale = HIT_STOP_SCALE
+
+
+func _process(_delta: float) -> void:
+	if stop_until == 0:
+		# Anything else that slowed time and forgot to put it back.
+		if Engine.time_scale != 1.0:
+			Engine.time_scale = 1.0
+		return
+	if Time.get_ticks_msec() >= stop_until or get_tree().paused:
+		stop_until = 0
+		Engine.time_scale = 1.0
+
+
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_settings()
 	add_child(FpsOverlay.new())
 
