@@ -82,6 +82,8 @@ var logs: Array[String] = []
 var caches_opened: Array[int] = []
 ## Drift caches spotted (they go on the map).
 var caches_seen: Array[int] = []
+## First-time hints already shown (Onboarding).
+var hints_seen: Array[String] = []
 ## Owned weapons, and ammo per weapon: id -> [in magazine, reserve] (reserve -1 is unlimited).
 var weapons: Array[String] = ["rifle"]
 var ammo: Dictionary = {}
@@ -216,6 +218,7 @@ func reset() -> void:
 	logs.clear()
 	caches_opened.clear()
 	caches_seen.clear()
+	hints_seen.clear()
 	launch_objective = ""
 	mission_stage.clear()
 	mission_done.clear()
@@ -263,6 +266,7 @@ func session_state() -> Dictionary:
 		"logs": logs.duplicate(),
 		"caches_opened": caches_opened.duplicate(),
 		"caches_seen": caches_seen.duplicate(),
+		"hints_seen": hints_seen.duplicate(),
 		"mission_stage": mission_stage.duplicate(),
 		"mission_done": mission_done.duplicate(),
 	}
@@ -300,6 +304,9 @@ func apply_session(data: Dictionary) -> void:
 	caches_seen.clear()
 	for i in data.get("caches_seen", []):
 		caches_seen.append(int(i))
+	hints_seen.clear()
+	for h in data.get("hints_seen", []):
+		hints_seen.append(String(h))
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()

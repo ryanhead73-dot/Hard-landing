@@ -19,6 +19,7 @@ func _bypass_missions() -> bool:
 func _run() -> void:
 	await _frames(30)
 	_opening_objective()
+	await _onboarding()
 	_clear_enemies()
 	await _framing()
 	await _boom()
@@ -28,6 +29,8 @@ func _run() -> void:
 	await _death()
 	await _arrival()
 	await _gamepad()
+	await _intro()
+	_install_signals()
 	finished = true
 
 
@@ -245,3 +248,60 @@ func _gamepad() -> void:
 	Input.parse_input_event(key)
 	await _frames(2)
 	_check("a key press switches back to keyboard prompts", not Game.using_pad)
+
+
+## One hint at a time, when it's useful, cleared by doing the thing; remembered in the save.
+func _onboarding() -> void:
+	Game.hints_seen.clear()
+	main.onboarding.current = ""
+	main.onboarding._quiet = 0.0
+	await _frames(5)
+	_check("the first hint is move and look", main.hud.hint_text().contains("move"), main.hud.hint_text())
+	_check("the old controls strip is gone", not main.hud._help.visible)
+	_place(_ground(ARENA), 0.0)
+	await _frames(3)
+	main.onboarding._start = player.global_position
+	await _walk(1.6)
+	_check("moving clears the move hint", not main.hud.hint_text().contains("move") and main.onboarding.seen("move"), main.hud.hint_text())
+	var data := Game.session_state()
+	Game.hints_seen.clear()
+	Game.apply_session(data)
+	_check("seen hints are saved", "move" in Game.hints_seen)
+	# Being hurt offers the roll.
+	main.onboarding._quiet = 0.0
+	main.onboarding.current = ""
+	player.take_damage(5.0, player.global_position + Vector3(3, 0, 0))
+	_check("a first hit offers the roll", main.onboarding.current == "dodge" and main.hud.hint_text().contains("roll"), main.hud.hint_text())
+	await _press("dodge")
+	await _frames(3)
+	_check("rolling clears it", main.onboarding.current != "dodge" and main.onboarding.seen("dodge"))
+	await _frames(40)
+	# Everything shown once doesn't come back; the rest stay quiet for the other checks.
+	Game.hints_seen.assign(Onboarding.HINTS.keys())
+	main.onboarding.finish()
+	player.health = player.max_health()
+
+
+## A new game's intro ends looking across the basin at the relay, and Juno faces that way.
+func _intro() -> void:
+	_place(_ground(ARENA), 1.0)
+	main.play_intro()
+	await get_tree().create_timer(main.INTRO_FALL + main.INTRO_SLIDE + main.INTRO_HOLD + 1.0).timeout
+	_check("after the crash the camera turns to the first goal", main._cine_focus != null)
+	await get_tree().create_timer(main.INTRO_REVEAL + 1.5).timeout
+	_check("the intro hands over to Juno", not main.intro_playing and player.camera().current)
+	var w: Vector3 = main._waypoint()
+	var to := Vector3(w.x - player.global_position.x, 0.0, w.z - player.global_position.z).normalized()
+	var fwd := -player.camera().global_basis.z
+	fwd = Vector3(fwd.x, 0.0, fwd.z).normalized()
+	_check("Juno starts facing the relay", fwd.angle_to(to) < 0.35, "%.2f rad off" % fwd.angle_to(to))
+
+
+## Installing a repair announces itself for the payoff staging.
+func _install_signals() -> void:
+	var got: Array = []
+	main.install_started.connect(func(id): got.append("start:" + id))
+	main.install_finished.connect(func(id): got.append("end:" + id))
+	Game.carrying = "aux_cell"
+	main._install("aux_power")
+	_check("install announces start and finish", got == ["start:aux_power", "end:aux_power"], str(got))

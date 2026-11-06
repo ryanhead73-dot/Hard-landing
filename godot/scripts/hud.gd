@@ -36,6 +36,8 @@ var _help_time := 150.0
 const PAD_HELP_TEXT := "L stick move · R stick look · LT aim · RT fire · X reload · D-pad right weapons · LB stim · RB arc charge · View inventory · D-pad down map · D-pad left logs · L3 sprint · A jump · B roll · R3 crouch · Y interact · D-pad up flashlight · Start pause"
 ## Last values given, so the key names can be redrawn when the player switches device.
 var _prompt_raw := ""
+## First-time hint (Onboarding): one line, lower left above the suit readout.
+var _hint: Label
 var _stims_last := Vector2i.ZERO
 var _charges_last := Vector2i.ZERO
 var _compass: Control
@@ -70,6 +72,15 @@ func _ready() -> void:
 	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_help.text = HELP_TEXT
+	# The full list lives in the pause menu; play teaches through one-at-a-time hints instead.
+	_help.visible = false
+	_help_time = 0.0
+	_hint = _label(17, Vector2.ZERO)
+	_anchor(_hint, 0.0, 1.0, 16, -170, 900, -140)
+	_hint.add_theme_color_override("font_color", Color("ffd08a"))
+	_hint.add_theme_constant_override("outline_size", 5)
+	_hint.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
+	_hint.visible = false
 	Game.input_device_changed.connect(_on_device_changed)
 	_help.modulate = Color(1, 1, 1, 0.6)
 
@@ -308,6 +319,15 @@ func set_objective(text: String) -> void:
 ## Shows a marker over a world position (Vector3), or hides it when given null.
 func set_waypoint(target) -> void:
 	_waypoint_target = target
+
+
+func show_hint(text: String) -> void:
+	_hint.text = text
+	_hint.visible = text != ""
+
+
+func hint_text() -> String:
+	return _hint.text if _hint.visible else ""
 
 
 func set_prompt(text: String) -> void:

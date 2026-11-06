@@ -11,6 +11,7 @@ var _invert: CheckBox
 var _volume: HSlider
 var _music: HSlider
 var _difficulty: OptionButton
+var _controls: Label
 
 
 func _ready() -> void:
@@ -82,6 +83,11 @@ func _ready() -> void:
 	quit.text = "Quit to desktop"
 	quit.pressed.connect(func(): get_tree().quit())
 	box.add_child(quit)
+	_controls = Label.new()
+	_controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_controls.add_theme_font_size_override("font_size", 13)
+	_controls.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(_controls)
 
 	_sensitivity.value_changed.connect(_on_sensitivity)
 	_invert.toggled.connect(_on_invert)
@@ -105,6 +111,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open() -> void:
+	_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.HELP_TEXT)
 	visible = true
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
