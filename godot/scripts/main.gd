@@ -118,6 +118,8 @@ var music: MusicDirector
 var ambience: Ambience
 var missions: MissionRunner
 var onboarding: Onboarding
+## Records the session for playtest review (only when this is the scene being played).
+var playtest: PlaytestLog
 ## What the intro camera looks at while it turns from the wreck to the first goal.
 var _cine_focus: Node3D
 ## True once the ending card is up; interact then returns to the title.
@@ -264,6 +266,7 @@ func _ready() -> void:
 	weather.setup(self)
 	_update_active_site()
 	_set_dusk(false)
+	_start_playtest.call_deferred(not Game.pending_load.is_empty())
 	if not Game.pending_load.is_empty():
 		load_state(Game.pending_load)
 		Game.pending_load = {}
@@ -273,6 +276,16 @@ func _ready() -> void:
 	else:
 		_face_first_goal()
 		voice.say(Story.OPENING)
+
+
+func _start_playtest(continued: bool, force := false) -> void:
+	if playtest or not (force or PlaytestLog.wanted(self)):
+		return
+	playtest = PlaytestLog.new()
+	playtest.name = "PlaytestLog"
+	playtest.main = self
+	playtest.continued = continued
+	add_child(playtest)
 
 
 ## Turns Juno toward the current site's beacon, so the first view on control is the way to go.
