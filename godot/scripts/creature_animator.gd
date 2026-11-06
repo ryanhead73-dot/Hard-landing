@@ -9,6 +9,11 @@ extends Node
 ## Legs come in two kinds: "splay" legs stick out sideways (scuttler, Warden) and sweep forward
 ## about the vertical axis, lifting about the long axis; "hang" legs hang down (spitter, ram) and
 ## swing like a walker's. Angles are degrees on top of each joint's rest pose.
+##
+## Creatures whose model carries keyframed clips from Blender (blender/build_creature_anims.py:
+## idle, walk, windup, attack, hurt, stagger, die) are played by an AnimationTree instead: walk
+## blended in by speed and played at the speed that keeps the feet planted, the wind-up and
+## stagger blended in by state, attack and hurt as one-shots, and the death clip at the end.
 
 const KINDS := {
 	"scuttler": {"legs": "splay", "stride": 1.1, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
@@ -27,6 +32,11 @@ var phase := 0.0
 var shot := ""
 ## [joint, side (-1 left / 1 right), gait offset] for every leg.
 var legs: Array = []
+## Set when the model has its own clips (see above).
+var tree: AnimationTree
+## Seconds per walk clip cycle at normal speed; one cycle covers the kind's "stride".
+const CYCLE_TIME := 0.8
+const CLIP_LOOPS := ["idle", "walk", "windup", "stagger"]
 
 var _cfg: Dictionary
 var _move := 0.0
@@ -60,12 +70,17 @@ func setup(e: Enemy, rig: Node3D, kind_name: String) -> void:
 			side = -1 if j[3] == "L" else 1
 			idx = int(j.substr(4)) - 1
 		legs.append([j, side, PI * ((idx + (1 if side > 0 else 0)) % 2)])
+	var clips := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer if rig else null
+	if clips and clips.has_animation("walk"):
+		_build_tree(clips)
 
 
 func trigger(shot_name: String) -> void:
 	if SHOTS.has(shot_name):
 		shot = shot_name
 		_shot_t = 0.0
+		if tree and _has_shot(shot_name):
+			tree.set("parameters/%s/request" % shot_name, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 
 
 ## 0..1 progress of the current one-shot, or -1 when none is playing.
@@ -92,6 +107,9 @@ func _process(delta: float) -> void:
 		_shot_t += delta
 		if _shot_t >= SHOTS[shot]:
 			shot = ""
+	if tree:
+		_drive_tree(st, hv)
+		return
 	_pose_legs()
 	_pose_body(st)
 
@@ -185,6 +203,86 @@ func _pose_body(st: String) -> void:
 	pose.rot("Body", body)
 	pose.offset("Body", Vector3(0.0, bob - 0.15 * _dead * float(_cfg["bob"]) * 10.0, 0.0))
 	pose.rot("Head", head.lerp(Vector3(-25.0, 0.0, 0.0), ease(_dead, -2.0)))
+
+
+# --- Clips --------------------------------------------------------------------------------
+
+func _has_shot(shot_name: String) -> bool:
+	return shot_name in ["attack", "hurt"]
+
+
+func _drive_tree(st: String, hv: float) -> void:
+	tree.set("parameters/move/blend_amount", _move)
+	tree.set("parameters/walk_speed/scale", clampf(hv / (float(_cfg["stride"]) / CYCLE_TIME), 0.5, 2.5))
+	tree.set("parameters/wind/blend_amount", _windup)
+	tree.set("parameters/stagger/blend_amount", 1.0 if st == "stagger" else 0.0)
+	var dead := st == "dead"
+	if dead != (tree.get("parameters/alive/current_state") == "dead"):
+		tree.set("parameters/alive/transition_request", "dead" if dead else "alive")
+
+
+func _build_tree(clips: AnimationPlayer) -> void:
+	for clip in CLIP_LOOPS:
+		if not clips.has_animation(clip):
+			continue
+		var a := clips.get_animation(clip)
+		a.loop_mode = Animation.LOOP_LINEAR
+		var last := 0.0
+		for i in a.get_track_count():
+			if a.track_get_key_count(i) > 0:
+				last = maxf(last, a.track_get_key_time(i, a.track_get_key_count(i) - 1))
+		if last > 0.0:
+			a.length = last
+	var bt := AnimationNodeBlendTree.new()
+	var clip_node := func(clip: String) -> AnimationNodeAnimation:
+		var n := AnimationNodeAnimation.new()
+		n.animation = clip
+		return n
+	var shot_node := func(fade_in: float, fade_out: float) -> AnimationNodeOneShot:
+		var n := AnimationNodeOneShot.new()
+		n.fadein_time = fade_in
+		n.fadeout_time = fade_out
+		return n
+	bt.add_node("idle", clip_node.call("idle"))
+	bt.add_node("walk", clip_node.call("walk"))
+	bt.add_node("walk_speed", AnimationNodeTimeScale.new())
+	bt.add_node("move", AnimationNodeBlend2.new())
+	bt.add_node("windup", clip_node.call("windup"))
+	bt.add_node("wind", AnimationNodeBlend2.new())
+	bt.add_node("stagger_clip", clip_node.call("stagger"))
+	bt.add_node("stagger", AnimationNodeBlend2.new())
+	bt.add_node("attack_clip", clip_node.call("attack"))
+	bt.add_node("attack", shot_node.call(0.04, 0.12))
+	bt.add_node("hurt_clip", clip_node.call("hurt"))
+	bt.add_node("hurt", shot_node.call(0.03, 0.1))
+	bt.add_node("die", clip_node.call("die"))
+	var alive := AnimationNodeTransition.new()
+	alive.xfade_time = 0.08
+	alive.add_input("alive")
+	alive.add_input("dead")
+	bt.add_node("alive", alive)
+	bt.connect_node("walk_speed", 0, "walk")
+	bt.connect_node("move", 0, "idle")
+	bt.connect_node("move", 1, "walk_speed")
+	bt.connect_node("wind", 0, "move")
+	bt.connect_node("wind", 1, "windup")
+	bt.connect_node("stagger", 0, "wind")
+	bt.connect_node("stagger", 1, "stagger_clip")
+	bt.connect_node("attack", 0, "stagger")
+	bt.connect_node("attack", 1, "attack_clip")
+	bt.connect_node("hurt", 0, "attack")
+	bt.connect_node("hurt", 1, "hurt_clip")
+	bt.connect_node("alive", 0, "hurt")
+	bt.connect_node("alive", 1, "die")
+	bt.connect_node("output", 0, "alive")
+	tree = AnimationTree.new()
+	tree.name = "AnimationTree"
+	tree.tree_root = bt
+	clips.get_parent().add_child(tree)
+	tree.anim_player = tree.get_path_to(clips)
+	tree.root_node = tree.get_path_to(clips.get_node(clips.root_node))
+	tree.set("parameters/alive/transition_request", "alive")
+	tree.active = true
 
 
 ## The skimmer's wings: a hard beat climbing or hanging, a lazy glide circling, swept back in the
