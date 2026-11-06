@@ -48,6 +48,13 @@ var _open := 0.0
 var _stun := 0.0
 var _charge := 0.0
 var _dead := 0.0
+## Weights for the procedural states that used to switch in a single frame: the lurker's
+## emerge, the skimmer's circling head, and which wind-up the Warden is in.
+var _emerge := 0.0
+var _circle := 0.0
+var _slam_up := 0.0
+var _charge_up := 0.0
+var _volley_up := 0.0
 var _shot_t := 0.0
 var _time := 0.0
 var _seed := 0.0
@@ -104,6 +111,12 @@ func _process(delta: float) -> void:
 	_stun = lerpf(_stun, 1.0 if st == "stunned" else 0.0, k)
 	_charge = lerpf(_charge, 1.0 if st == "charge" else 0.0, k)
 	_dead = move_toward(_dead, 1.0 if st == "dead" else 0.0, delta * 3.0)
+	var k5 := clampf(delta * 5.0, 0.0, 1.0)
+	_emerge = lerpf(_emerge, 1.0 if st == "emerge" else 0.0, k)
+	_circle = lerpf(_circle, 1.0 if st == "circle" else 0.0, clampf(delta * 3.0, 0.0, 1.0))
+	_slam_up = lerpf(_slam_up, 1.0 if st == "slam_windup" else 0.0, k5)
+	_charge_up = lerpf(_charge_up, 1.0 if st == "charge_windup" else 0.0, k5)
+	_volley_up = lerpf(_volley_up, 1.0 if st == "volley_windup" else 0.0, k5)
 	if _dead <= 0.0:
 		phase = fmod(phase + maxf(hv, 0.0) / float(_cfg["stride"]) * TAU * delta, TAU)
 	if shot != "":
@@ -170,9 +183,9 @@ func _pose_body(st: String) -> void:
 			pose.rot("Tail", Vector3(0.0, sin(_time * 5.0 + _seed) * 20.0 * (1.0 - _dead), 0.0))
 		"lurker":
 			# A low, side-to-side crawl; the jaw gapes on the wind-up and snaps shut on the bite.
-			var gape := 48.0 * _windup + (30.0 if st == "emerge" else 0.0) - (40.0 * punch if shot == "attack" else 0.0)
+			var gape := 48.0 * _windup + 30.0 * _emerge - (40.0 * punch if shot == "attack" else 0.0)
 			pose.rot("Jaw", Vector3(-maxf(gape, 0.0), 0.0, 0.0))
-			head.x += 14.0 * _windup + (10.0 if st == "emerge" else 0.0)
+			head.x += 14.0 * _windup + 10.0 * _emerge
 			head.y += sin(phase) * 10.0 * m
 			body.y = -sin(phase) * 9.0 * m
 			var lash := sin(phase + 1.2) * 22.0 * m + sin(_time * 1.3 + _seed) * 8.0 * (1.0 - m)
@@ -184,19 +197,19 @@ func _pose_body(st: String) -> void:
 		"skimmer":
 			_pose_wings(st)
 			head.x += 28.0 * _windup
-			head.y = sin(_time * 0.9 + _seed) * 12.0 * (1.0 if st == "circle" else 0.0)
+			head.y = sin(_time * 0.9 + _seed) * 12.0 * _circle
 			var lash := sin(_time * 2.4 + _seed) * 14.0
 			pose.rot("Tail", Vector3(lash * 0.3, lash, 0.0))
 			pose.rot("TailTip", Vector3(0.0, lash * 1.4, 0.0))
 		"warden":
-			var raise := 105.0 * _windup if st == "slam_windup" else 0.0
+			var raise := 105.0 * _slam_up
 			var slam := 120.0 * punch if shot == "slam" else 0.0
 			var arms := Vector3(raise - slam, 0.0, 0.0)
 			pose.rot("ArmL", arms)
 			pose.rot("ArmR", arms)
-			body.x += -8.0 * (_windup if st == "charge_windup" else 0.0) - 6.0 * _charge
+			body.x += -8.0 * _charge_up - 6.0 * _charge
 			# The carapace opens to bare the core: plates lift outward.
-			var plate := 50.0 * _open + 18.0 * (_windup if st == "volley_windup" else 0.0)
+			var plate := 50.0 * _open + 18.0 * _volley_up
 			pose.rot("PlateL", Vector3(0.0, 0.0, -plate))
 			pose.rot("PlateR", Vector3(0.0, 0.0, plate))
 			var core := pose.node("Core")
