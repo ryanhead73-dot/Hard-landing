@@ -164,6 +164,7 @@ func _wildlife() -> void:
 	var tri: Dictionary = {}
 	for leg in sc.anim.legs:
 		tri[leg[0]] = leg[2]
+	_check("the scuttler plays its keyframed Blender clips", sc.anim.tree != null and sc.anim.tree.active)
 	_check("six legs walk a tripod gait", tri["LegL1"] == tri["LegR2"] and tri["LegL1"] == tri["LegL3"] and tri["LegL1"] != tri["LegR1"])
 	var ram: Enemy = made["ram"]
 	var quad: Dictionary = {}

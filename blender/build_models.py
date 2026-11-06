@@ -630,9 +630,10 @@ def components():
     export("crate")
 
 
-# Juno is built by build_juno.py (a skinned rig with keyframed clips) from juno() above.
+# Juno is built by build_juno.py (a skinned rig with keyframed clips) from juno() above, and the
+# animated creatures (scuttler) by build_creature_anims.py, which exports them with their clips.
 BUILDERS = {
-    "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer,
+    "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer,
     "rifle": rifle, "scattergun": scattergun, "arc_lance": arc_lance,
 }
 
