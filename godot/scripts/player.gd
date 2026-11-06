@@ -48,6 +48,10 @@ const ROLL_GUARD := 0.32
 const ROLL_COOLDOWN := 0.3
 ## Camera kick per shot (metres of view offset), by weapon.
 const KICK := {"rifle": 0.035, "scattergun": 0.14, "arc_lance": 0.08}
+## Muzzle climb per shot in degrees (up, and up to this much either way sideways). Most of the
+## climb is pulled back once the trigger is let go, so sustained fire drifts up a little.
+const CLIMB := {"rifle": [0.22, 0.1], "scattergun": [1.6, 0.4], "arc_lance": [1.0, 0.2]}
+const CLIMB_RECOVER := 0.8
 
 var crouching := false
 var aiming := false
@@ -82,6 +86,9 @@ var _roll_cool := 0.0
 ## Camera shake: trauma (0-1) decays; the shake is trauma squared, so small knocks stay small.
 var trauma := 0.0
 var _kick := 0.0
+## Climb still to pull back, in radians, and how long since the last shot.
+var _climb := 0.0
+var _since_fired := 9.0
 var _shake_noise := FastNoiseLite.new()
 var _shake_t := 0.0
 var _airborne_speed := 0.0
@@ -278,6 +285,12 @@ func big_kill() -> void:
 
 func _on_fired() -> void:
 	_kick += KICK.get(weapon.current, 0.04)
+	var c: Array = CLIMB.get(weapon.current, [0.3, 0.1])
+	var up := deg_to_rad(float(c[0])) * (0.6 if aiming else 1.0)
+	_pitch.rotation.x = clampf(_pitch.rotation.x + up, deg_to_rad(-70.0), deg_to_rad(50.0))
+	_climb += up * CLIMB_RECOVER
+	_yaw.rotation.y += deg_to_rad(randf_range(-float(c[1]), float(c[1])))
+	_since_fired = 0.0
 	if weapon.current == "scattergun":
 		add_trauma(0.18)
 
@@ -399,6 +412,13 @@ func _update_shake(delta: float) -> void:
 	_roll_cool = maxf(_roll_cool - delta, 0.0)
 	trauma = maxf(trauma - delta * 1.5, 0.0)
 	_kick = lerpf(_kick, 0.0, clampf(delta * 14.0, 0.0, 1.0))
+	_since_fired += delta
+	if _since_fired > 0.18 and _climb > 0.0:
+		var back := minf(_climb, maxf(_climb * 9.0, deg_to_rad(2.0)) * delta)
+		_pitch.rotation.x -= back
+		_climb -= back
+	var hv := Vector2(velocity.x, velocity.z).length()
+	weapon.move_penalty = 1.0 if not is_on_floor() else clampf(hv / sprint_speed, 0.0, 1.0)
 	_shake_t += delta
 	var shake := trauma * trauma * Game.screen_shake
 	_camera.h_offset = _shake_noise.get_noise_2d(_shake_t * 60.0, 0.0) * 0.22 * shake
