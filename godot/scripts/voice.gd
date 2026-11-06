@@ -52,6 +52,7 @@ func heard(fragment: String) -> bool:
 func clear() -> void:
 	_queue.clear()
 	_current = []
+	Sfx.end_duck("voice")
 	if hud:
 		hud.set_voice("", "")
 
@@ -73,6 +74,7 @@ func _next() -> void:
 	if _queue.is_empty():
 		var was_busy := not _current.is_empty()
 		_current = []
+		Sfx.end_duck("voice")
 		if hud:
 			hud.set_voice("", "")
 		if was_busy:
@@ -80,6 +82,8 @@ func _next() -> void:
 		return
 	_current = _queue.pop_front()
 	_time = duration(_current[1])
+	# Dialogue sits on top of the music.
+	Sfx.duck(-5.0, _time, "voice")
 	history.append("%s: %s" % _current)
 	if hud:
 		hud.set_voice(_current[0], _current[1])

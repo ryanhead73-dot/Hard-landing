@@ -61,6 +61,8 @@ const PROMPT_KEYS := {
 }
 var master_volume := 0.8
 var music_volume := 0.7
+## Sound effects (the SFX bus: weapons, creatures, machines, UI).
+var sfx_volume := 1.0
 var difficulty := 1
 ## Camera shake strength (0 turns it off).
 var screen_shake := 1.0
@@ -154,17 +156,20 @@ func load_settings() -> void:
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
+		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
 	apply_settings()
 
 
-## Music and Ambience buses, both feeding Master, so music has its own volume setting; an
+## The mix. Music, Ambience and SFX buses feed Master, each with its own volume setting; an
 ## Interior reverb bus that enclosed spaces send to (AudioZones); and a limiter on Master so a
-## pile-up of explosions never clips.
+## pile-up of explosions never clips. Music and Ambience duck two ways: a compressor keyed off
+## the SFX bus pulls them down under gunfire and blasts, and a "Duck" amplifier that Sfx.duck()
+## drives for story beats (dialogue, the aux power-up).
 static func ensure_buses() -> void:
-	for bus_name in ["Music", "Ambience", "Interior"]:
+	for bus_name in ["Music", "Ambience", "SFX", "Interior"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			var i := AudioServer.bus_count - 1
@@ -180,6 +185,18 @@ static func ensure_buses() -> void:
 				verb.wet = 0.55
 				verb.hipass = 0.15
 				AudioServer.add_bus_effect(i, verb)
+			elif bus_name in ["Music", "Ambience"]:
+				var duck := AudioEffectAmplify.new()
+				duck.resource_name = "Duck"
+				AudioServer.add_bus_effect(i, duck)
+				var side := AudioEffectCompressor.new()
+				side.resource_name = "Sidechain"
+				side.sidechain = &"SFX"
+				side.threshold = -22.0
+				side.ratio = 3.0 if bus_name == "Music" else 2.0
+				side.attack_us = 3000.0
+				side.release_ms = 450.0
+				AudioServer.add_bus_effect(i, side)
 	var has_limiter := false
 	for k in AudioServer.get_bus_effect_count(0):
 		if AudioServer.get_bus_effect(0, k) is AudioEffectHardLimiter:
@@ -191,12 +208,25 @@ static func ensure_buses() -> void:
 		AudioServer.add_bus_effect(0, limiter)
 
 
+## A bus effect by its resource name (e.g. the "Duck" amplifier), or null.
+static func bus_effect(bus_name: String, effect_name: String) -> AudioEffect:
+	var i := AudioServer.get_bus_index(bus_name)
+	if i < 0:
+		return null
+	for k in AudioServer.get_bus_effect_count(i):
+		var e := AudioServer.get_bus_effect(i, k)
+		if e.resource_name == effect_name:
+			return e
+	return null
+
+
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("controls", "invert_y", invert_y)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
+	cfg.set_value("audio", "sfx_volume", sfx_volume)
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.set_value("game", "screen_shake", screen_shake)
 	cfg.set_value("video", "graphics", graphics)
@@ -207,6 +237,7 @@ func apply_settings() -> void:
 	ensure_buses()
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
 	settings_changed.emit()
 
 
