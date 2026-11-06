@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -33,6 +33,11 @@ var _boss: Enemy
 var _hull_ratio := -1.0
 var _help: Label
 var _help_time := 150.0
+const PAD_HELP_TEXT := "L stick move · R stick look · LT aim · RT fire · X reload · D-pad right weapons · LB stim · RB arc charge · View inventory · D-pad down map · D-pad left logs · L3 sprint · A jump · B roll · R3 crouch · Y interact · D-pad up flashlight · Start pause"
+## Last values given, so the key names can be redrawn when the player switches device.
+var _prompt_raw := ""
+var _stims_last := Vector2i.ZERO
+var _charges_last := Vector2i.ZERO
 var _compass: Control
 const COMPASS_HALF_WIDTH := 260.0
 ## Degrees either side of the heading that the compass strip shows.
@@ -65,6 +70,7 @@ func _ready() -> void:
 	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_help.text = HELP_TEXT
+	Game.input_device_changed.connect(_on_device_changed)
 	_help.modulate = Color(1, 1, 1, 0.6)
 
 	# Compass strip across the top: headings, and the waypoint as an amber diamond.
@@ -186,7 +192,11 @@ func _ready() -> void:
 	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	_voice.add_theme_constant_override("shadow_offset_x", 1)
 	_voice.add_theme_constant_override("shadow_offset_y", 1)
-	_anchor(_voice, 0.5, 1.0, -480, -250, 480, -160)
+	# An outline keeps them legible over bright sky, steam and the cream hull alike.
+	_voice.add_theme_constant_override("outline_size", 6)
+	_voice.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
+	# Low, below Juno's waist and the interaction prompt, as in film subtitles.
+	_anchor(_voice, 0.5, 1.0, -480, -112, 480, -34)
 	_voice.visible = false
 	add_child(_voice)
 
@@ -301,7 +311,8 @@ func set_waypoint(target) -> void:
 
 
 func set_prompt(text: String) -> void:
-	_prompt.text = text
+	_prompt_raw = text
+	_prompt.text = Game.device_text(text)
 	_prompt.visible = text != ""
 
 
@@ -329,12 +340,14 @@ func set_weapon_info(weapon_name: String, reserve: int) -> void:
 
 
 func set_charges(count: int, max_count: int) -> void:
-	_charges.text = "CHARGES %d / %d  [G]" % [count, max_count]
+	_charges_last = Vector2i(count, max_count)
+	_charges.text = "CHARGES %d / %d  [%s]" % [count, max_count, Game.key_name("throw")]
 	_charges.modulate = Color(0.75, 1, 0.95, 0.85 if count > 0 else 0.4)
 
 
 func set_stims(count: int, max_count: int) -> void:
-	_stims.text = "STIMS %d / %d  [Q]" % [count, max_count]
+	_stims_last = Vector2i(count, max_count)
+	_stims.text = "STIMS %d / %d  [%s]" % [count, max_count, Game.key_name("stim")]
 	_stims.modulate = Color(1, 1, 1, 0.85 if count > 0 else 0.4)
 
 
@@ -459,7 +472,7 @@ func voice_text() -> String:
 
 
 func show_log_toast(title: String) -> void:
-	_log_toast.text = "◈ Log recovered: %s   [L] read" % title
+	_log_toast.text = "◈ Log recovered: %s   [%s] read" % [title, Game.key_name("logs")]
 	_log_toast_time = 6.0
 	_log_toast.visible = true
 	_log_toast.modulate.a = 1.0
@@ -602,3 +615,10 @@ func _anchor(control: Control, ax: float, ay: float, left: float, top: float, ri
 	control.offset_top = top
 	control.offset_right = right
 	control.offset_bottom = bottom
+
+
+func _on_device_changed(pad: bool) -> void:
+	_help.text = PAD_HELP_TEXT if pad else HELP_TEXT
+	set_prompt(_prompt_raw)
+	set_stims(_stims_last.x, _stims_last.y)
+	set_charges(_charges_last.x, _charges_last.y)

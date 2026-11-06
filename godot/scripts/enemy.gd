@@ -35,6 +35,10 @@ var weak_offset := Vector3.ZERO
 var weak_radius := 0.0
 ## Whether the last hit taken was on the weak spot.
 var last_hit_crit := false
+## The last hit's travel direction (zero for blasts) and its damage after scaling, so a creature
+## can react to how hard and from where it was hit.
+var last_hit_dir := Vector3.ZERO
+var last_hit_amount := 0.0
 var crits_taken := 0
 var _weak: Node3D
 ## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
@@ -127,6 +131,8 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		crits_taken += 1
 		_crit_effect(point)
 	health -= amount * mult
+	last_hit_dir = dir
+	last_hit_amount = amount * mult
 	_on_hurt(dir)
 	_flash()
 	if health > 0.0:

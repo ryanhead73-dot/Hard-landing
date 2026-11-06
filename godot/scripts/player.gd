@@ -11,10 +11,14 @@ signal died
 @export var crouch_speed := 2.0
 @export var carry_speed_factor := 0.85
 @export var jump_velocity := 4.6
-@export var boom_length := 2.5
-@export var aim_boom_length := 1.6
-@export var shoulder_offset := 0.75
+## Camera framing: Juno sits in the left third of the frame with the crosshair clear of her
+## shoulder, and the camera far enough back to read the ground and creatures round her.
+@export var boom_length := 3.1
+@export var aim_boom_length := 1.75
+@export var shoulder_offset := 1.05
 @export var aim_shoulder_offset := 0.85
+## Height of the camera pivot above her feet.
+@export var pivot_height := 1.75
 @export var fov := 70.0
 @export var aim_fov := 52.0
 @export var stand_height := 1.8
@@ -25,6 +29,16 @@ signal died
 @export var regen_rate := 12.0
 ## Sprinting widens the view a little, for a sense of speed.
 @export var sprint_fov_boost := 7.0
+## Ground acceleration and braking (m/s^2), and how much steering she has in the air.
+@export var ground_accel := 32.0
+@export var ground_brake := 42.0
+@export var air_accel := 9.0
+## A jump still works this long after running off an edge, and a press this long before
+## landing is kept until she lands.
+const COYOTE_TIME := 0.12
+const JUMP_BUFFER := 0.15
+## How fast the camera eases back out after a wall pushed it in (m/s). It always snaps in.
+const BOOM_RECOVER := 3.5
 
 ## Dodge roll: a quick burst along the move direction (backwards if standing still), briefly
 ## untouchable at the start.
@@ -75,6 +89,11 @@ var _sprinting := false
 var _stop_until := 0
 ## Where the last hit came from (world space), for the HUD's damage arcs.
 var last_hit_from := Vector3.ZERO
+## Camera boom eased back out after a squeeze (see BOOM_RECOVER), and the node that carries it.
+var _boom_smooth := 3.1
+var _boom: Node3D
+var _since_floor := 0.0
+var _jump_buffer := 0.0
 
 
 func _ready() -> void:
@@ -98,7 +117,7 @@ func _ready() -> void:
 	_yaw.name = "CameraYaw"
 	add_child(_yaw)
 	_pitch = Node3D.new()
-	_pitch.position.y = 1.7
+	_pitch.position.y = pivot_height
 	_yaw.add_child(_pitch)
 	_arm = SpringArm3D.new()
 	_arm.spring_length = boom_length
@@ -110,10 +129,16 @@ func _ready() -> void:
 	_arm.shape = probe
 	_arm.add_excluded_object(get_rid())
 	_pitch.add_child(_arm)
+	# The spring arm places _boom at the collision point; the camera rides on it, pulled in
+	# further while the boom eases back out after a squeeze, so it never pops.
+	_boom = Node3D.new()
+	_boom.name = "Boom"
+	_arm.add_child(_boom)
+	_boom_smooth = boom_length
 	_camera = Camera3D.new()
 	_camera.fov = fov
 	_camera.current = true
-	_arm.add_child(_camera)
+	_boom.add_child(_camera)
 
 	_flashlight = SpotLight3D.new()
 	_flashlight.position = Vector3(0.3, 0.0, 0.0)
@@ -165,7 +190,7 @@ func camera() -> Camera3D:
 
 
 func boom_current() -> float:
-	return _arm.get_hit_length()
+	return minf(_arm.get_hit_length(), _boom_smooth)
 
 
 func boom_target() -> float:
@@ -314,6 +339,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		weapon.cycle(-1)
 
 
+## Right-stick look: a power-1.6 response curve for fine aim near the centre, full speed at the
+## edge. Slower while aiming, like the mouse, and scaled by the sensitivity setting.
+func _pad_look(delta: float) -> void:
+	if dead or Game.dev_panel_open or get_tree().paused:
+		return
+	var v := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	if v == Vector2.ZERO:
+		return
+	v *= pow(v.length(), 0.6)
+	var speed := Game.pad_look_speed * (Game.mouse_sensitivity / 0.0025) * (aim_fov / fov if aiming else 1.0)
+	var look_y := -v.y if Game.invert_y else v.y
+	_yaw.rotate_y(-v.x * speed * delta)
+	_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * speed * 0.7 * delta, deg_to_rad(-70.0), deg_to_rad(50.0))
+
+
 ## Keyboard actions are polled so they also respond to simulated presses (tests, remapping).
 func _poll_actions() -> void:
 	if dead or Game.dev_panel_open or get_tree().paused:
@@ -331,17 +371,29 @@ func _poll_actions() -> void:
 
 func _process(delta: float) -> void:
 	_poll_actions()
+	_pad_look(delta)
 	var t := clampf(delta * 12.0, 0.0, 1.0)
 	var want_fov := aim_fov if aiming else fov + (sprint_fov_boost if _sprinting else 0.0)
 	_camera.fov = lerpf(_camera.fov, want_fov, clampf(delta * (12.0 if aiming else 5.0), 0.0, 1.0))
 	_update_shake(delta)
 	_arm.spring_length = lerpf(_arm.spring_length, aim_boom_length if aiming else boom_length, t)
 	_arm.position.x = lerpf(_arm.position.x, aim_shoulder_offset if aiming else shoulder_offset, t)
+	_update_boom(delta)
 	_since_damage += delta
 	var servo := Game.has_upgrade("regen_servo")
 	if not dead and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
 		health = minf(health + regen_rate * (1.5 if servo else 1.0) * delta, max_health())
 		health_changed.emit(health, max_health())
+
+
+## Snaps the camera in when something comes between it and Juno, then eases it back out.
+func _update_boom(delta: float) -> void:
+	var hit := _arm.get_hit_length()
+	if hit < _boom_smooth:
+		_boom_smooth = hit
+	else:
+		_boom_smooth = move_toward(_boom_smooth, hit, BOOM_RECOVER * delta)
+	_camera.position.z = _boom_smooth - hit
 
 
 func _update_shake(delta: float) -> void:
@@ -375,14 +427,18 @@ func _physics_process(delta: float) -> void:
 	if is_rolling():
 		_roll(delta)
 		return
-	if is_on_floor() and Input.is_action_just_pressed("jump") and not crouching:
+	_since_floor = 0.0 if is_on_floor() else _since_floor + delta
+	_jump_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_jump_buffer - delta, 0.0)
+	if _jump_buffer > 0.0 and _since_floor <= COYOTE_TIME and velocity.y <= 0.5 and not crouching:
 		velocity.y = jump_velocity
+		_jump_buffer = 0.0
+		_since_floor = COYOTE_TIME + 1.0
 	_update_crouch(Input.is_action_pressed("crouch"))
 	aiming = Input.is_action_pressed("aim")
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
 	if _hold_fire and not Input.is_action_pressed("fire"):
 		_hold_fire = false
-	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or DisplayServer.get_name() == "headless"
+	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Game.using_pad or DisplayServer.get_name() == "headless"
 	var firing := can_fire and not _hold_fire and Input.is_action_pressed("fire")
 	if firing and weapon.try_fire(aiming):
 		_combat_face = 0.6
@@ -402,8 +458,15 @@ func _physics_process(delta: float) -> void:
 		speed = minf(speed, walk_speed * 0.7)
 	if Game.carrying != "":
 		speed *= carry_speed_factor
-	velocity.x = move_toward(velocity.x, dir.x * speed, 30.0 * delta)
-	velocity.z = move_toward(velocity.z, dir.z * speed, 30.0 * delta)
+	# Quick to get going, quicker to stop, and only a little steering in the air.
+	var want := Vector2(dir.x, dir.z) * speed
+	var now := Vector2(velocity.x, velocity.z)
+	var rate := air_accel
+	if is_on_floor():
+		rate = ground_brake if want.length() < now.length() - 0.05 or want.dot(now) < 0.0 else ground_accel
+	now = now.move_toward(want, rate * delta)
+	velocity.x = now.x
+	velocity.z = now.y
 
 	# Face the crosshair while aiming or shooting; otherwise face the direction of travel.
 	_combat_face = maxf(_combat_face - delta, 0.0)
@@ -472,7 +535,7 @@ func _update_crouch(want: bool) -> void:
 	var h := crouch_height if crouching else stand_height
 	_capsule.height = h
 	_shape.position.y = h * 0.5
-	_pitch.position.y = h - 0.1
+	_pitch.position.y = h - (stand_height - pivot_height)
 
 
 func _build_body() -> void:

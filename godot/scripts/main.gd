@@ -48,6 +48,35 @@ const DAY_LENGTH := 1200.0
 const INTRO_FALL := 3.4
 const INTRO_SLIDE := 1.6
 const INTRO_HOLD := 1.6
+## Gamepad (Xbox names; Godot maps PlayStation and others to the same positions).
+const PAD_BUTTONS := {
+	"jump": [JOY_BUTTON_A],
+	"dodge": [JOY_BUTTON_B],
+	"reload": [JOY_BUTTON_X],
+	"interact": [JOY_BUTTON_Y],
+	"stim": [JOY_BUTTON_LEFT_SHOULDER],
+	"throw": [JOY_BUTTON_RIGHT_SHOULDER],
+	"sprint": [JOY_BUTTON_LEFT_STICK],
+	"crouch": [JOY_BUTTON_RIGHT_STICK],
+	"weapon_next": [JOY_BUTTON_DPAD_RIGHT],
+	"logs": [JOY_BUTTON_DPAD_LEFT],
+	"flashlight": [JOY_BUTTON_DPAD_UP],
+	"map": [JOY_BUTTON_DPAD_DOWN],
+	"inventory": [JOY_BUTTON_BACK],
+}
+## [axis, direction]: sticks move, triggers aim and fire.
+const PAD_AXES := {
+	"move_forward": [JOY_AXIS_LEFT_Y, -1.0],
+	"move_back": [JOY_AXIS_LEFT_Y, 1.0],
+	"move_left": [JOY_AXIS_LEFT_X, -1.0],
+	"move_right": [JOY_AXIS_LEFT_X, 1.0],
+	"aim": [JOY_AXIS_TRIGGER_LEFT, 1.0],
+	"fire": [JOY_AXIS_TRIGGER_RIGHT, 1.0],
+	"look_left": [JOY_AXIS_RIGHT_X, -1.0],
+	"look_right": [JOY_AXIS_RIGHT_X, 1.0],
+	"look_up": [JOY_AXIS_RIGHT_Y, -1.0],
+	"look_down": [JOY_AXIS_RIGHT_Y, 1.0],
+}
 const BUTTONS := {
 	"fire": [MOUSE_BUTTON_LEFT],
 	"aim": [MOUSE_BUTTON_RIGHT],
@@ -838,6 +867,30 @@ func _setup_input() -> void:
 			var ev := InputEventMouseButton.new()
 			ev.button_index = button
 			InputMap.action_add_event(action, ev)
+	for action in PAD_BUTTONS:
+		for button in PAD_BUTTONS[action]:
+			var ev := InputEventJoypadButton.new()
+			ev.button_index = button
+			ev.device = -1
+			InputMap.action_add_event(action, ev)
+	for action in PAD_AXES:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		var ev := InputEventJoypadMotion.new()
+		ev.axis = PAD_AXES[action][0]
+		ev.axis_value = PAD_AXES[action][1]
+		ev.device = -1
+		InputMap.action_add_event(action, ev)
+		InputMap.action_set_deadzone(action, 0.35 if action in ["aim", "fire"] else 0.15)
+	# Start pauses. B is the dodge in play, so it must not also be "cancel" (Esc still is, and
+	# B still backs out of menus, which handle it themselves while the game is paused).
+	for ev in InputMap.action_get_events("ui_cancel"):
+		if ev is InputEventJoypadButton:
+			InputMap.action_erase_event("ui_cancel", ev)
+	var start := InputEventJoypadButton.new()
+	start.button_index = JOY_BUTTON_START
+	start.device = -1
+	InputMap.action_add_event("ui_cancel", start)
 
 
 func _ensure_action(action: String) -> void:
