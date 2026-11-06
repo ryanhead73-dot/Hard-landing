@@ -343,8 +343,15 @@ func show_message(text: String) -> void:
 
 
 func set_ammo(in_mag: int, mag_size: int, reloading: bool) -> void:
-	_ammo.text = "RELOADING" if reloading else "%d / %d" % [in_mag, mag_size]
-	_ammo.add_theme_color_override("font_color", Color("ffb24d") if reloading or in_mag <= 5 else Color.WHITE)
+	if reloading:
+		_ammo.text = "RELOADING"
+	elif in_mag == 0:
+		_ammo.text = "RELOAD  [%s]" % Game.key_name("reload")
+	else:
+		_ammo.text = "%d / %d" % [in_mag, mag_size]
+	# Amber once a quarter of the magazine (or less) is left, so the reload never surprises.
+	var low := in_mag <= maxi(2, mag_size / 4)
+	_ammo.add_theme_color_override("font_color", Color("ffb24d") if reloading or low else Color.WHITE)
 
 
 func set_health(health: float, max_health: float) -> void:
@@ -589,12 +596,23 @@ func _draw_compass() -> void:
 		_compass.draw_colored_polygon(PackedVector2Array([Vector2(x, 2), Vector2(x + 5, 7), Vector2(x, 12), Vector2(x - 5, 7)]), c)
 
 
+## How far the crosshair ticks spread for the weapon's current accuracy, in pixels: the cone a
+## shot can land in, as seen through the camera.
+func crosshair_spread_px(cam: Camera3D) -> float:
+	var p := get_tree().get_first_node_in_group("player") as Player
+	if p == null or cam == null or p.weapon == null:
+		return 0.0
+	var half := deg_to_rad(cam.fov) * 0.5
+	return minf(tan(p.weapon.current_spread(p.aiming)) / tan(half) * _crosshair.size.y * 0.5, 60.0)
+
+
 func _draw_crosshair() -> void:
 	var c := _crosshair.size * 0.5
 	var col := Color(1, 1, 1, 0.85)
-	for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-		_crosshair.draw_line(c + d * 6.0, c + d * 13.0, col, 2.0)
 	var cam := get_viewport().get_camera_3d()
+	var gap := 6.0 + crosshair_spread_px(cam)
+	for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		_crosshair.draw_line(c + d * gap, c + d * (gap + 7.0), col, 2.0)
 	if cam:
 		var heading := deg_to_rad(compass_heading())
 		for m in _hurt_marks:

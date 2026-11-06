@@ -28,6 +28,13 @@ const SPECS := {
 	},
 }
 const SWITCH_TIME := 0.35
+## Sustained fire blooms the spread (radians added per shot, and the most it can add); it settles
+## once the trigger is let go.
+const BLOOM := {"rifle": 0.0022, "scattergun": 0.0, "arc_lance": 0.0}
+const BLOOM_MAX := 0.018
+const BLOOM_SETTLE := 0.09
+## Spent casings: colour and size per weapon (the arc lance has none).
+const CASINGS := {"rifle": [Color("c9a24a"), 0.022], "scattergun": [Color("9c3324"), 0.035]}
 
 var camera: Camera3D
 var shooter: CollisionObject3D
@@ -49,6 +56,11 @@ var _flash: OmniLight3D
 var _tracer_mat: StandardMaterial3D
 var _beam_mat: StandardMaterial3D
 var _models: Dictionary = {}
+## 0 standing still .. 1 sprinting or in the air: moving spreads shots. The player sets it.
+var move_penalty := 0.0
+var bloom := 0.0
+var _since_shot := 9.0
+var _shots := 0
 
 
 func _ready() -> void:
@@ -73,6 +85,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_cooldown = maxf(_cooldown - delta, 0.0)
+	_since_shot += delta
+	if _since_shot > 0.12:
+		bloom = move_toward(bloom, 0.0, BLOOM_SETTLE * delta)
 	if reloading:
 		_reload_left -= delta
 		if _reload_left <= 0.0:
@@ -109,6 +124,12 @@ func reload_time() -> float:
 	if current == "arc_lance" and Game.has_upgrade("arc_capacitor"):
 		t *= 0.7
 	return t
+
+
+## The spread a shot fired now would have: the weapon's base, widened by moving, plus bloom.
+## The HUD sizes the crosshair from it.
+func current_spread(aiming: bool) -> float:
+	return spread(aiming) * (1.0 + 1.5 * move_penalty) + bloom * (0.5 if aiming else 1.0)
 
 
 func spread(aiming: bool) -> float:
@@ -184,7 +205,7 @@ func try_fire(aiming: bool) -> bool:
 	var killed_any := false
 	var crit_any := false
 	for p in int(s["pellets"]):
-		var result := _trace(spread(aiming), float(s["range"]), int(s["pierce"]))
+		var result := _trace(current_spread(aiming), float(s["range"]), int(s["pierce"]))
 		hit_any = hit_any or result[0]
 		killed_any = killed_any or result[1]
 		crit_any = crit_any or result[2]
@@ -194,7 +215,11 @@ func try_fire(aiming: bool) -> bool:
 			crit_landed.emit()
 		var tick := "kill_tick" if killed_any else ("hit_crit" if crit_any else "hit_tick")
 		Sfx.play(tick, null, -4.0, 0.0)
+	bloom = minf(bloom + float(BLOOM.get(current, 0.0)), BLOOM_MAX)
+	_since_shot = 0.0
+	_shots += 1
 	_show_flash()
+	_eject()
 	Sfx.play(s["sound"], null, -3.0, 0.08)
 	fired.emit()
 	_emit_ammo()
@@ -298,11 +323,26 @@ func _show_flash() -> void:
 	_flash.visible = true
 	_star.visible = true
 	_star.rotation.z = randf() * TAU
-	_star.scale = Vector3.ONE * (1.6 if current == "scattergun" else 1.0)
+	_star.scale = Vector3.ONE * (1.6 if current == "scattergun" else 1.0) * randf_range(0.8, 1.2)
 	await get_tree().create_timer(0.04).timeout
 	if is_instance_valid(_flash):
 		_flash.visible = false
 		_star.visible = false
+
+
+## A spent casing flicked out of the ejection port to the right, and every few shots a wisp of
+## smoke from the muzzle.
+func _eject() -> void:
+	if not is_inside_tree() or not is_visible_in_tree():
+		return
+	var scene := get_tree().current_scene
+	if CASINGS.has(current):
+		var c: Array = CASINGS[current]
+		var port := global_transform * Vector3(0.05, 0.04, 0.02)
+		var out := (global_basis.x * 1.0 + global_basis.y * 0.7 + global_basis.z * 0.2).normalized()
+		Vfx.burst(scene, port, c[0], 1, 2.4, c[1], 0.6, out, 18.0, -9.8)
+	if _shots % 3 == 0 or current != "rifle":
+		Vfx.burst(scene, _muzzle.global_position, Color(0.55, 0.55, 0.52, 0.5), 2, 0.4, 0.09, 0.5, Vector3.UP, 30.0, 0.6)
 
 
 func _tracer(from: Vector3, to: Vector3) -> void:

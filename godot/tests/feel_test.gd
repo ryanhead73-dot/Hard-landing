@@ -18,6 +18,7 @@ func _run() -> void:
 	await _sprint_fov()
 	await _splash()
 	await _damage_arcs()
+	await _rifle()
 	_graphics()
 	finished = true
 
@@ -77,7 +78,7 @@ func _shake() -> void:
 	player._update_shake(0.0)
 	_check("a shot kicks the view", fired and kick > 0.02 and player.camera().v_offset < -0.02, "fired=%s kick %.3f v_offset %.4f" % [fired, kick, player.camera().v_offset])
 	await _frames(1)
-	_check("the kick never moves the aim", (-player.camera().global_basis.z).angle_to(aim) < 0.01)
+	_check("one shot's climb barely moves the aim", (-player.camera().global_basis.z).angle_to(aim) < 0.01)
 	await _frames(40)
 	_check("the kick recovers", absf(player.camera().v_offset) < 0.003, "%.4f" % player.camera().v_offset)
 	_check("hit stop is skipped headless", Engine.time_scale == 1.0)
@@ -130,6 +131,45 @@ func _damage_arcs() -> void:
 	_check("a hit shows where it came from", hud.hurt_mark_count() == 1)
 	await get_tree().create_timer(1.6).timeout
 	_check("the damage arc fades", hud.hurt_mark_count() == 0)
+
+
+## M13.5: the rifle blooms under sustained fire and settles, moving widens the spread, the
+## muzzle climbs and mostly comes back, casings fly, and the crosshair shows the spread.
+func _rifle() -> void:
+	_clear_enemies()
+	_place(_ground(ARENA), 0.0)
+	await _frames(30)
+	var w := player.weapon
+	w.equip("rifle")
+	w.refill()
+	await get_tree().create_timer(0.8).timeout
+	var still := w.current_spread(false)
+	var hud: Hud = main.hud
+	var gap0 := hud.crosshair_spread_px(player.camera())
+	var pitch0 := player._pitch.rotation.x
+	var bursts := get_tree().get_nodes_in_group("vfx_burst").size()
+	var shots := 0
+	for i in 12:
+		if w.try_fire(false):
+			shots += 1
+		await get_tree().create_timer(w.fire_interval() + 0.01).timeout
+	_check("sustained fire blooms the spread", w.bloom > 0.01 and w.current_spread(false) > still * 1.8, "%d shots bloom %.4f spread %.4f -> %.4f" % [shots, w.bloom, still, w.current_spread(false)])
+	_check("the crosshair opens with it", hud.crosshair_spread_px(player.camera()) > gap0 + 4.0, "%.1f -> %.1f px" % [gap0, hud.crosshair_spread_px(player.camera())])
+	var climbed := player._pitch.rotation.x - pitch0
+	_check("the muzzle climbs", climbed > deg_to_rad(1.0), "%.2f deg" % rad_to_deg(climbed))
+	_check("casings and smoke fly", get_tree().get_nodes_in_group("vfx_burst").size() > bursts + 6)
+	await get_tree().create_timer(0.6).timeout
+	var left := player._pitch.rotation.x - pitch0
+	_check("most of the climb is pulled back", left < climbed * 0.4 and left > 0.0, "%.2f of %.2f deg" % [rad_to_deg(left), rad_to_deg(climbed)])
+	_check("the bloom settles", w.bloom < 0.004, "%.4f" % w.bloom)
+	_check("aiming tightens it", w.current_spread(true) < w.current_spread(false) * 0.5)
+	Input.action_press("move_forward")
+	Input.action_press("sprint")
+	await _frames(40)
+	_check("moving widens the spread", w.move_penalty > 0.5 and w.current_spread(false) > still * 1.5, "penalty %.2f" % w.move_penalty)
+	Input.action_release("sprint")
+	Input.action_release("move_forward")
+	await _frames(30)
 
 
 func _graphics() -> void:
