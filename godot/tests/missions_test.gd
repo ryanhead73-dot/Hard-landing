@@ -22,7 +22,9 @@ func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
 	_check("every repair has a mission of one or more stages", Campaign.REPAIRS.all(func(r): return runner.stage_count(r["id"]) >= 1))
-	_check("first objective is a mission stage", Game.objective_text().contains("breakers"), Game.objective_text())
+	# From the crash site the HUD names the trip; the first stage shows on arrival (slice_test).
+	_check("first stage is the breakers", String(runner.stage("aux_power").get("text", "")).contains("breakers"))
+	_check("the opening objective names the relay", Game.objective_text().contains("relay station"), Game.objective_text())
 	_check_placement()
 	for r in Campaign.REPAIRS:
 		if r["id"] == "cooling":
