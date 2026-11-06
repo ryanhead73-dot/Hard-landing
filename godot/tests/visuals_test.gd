@@ -6,7 +6,7 @@ extends "res://tests/test_base.gd"
 ##   godot --headless --path . res://tests/visuals_test.tscn
 
 const MODELS := {
-	"juno": ["Hips", "Spine", "Chest", "Neck", "Head", "ArmL", "ArmR", "ForearmL", "ForearmR", "LegL", "LegR", "ShinL", "ShinR", "PackMount"],
+	"juno_rigged": ["Skeleton3D", "JunoMesh"],
 	"scuttler": ["Body", "Head", "JawL", "JawR", "LegL1", "LegL2", "LegL3", "LegR1", "LegR2", "LegR3", "FootL1", "FootR3"],
 	"spitter": ["Body", "Neck", "Head", "Sac", "LegL1", "LegL2", "LegR1", "LegR2", "FootL1"],
 	"ram": ["Body", "Head", "Tail", "LegFL", "LegFR", "LegBL", "LegBR", "FootFL"],
@@ -154,6 +154,16 @@ func _models() -> void:
 
 func _player_and_weapons() -> void:
 	_check("Juno is the Blender model", player.rig != null and Rig.joint(player.rig, "Head") != null)
+	var sk := player.anim.skeleton
+	var bones_ok := sk != null
+	for b in ["Hips", "Spine", "Chest", "Neck", "Head", "ArmL", "ArmR", "ForearmL", "ForearmR", "LegL", "LegR", "ShinL", "ShinR", "PackMount", "WeaponMount"]:
+		bones_ok = bones_ok and sk.find_bone(b) >= 0
+	_check("Juno's skeleton has every bone", bones_ok)
+	var clips := (player.rig.find_child("AnimationPlayer", true, false) as AnimationPlayer).get_animation_list()
+	var clips_ok := true
+	for c in ["idle", "walk", "run", "crouch", "crouch_walk", "jump", "fall", "aim", "reload", "hurt", "roll", "interact", "install", "stim", "throw", "die"]:
+		clips_ok = clips_ok and c in clips
+	_check("Juno has all her Blender clips", clips_ok, ", ".join(clips))
 	var pack: Node3D = player._packs.get("aux_cell")
 	_check("carried components use their models", pack != null and not Rig.meshes(pack).is_empty() and not pack.visible)
 	Game.take_component("aux_cell")

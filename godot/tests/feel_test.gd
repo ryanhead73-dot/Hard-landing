@@ -41,7 +41,7 @@ func _roll() -> void:
 	var moved := _flat_distance(player.global_position, start)
 	# Standing still, the roll goes backwards (+z when facing north).
 	_check("a standing roll carries her back a few metres", moved > 2.0 and player.global_position.z > start.z, "moved %.2f" % moved)
-	_check("the rig is upright again", player.anim.pose.root.rotation.length() < 0.01 and player.anim.state != "roll")
+	_check("she's upright again", absf(player.anim.bone_rot("Hips").x) < 10.0 and player.anim.bone_pos("Hips").y > 0.8 and player.anim.state != "roll", "hips %.0f %.2f" % [player.anim.bone_rot("Hips").x, player.anim.bone_pos("Hips").y])
 	await _frames(30)
 	# Rolling along the move direction.
 	start = player.global_position

@@ -151,15 +151,14 @@ func _ready() -> void:
 
 	weapon = Weapon.new()
 	weapon.name = "Rifle"
-	weapon.position = Vector3(0.28, 1.22, -0.32)
 	weapon.camera = _camera
 	weapon.shooter = self
-	# The weapon rides on Juno's chest so it follows her aim, lean and recoil with her hands.
-	var chest := Rig.joint(rig, "Chest")
-	if chest:
-		weapon.position -= _body.to_local(chest.global_position)
-		chest.add_child(weapon)
+	# The weapon hangs on the rig's WeaponMount bone: every clip carries it with her hands on it.
+	var mount := Rig.joint(rig, "WeaponMount")
+	if mount:
+		mount.add_child(weapon)
 	else:
+		weapon.position = Vector3(0.13, 1.27, -0.4)
 		_body.add_child(weapon)
 	anim = JunoAnimator.new()
 	anim.name = "Animator"
@@ -542,7 +541,9 @@ func _build_body() -> void:
 	_body = Node3D.new()
 	_body.name = "Body"
 	add_child(_body)
-	rig = Rig.spawn("juno", _body)
+	rig = Rig.spawn("juno_rigged", _body)
+	for bone in ["Chest", "Head", "PackMount", "WeaponMount"]:
+		Rig.attach(rig, bone)
 	# Whatever component is being carried rides on the life-support pack.
 	var mount := Rig.joint(rig, "PackMount")
 	for id in Campaign.PACKS:

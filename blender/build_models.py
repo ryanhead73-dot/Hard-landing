@@ -259,15 +259,15 @@ def juno():
         pod("ear%d" % s, (0.05, 0.1, 0.1), (0.165 * s, 0.12, 0.02), head, dark, n=2.6)
     cyl("antenna", 0.006, 0.16, (0.15, 0.27, 0.07), head, dark, verts=6, bevel=0.0)
     for side, s in (("L", -1), ("R", 1)):
-        shoulder = pivot("Arm" + side, (0.29 * s, 0.3, 0), chest)
-        pod("pauldron" + side, (0.16, 0.11, 0.19), (0.01 * s, 0.0, 0), shoulder, plate, n=3.4, taper=0.85)
-        pod("pauldron_trim" + side, (0.18, 0.03, 0.18), (0.015 * s, -0.055, 0), shoulder, orange, n=3.0)
-        pod("upper_arm" + side, (0.135, 0.31, 0.14), (0, -0.15, 0), shoulder, suit, n=2.4, taper=0.85)
-        elbow = pivot("Forearm" + side, (0, -0.3, 0), shoulder)
+        shoulder = pivot("Arm" + side, (0.26 * s, 0.3, 0), chest)
+        pod("pauldron" + side, (0.16, 0.11, 0.19), (0.02 * s, 0.0, 0), shoulder, plate, n=3.4, taper=0.85)
+        pod("pauldron_trim" + side, (0.18, 0.03, 0.18), (0.025 * s, -0.055, 0), shoulder, orange, n=3.0)
+        pod("upper_arm" + side, (0.135, 0.35, 0.14), (0, -0.17, 0), shoulder, suit, n=2.4, taper=0.85)
+        elbow = pivot("Forearm" + side, (0, -0.35, 0), shoulder)
         pod("elbow" + side, (0.125, 0.1, 0.125), (0, 0.0, 0), elbow, weave, n=2.2)
-        pod("forearm" + side, (0.12, 0.27, 0.13), (0, -0.13, 0), elbow, suit, n=2.4, taper=0.85)
-        pod("bracer" + side, (0.145, 0.16, 0.15), (0, -0.13, 0), elbow, plate, n=3.0, taper=0.9)
-        pod("glove" + side, (0.11, 0.12, 0.12), (0, -0.3, 0), elbow, dark, n=2.6)
+        pod("forearm" + side, (0.12, 0.3, 0.13), (0, -0.15, 0), elbow, suit, n=2.4, taper=0.85)
+        pod("bracer" + side, (0.145, 0.17, 0.15), (0, -0.16, 0), elbow, plate, n=3.0, taper=0.9)
+        pod("glove" + side, (0.11, 0.12, 0.12), (0, -0.35, 0), elbow, dark, n=2.6)
         hip = pivot("Leg" + side, (0.1 * s, -0.06, 0), hips)
         pod("thigh" + side, (0.19, 0.46, 0.2), (0, -0.21, 0), hip, suit, n=2.4, taper=0.8)
         pod("thigh_plate" + side, (0.15, 0.24, 0.06), (0, -0.18, -0.09), hip, plate, n=3.0, taper=0.85)
@@ -630,8 +630,9 @@ def components():
     export("crate")
 
 
+# Juno is built by build_juno.py (a skinned rig with keyframed clips) from juno() above.
 BUILDERS = {
-    "juno": juno, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer,
+    "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer,
     "rifle": rifle, "scattergun": scattergun, "arc_lance": arc_lance,
 }
 

@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
-## Milestone 5 animation: Juno's walk, run, crouch, jump, aim, recoil, reload, actions, hurt and
-## down poses; the wildlife gaits and per-creature poses; the repair install, the turret's idle
+## Juno's Blender clips in game (walk, run, crouch, jump, aim, recoil, reload, actions, hurt and
+## going down, hands on the rifle); the wildlife gaits and per-creature poses; the repair install, the turret's idle
 ## sweep and the crash intro. Run:
 ##   godot --headless --path . res://tests/animation_test.tscn
 
@@ -24,7 +24,12 @@ func _run() -> void:
 
 
 func _rot(joint: String) -> Vector3:
-	return player.anim.pose.rot_of(joint)
+	return player.anim.bone_rot(joint)
+
+
+func _grip_gap(side: String) -> float:
+	var a := player.anim
+	return a.hand(side).distance_to(a.weapon_point(Vector3(0.0, -0.12, 0.17) if side == "R" else Vector3(0.0, -0.06, -0.12)))
 
 
 func _juno_locomotion() -> void:
@@ -32,7 +37,9 @@ func _juno_locomotion() -> void:
 	_place(ARENA, 0.0)
 	await _frames(20)
 	_check("Juno stands idle", a.state == "idle", a.state)
-	_check("the weapon rides on her chest", player.weapon.get_parent().name == "Chest")
+	_check("she's a skinned model driven by an AnimationTree", a.skeleton != null and a.tree != null and a.tree.active)
+	_check("the weapon hangs on her WeaponMount bone", player.weapon.get_parent().name == "WeaponMount")
+	_check("both hands are on the rifle", _grip_gap("R") < 0.06 and _grip_gap("L") < 0.08, "R %.2f L %.2f" % [_grip_gap("R"), _grip_gap("L")])
 	# Walk: legs swing in opposition, knees bend.
 	Input.action_press("move_forward")
 	await _frames(30)
@@ -48,19 +55,20 @@ func _juno_locomotion() -> void:
 		opposed = opposed or (absf(l) > 8.0 and l * r < 0.0)
 	_check("walking swings her legs", a.state == "walk" and hi - lo > 25.0, "%s range=%.0f" % [a.state, hi - lo])
 	_check("legs move in opposition", opposed)
+	_check("the walk plays at a speed that keeps her feet with the ground", absf(float(a.tree.get("parameters/gait_speed/scale")) - player.walk_speed / (a.WALK_CYCLE / a.CYCLE_TIME)) < 0.2, "%.2f" % float(a.tree.get("parameters/gait_speed/scale")))
 	Input.action_press("sprint")
 	await _frames(40)
 	_check("sprinting runs", a.state == "run", a.state)
-	_check("running leans her forward", _rot("Spine").x < -5.0, "spine=%.1f" % _rot("Spine").x)
+	_check("running leans her forward", _rot("Spine").x < -4.0, "spine=%.1f" % _rot("Spine").x)
+	_check("her hands stay on the rifle while running", _grip_gap("R") < 0.08, "R %.2f" % _grip_gap("R"))
 	Input.action_release("sprint")
 	Input.action_release("move_forward")
 	await _frames(30)
 	# Crouch folds the legs instead of squashing the model.
 	Input.action_press("crouch")
 	await _frames(40)
-	var hips := player.anim.pose.node("Hips")
-	_check("crouching folds her legs", a.state == "crouch" and _rot("LegL").x > 50.0 and _rot("ShinL").x < -80.0, "leg=%.0f shin=%.0f" % [_rot("LegL").x, _rot("ShinL").x])
-	_check("crouch lowers the hips, no squash", hips.position.y < 0.6 and is_equal_approx(player._body.scale.y, 1.0), "hips=%.2f" % hips.position.y)
+	_check("crouching folds her legs", a.state == "crouch" and _rot("LegL").x > 50.0 and a.bone_bend("ShinL") > 80.0, "leg=%.0f knee=%.0f" % [_rot("LegL").x, a.bone_bend("ShinL")])
+	_check("crouch lowers the hips, no squash", a.bone_pos("Hips").y < 0.6 and is_equal_approx(player._body.scale.y, 1.0), "hips=%.2f" % a.bone_pos("Hips").y)
 	Input.action_release("crouch")
 	await _frames(40)
 	await _press("jump")
@@ -78,6 +86,8 @@ func _juno_upper_body() -> void:
 	player.aim_at(player.global_position + Vector3(0.0, 9.0, -10.0))
 	await _frames(30)
 	_check("aiming up pitches her chest", _rot("Chest").x > 8.0, "chest=%.1f" % _rot("Chest").x)
+	_check("aiming shoulders the rifle", a.weapon_point(Vector3.ZERO).y > 1.45, "%.2f" % a.weapon_point(Vector3.ZERO).y)
+	_check("her hands follow the rifle up", _grip_gap("R") < 0.06, "R %.2f" % _grip_gap("R"))
 	Input.action_release("aim")
 	await _frames(5)
 	w.fired.emit()
@@ -87,30 +97,36 @@ func _juno_upper_body() -> void:
 	await _frames(30)
 	Game.set_ammo(w.current, 0, 50)
 	w.start_reload()
+	var left_off := 0.0
+	var tilt := 0.0
+	var start := Time.get_ticks_msec()
+	while w.reloading and Time.get_ticks_msec() - start < 4000:
+		await get_tree().process_frame
+		left_off = maxf(left_off, _grip_gap("L"))
+		tilt = maxf(tilt, absf(w.global_basis.x.y))
+	_check("reloading tilts the rifle and the left hand leaves it for a fresh cell", left_off > 0.2 and tilt > 0.25, "hand off %.2f tilt %.2f" % [left_off, tilt])
 	await _frames(20)
-	_check("reloading tilts the weapon and drops the left hand", w.reloading and w.rotation_degrees.z > 12.0 and _rot("ForearmL").x > 40.0, "roll=%.0f forearm=%.0f" % [w.rotation_degrees.z, _rot("ForearmL").x])
-	await get_tree().create_timer(2.5).timeout
-	_check("reload pose clears", not w.reloading and w.rotation_degrees.z < 3.0)
+	_check("reload pose clears, hands back on", not w.reloading and _grip_gap("L") < 0.08, "L %.2f" % _grip_gap("L"))
 	_check("a stim plays its action", a.play("stim") and a.action == "stim")
-	await get_tree().create_timer(0.45).timeout
-	_check("the stim goes to her chest", _rot("ForearmL").x > 70.0, "forearm=%.0f" % _rot("ForearmL").x)
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(0.4).timeout
+	_check("the stim goes into her thigh", a.hand("L").y < 1.0 and _grip_gap("L") > 0.3, "hand y %.2f" % a.hand("L").y)
+	await get_tree().create_timer(0.7).timeout
 	_check("actions finish", a.action == "")
 	_check("a throw plays its action", a.play("throw") and a.action == "throw")
-	var wound := 0.0
-	var release := 999.0
-	var start := Time.get_ticks_msec()
+	var high := -9.0
+	var forward := 9.0
+	start = Time.get_ticks_msec()
 	while a.action == "throw":
 		await get_tree().process_frame
-		var arm := _rot("ArmL").x
+		var h := a.hand("L")
 		if Time.get_ticks_msec() - start < 260:
-			wound = maxf(wound, arm)
-		elif wound > 0.0:
-			release = minf(release, arm)
-	_check("the throw winds up and whips through", wound > 75.0 and release < wound - 30.0, "wind-up=%.0f release=%.0f" % [wound, release])
+			high = maxf(high, h.y)
+		else:
+			forward = minf(forward, h.z)
+	_check("the throw winds up and whips through", high > 1.5 and forward < -0.45, "wind-up y=%.2f release z=%.2f" % [high, forward])
 	a.play("install")
 	await get_tree().create_timer(0.6).timeout
-	_check("installing uses both hands, weapon stowed", not w.visible and _rot("ArmR").x > 40.0 and _rot("Spine").x < -10.0)
+	_check("installing kneels and uses both hands, weapon stowed", not w.visible and a.bone_pos("Hips").y < 0.75 and a.hand("L").z < -0.35 and a.hand("R").z < -0.35, "hips %.2f hands %.2f %.2f" % [a.bone_pos("Hips").y, a.hand("L").z, a.hand("R").z])
 	await get_tree().create_timer(1.0).timeout
 	_check("the weapon comes back after", w.visible)
 	_check("unknown actions are refused", not a.play("cartwheel"))
@@ -123,12 +139,12 @@ func _juno_upper_body() -> void:
 func _juno_down() -> void:
 	var a := player.anim
 	player.take_damage(9999.0)
-	await get_tree().create_timer(1.0).timeout
-	_check("she goes down", a.state == "down" and player.rig.rotation_degrees.x < -60.0, "%s %.0f" % [a.state, player.rig.rotation_degrees.x])
+	await get_tree().create_timer(1.6).timeout
+	_check("she goes down", a.state == "down" and a.bone_pos("Hips").y < 0.4 and not player.weapon.visible, "%s hips %.2f" % [a.state, a.bone_pos("Hips").y])
 	_check("no actions while down", not a.play("stim"))
 	player.revive(ARENA)
-	await _frames(3)
-	_check("revived, she's back on her feet", absf(player.rig.rotation_degrees.x) < 1.0 and player.weapon.visible and a.state != "down")
+	await _frames(20)
+	_check("revived, she's back on her feet", a.bone_pos("Hips").y > 0.8 and player.weapon.visible and a.state != "down", "hips %.2f" % a.bone_pos("Hips").y)
 
 
 func _wildlife() -> void:
