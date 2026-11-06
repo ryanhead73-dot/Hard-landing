@@ -53,3 +53,21 @@ static func own_material(root: Node, material_name: String) -> StandardMaterial3
 					copy = src.duplicate() as StandardMaterial3D
 				m.set_surface_override_material(i, copy)
 	return copy
+
+
+## For a skinned model: a node that follows `bone` with the axes the old rigid pivots had (model
+## axes at rest), so anything hung on it sits the same way it did on a pivot. Named after the bone,
+## so joint() finds it. Null if the model has no such bone.
+static func attach(root: Node, bone: String) -> Node3D:
+	var skel := root.find_child("Skeleton3D", true, false) as Skeleton3D
+	if skel == null or skel.find_bone(bone) < 0:
+		return null
+	var att := BoneAttachment3D.new()
+	att.name = bone + "Bone"
+	skel.add_child(att)
+	att.bone_name = bone
+	var aligned := Node3D.new()
+	aligned.name = bone
+	aligned.basis = skel.get_bone_global_rest(skel.find_bone(bone)).basis.orthonormalized().inverse()
+	att.add_child(aligned)
+	return aligned
