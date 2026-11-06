@@ -167,6 +167,34 @@ def power_up(v):
     return indoor(place(3.5, *relays, (0.3, spool), (0.3, whine), (1.9, hum), (1.9, thud(55, 0.4, 0.8) * 0.8)), 0.3)
 
 
+@sound("aux_restart")
+def aux_restart(v):
+    """Kestrel's lights coming back after the aux cell goes in (timed to Kestrel.power_up)."""
+    d = 3.6
+    # The emergency circuit drops out: a buzz that sags and dies under a heavy contactor.
+    sag = osc(sweep(100, 70, 0.45), 0.45, "saw") * env(0.45, 0.005, 0.4) * 0.25
+    sag = bp(sag, 80, 1200)
+    contactor = place(0.5, (0, thud(70, 0.3, 0.6)), (0, clack(700, 0.15, 0.3, 1.0)))
+    # Then the bus spools up, and the hum lands as the last lamp strikes.
+    spool = lp(osc(sweep(30, 110, 2.0, 0.6), 2.0, "saw"), 800) * env(2.0, 1.6, 0.4) * 0.35
+    whine = osc(sweep(300, 1500, 2.0, 0.7), 2.0) * env(2.0, 1.7, 0.3) * 0.07
+    hum = (osc(60, 1.4) + 0.5 * osc(120, 1.4) + 0.3 * osc(180, 1.4)) * env(1.4, 0.05, 1.2) * 0.35
+    return indoor(place(d, (0, sag), (0.05, contactor), (0.6, spool), (0.6, whine), (2.5, hum),
+                        (2.5, thud(55, 0.4, 0.8) * 0.9)), 0.3)
+
+
+@sound("lamp_strike", 3)
+def lamp_strike(v):
+    """A ceiling lamp catching: a starter tick, a stutter of ballast buzz, a settle."""
+    parts = [(0, click(0.006, 2500, 9000) * 0.8)]
+    for k in range(2 + v % 2):
+        at = 0.03 + k * (0.05 + 0.015 * v)
+        b = bp(osc(100, 0.035, "saw") + 0.3 * white(0.035), 150, 4000) * env(0.035, 0.002, 0.03) * 0.35
+        parts.append((at, b))
+    parts.append((0.18 + 0.02 * v, clack(3000 + 300 * v, 0.05, 0.1, 0.35)))
+    return indoor(place(0.45, *parts), 0.2)
+
+
 @sound("fabricate")
 def fabricate(v):
     d = 1.6
@@ -712,7 +740,7 @@ PEAKS = {
     "thunder": 0.9,
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
     "signal_ping": 0.4, "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
-    "hull_groan": 0.9,
+    "hull_groan": 0.9, "aux_restart": 0.85, "lamp_strike": 0.45,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).

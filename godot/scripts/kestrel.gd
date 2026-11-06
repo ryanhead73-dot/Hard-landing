@@ -6,6 +6,8 @@ extends Node3D
 ## (centreline at 13), y = metres above the main deck. plan() converts them to local space.
 
 signal repair_changed(id: String, repaired: bool)
+## The staged aux power-up (see power_up) has finished and every light is on.
+signal power_up_finished
 
 const LAYOUT_PATH := "res://data/kestrel_layout.json"
 const REPAIR_ORDER: Array[String] = ["aux_power", "cooling", "canopy", "landing_gear", "wing", "engine", "navigation"]
@@ -62,6 +64,14 @@ const AUX_LIGHTS := [
 	Vector3(9.7, 2.4, 10.6), Vector3(9.7, 2.4, 15.4), Vector3(9.6, 3.4, 13.0), Vector3(6.0, 3.4, 13.0),
 	Vector3(25.5, 2.8, 13.0), Vector3(28.5, 2.8, 13.0), Vector3(26.2, 1.2, 9.7), Vector3(26.2, 1.2, 16.3),
 ]
+## The aux power-up: the emergency lights drop out, then the lamps strike one by one outward from
+## the aux bay between LAMPS_FROM and LAMPS_TO seconds, and the cabin warms. Matches aux_restart.
+const POWER_UP_TIME := 2.9
+const LAMPS_FROM := 0.9
+const LAMPS_TO := 2.4
+const AUX_ENERGY := 0.8
+const WARM_AMBIENT := Color(0.32, 0.25, 0.17)
+const DARK_AMBIENT := Color(0.09, 0.11, 0.14)
 const EMERGENCY_LIGHTS := [
 	Vector3(12.0, 3.0, 13.0), Vector3(23.0, 3.0, 13.0), Vector3(9.6, 3.4, 13.0), Vector3(27.0, 2.8, 13.0),
 ]
@@ -92,6 +102,10 @@ var _lamps: Array[MeshInstance3D] = []
 var _screens: Array[MeshInstance3D] = []
 var _interior_probes: Array[ReflectionProbe] = []
 var _pose_tween: Tween
+## True while the staged aux power-up plays.
+var powering_up := false
+var _power_tween: Tween
+var _animate_next := false
 var _ramp_hinge: Node3D
 var _ramp_tween: Tween
 ## The wing's point-defence turret (live only while the wing is repaired).
@@ -107,6 +121,7 @@ func rebuild() -> void:
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
+	_cancel_power_up()
 	repairs.clear()
 	interact_points.clear()
 	_aux_lights.clear()
@@ -154,9 +169,13 @@ func is_repaired(id: String) -> bool:
 	return repairs.has(id) and (repairs[id] as Repairable).repaired
 
 
-func set_repaired(id: String, value: bool) -> void:
+## Pass animate to stage the change for the player (the aux power-up); loads and debug toggles
+## apply it at once.
+func set_repaired(id: String, value: bool, animate := false) -> void:
 	if repairs.has(id):
+		_animate_next = animate
 		(repairs[id] as Repairable).repaired = value
+		_animate_next = false
 
 
 func play_repair(id: String) -> void:
@@ -354,7 +373,11 @@ func _build_repairs() -> void:
 func _on_repair_state_changed(fixed: bool, id: String) -> void:
 	match id:
 		"aux_power":
-			_apply_aux(fixed)
+			if fixed and _animate_next and not Engine.is_editor_hint():
+				power_up()
+			else:
+				_cancel_power_up()
+				_apply_aux(fixed)
 		"landing_gear":
 			_apply_pose(fixed, true)
 			_apply_ramp(fixed, true)
@@ -370,9 +393,70 @@ func _apply_aux(on: bool) -> void:
 		lamp.material_override = _mat("amber_glow" if on else "metal_dark")
 	for screen in _screens:
 		screen.material_override = _screen_material() if on else _mat("screen_off")
+	for light in _aux_lights:
+		light.light_energy = AUX_ENERGY
 	for probe in _interior_probes:
-		probe.ambient_color = Color(0.32, 0.25, 0.17) if on else Color(0.09, 0.11, 0.14)
+		probe.ambient_color = WARM_AMBIENT if on else DARK_AMBIENT
 		probe.ambient_color_energy = 0.8 if on else 0.6
+
+
+## The payoff for fitting the aux cell. The emergency circuit stutters and drops out, a beat of
+## darkness, then the lamps strike one by one outward from the aux bay, each with a flicker and
+## a surge, the screens wake and the cabin warms. Ends exactly in the _apply_aux(true) state.
+func power_up() -> void:
+	_cancel_power_up()
+	_apply_aux(false)
+	powering_up = true
+	var bay: Vector3 = (repairs["aux_power"] as Node3D).global_position if repairs.has("aux_power") else global_position
+	Sfx.play("aux_restart", bay, 0.0, 0.0)
+	var tw := create_tween().set_parallel(true)
+	_power_tween = tw
+	for light in _emergency_lights:
+		tw.tween_callback(light.hide).set_delay(0.06)
+		tw.tween_callback(light.show).set_delay(0.14)
+		tw.tween_callback(light.hide).set_delay(0.3)
+	for probe in _interior_probes:
+		tw.tween_property(probe, "ambient_color", Color(0.03, 0.035, 0.05), 0.35).set_delay(0.06)
+		tw.tween_property(probe, "ambient_color", WARM_AMBIENT, LAMPS_TO - LAMPS_FROM + 0.4).set_delay(LAMPS_FROM)
+		tw.tween_property(probe, "ambient_color_energy", 0.8, LAMPS_TO - LAMPS_FROM + 0.4).set_delay(LAMPS_FROM)
+	var order: Array = range(_aux_lights.size())
+	order.sort_custom(func(a: int, b: int) -> bool:
+		return _aux_lights[a].global_position.distance_squared_to(bay) < _aux_lights[b].global_position.distance_squared_to(bay))
+	for k in order.size():
+		var i: int = order[k]
+		var at := LAMPS_FROM + (LAMPS_TO - LAMPS_FROM) * float(k) / float(maxi(1, order.size() - 1))
+		tw.tween_callback(_strike.bind(i, true, true)).set_delay(at)
+		tw.tween_callback(_strike.bind(i, false, false)).set_delay(at + 0.06)
+		tw.tween_callback(_strike.bind(i, true, false)).set_delay(at + 0.15)
+		tw.tween_property(_aux_lights[i], "light_energy", AUX_ENERGY, 0.6).from(AUX_ENERGY * 1.8).set_delay(at + 0.15)
+	for k in _screens.size():
+		tw.tween_callback(_wake_screen.bind(k)).set_delay(minf(LAMPS_TO - 0.2 + 0.12 * k, POWER_UP_TIME - 0.05))
+	tw.tween_callback(_finish_power_up).set_delay(POWER_UP_TIME)
+
+
+func _strike(i: int, on: bool, loud: bool) -> void:
+	_aux_lights[i].visible = on
+	_lamps[i].material_override = _mat("amber_glow" if on else "metal_dark")
+	if loud:
+		Sfx.play("lamp_strike", _aux_lights[i].global_position, -6.0)
+
+
+func _wake_screen(i: int) -> void:
+	_screens[i].material_override = _screen_material()
+
+
+func _finish_power_up() -> void:
+	_power_tween = null
+	powering_up = false
+	_apply_aux(true)
+	power_up_finished.emit()
+
+
+func _cancel_power_up() -> void:
+	if _power_tween and _power_tween.is_valid():
+		_power_tween.kill()
+	_power_tween = null
+	powering_up = false
 
 
 func _apply_pose(level: bool, animate: bool) -> void:

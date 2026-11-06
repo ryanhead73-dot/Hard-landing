@@ -15,7 +15,7 @@ const SOUNDS: Array[String] = [
 	"wind_loop", "ship_hum_loop",
 	"music_calm", "music_combat", "music_finale",
 	"amb_springs_loop", "amb_loom_loop", "amb_interior_loop", "spool_loop",
-	"crash_impact", "repair_clunk", "log_chime", "ui_click", "warden_slam",
+	"crash_impact", "repair_clunk", "aux_restart", "lamp_strike", "log_chime", "ui_click", "warden_slam",
 	"spitter_death", "ram_death", "launch_roar", "splash_0", "splash_1", "roll_whoosh",
 	"step_metal", "amb_moss_loop", "amb_wreck_loop", "charge_throw", "charge_bounce", "charge_blast",
 	"lurker_emerge", "lurker_hiss", "lurker_bite", "lurker_hurt", "lurker_death", "lurker_dive",

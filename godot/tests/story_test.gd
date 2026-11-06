@@ -102,6 +102,8 @@ func _mission_lines() -> void:
 	player.revive(main.install_point("aux_power") + Vector3.UP * 0.2)
 	await _frames(8)
 	await _press("interact")
+	# HOB speaks once the staged power-up has lit the ship.
+	await get_tree().create_timer(Kestrel.POWER_UP_TIME + 0.5).timeout
 	_check("installing the cell brings HOB online", Game.is_repaired("aux_power") and main.voice.heard("HOB online"), main.voice.current_text())
 	# The canopy repair arms a siege, and HOB calls it in.
 	for id in ["cooling", "canopy"]:

@@ -625,16 +625,32 @@ func _take_component(id: String) -> void:
 func _install(id: String) -> void:
 	install_started.emit(id)
 	Game.install_component()
-	kestrel.set_repaired(id, true)
+	var staged := id == "aux_power"
+	kestrel.set_repaired(id, true, staged)
 	kestrel.play_repair(id)
 	Sfx.play("repair_clunk", (kestrel.repairs[id] as Node3D).global_position, 2.0, 0.0)
 	player.anim.play("install")
-	voice.say(Story.INSTALLED.get(id, []))
+	player.add_trauma(0.22)
+	if staged:
+		# HOB waits for the lights: the power-up is the moment, the talk follows it.
+		kestrel.power_up_finished.connect(_on_power_restored.bind(id), CONNECT_ONE_SHOT)
+	else:
+		Sfx.play("power_up")
+		voice.say(Story.INSTALLED.get(id, []))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
 	save_game()
 	install_finished.emit(id)
+
+
+## The aux power-up has finished: name the moment, then let HOB speak.
+func _on_power_restored(id: String) -> void:
+	if not is_instance_valid(player) or not Game.is_repaired(id):
+		return
+	hud.show_banner("AUXILIARY POWER RESTORED", "Lights, fabricator and HOB back online")
+	Sfx.play("log_chime", null, -6.0, 0.0)
+	voice.say(Story.INSTALLED.get(id, []))
 
 
 func _search_crate(site: Node3D, i: int) -> void:
@@ -876,6 +892,10 @@ func _on_repair_changed(id: String, repaired: bool) -> void:
 		kestrel.add_child(anchor)
 		anchor.position = kestrel.plan(FABRICATOR_POINT.x, 1.6, FABRICATOR_POINT.z - 2.0)
 		_ship_hum = Sfx.loop("ship_hum_loop", anchor, -6.0)
+		if kestrel.powering_up and _ship_hum:
+			# The hum lands with the last lamp of the power-up.
+			_ship_hum.volume_db = -40.0
+			create_tween().tween_property(_ship_hum, "volume_db", -6.0, 1.2).set_delay(Kestrel.LAMPS_TO - 0.2)
 	elif not repaired and _ship_hum:
 		_ship_hum.get_parent().queue_free()
 		_ship_hum = null

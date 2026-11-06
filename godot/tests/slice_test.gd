@@ -31,7 +31,7 @@ func _run() -> void:
 	await _gamepad()
 	await _relay_flow()
 	await _intro()
-	_install_signals()
+	await _install_payoff()
 	finished = true
 
 
@@ -298,14 +298,57 @@ func _intro() -> void:
 	_check("Juno starts facing the relay", fwd.angle_to(to) < 0.35, "%.2f rad off" % fwd.angle_to(to))
 
 
-## Installing a repair announces itself for the payoff staging.
-func _install_signals() -> void:
+## Installing the aux cell announces itself for the staging, then powers Kestrel up in stages:
+## the emergency lights drop, the lamps strike outward from the bay, the hum lands, a title card
+## names it and HOB speaks only once the lights are on. A load shows the finished state at once.
+func _install_payoff() -> void:
 	var got: Array = []
 	main.install_started.connect(func(id): got.append("start:" + id))
 	main.install_finished.connect(func(id): got.append("end:" + id))
+	main.voice.clear()
+	var done := [false]
+	kestrel.power_up_finished.connect(func(): done[0] = true, CONNECT_ONE_SHOT)
 	Game.carrying = "aux_cell"
 	main._install("aux_power")
 	_check("install announces start and finish", got == ["start:aux_power", "end:aux_power"], str(got))
+	_check("the power-up starts dark", kestrel.powering_up and _lit(kestrel._aux_lights) == 0, "%d lit" % _lit(kestrel._aux_lights))
+	_check("HOB waits for the lights", not main.voice.busy() and main.hud.banner_text() != "AUXILIARY POWER RESTORED")
+	await get_tree().create_timer(0.6).timeout
+	_check("the emergency lights drop out", _lit(kestrel._emergency_lights) == 0)
+	await get_tree().create_timer(Kestrel.LAMPS_FROM + 0.5 - 0.6).timeout
+	var partway := _lit(kestrel._aux_lights)
+	_check("the lamps come on in stages", partway > 0 and partway < kestrel._aux_lights.size(), "%d of %d" % [partway, kestrel._aux_lights.size()])
+	var bay: Vector3 = (kestrel.repairs["aux_power"] as Node3D).global_position
+	var near := 0.0
+	var far := 0.0
+	for light in kestrel._aux_lights:
+		var d := light.global_position.distance_to(bay)
+		if light.visible:
+			near = maxf(near, d)
+		else:
+			far = d if far == 0.0 else minf(far, d)
+	_check("the wave spreads out from the aux bay", near <= far + 0.01, "lit to %.1f m, dark from %.1f m" % [near, far])
+	var t := 0.0
+	while not done[0] and t < 5.0:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	_check("the power-up finishes", done[0] and not kestrel.powering_up, "%.1f s" % t)
+	_check("every lamp is on and the emergency lights are off", _lit(kestrel._aux_lights) == kestrel._aux_lights.size() and _lit(kestrel._emergency_lights) == 0)
+	_check("the cabin is warm", kestrel._interior_probes[0].ambient_color.is_equal_approx(Kestrel.WARM_AMBIENT))
+	_check("a title card names the moment", main.hud.banner_text() == "AUXILIARY POWER RESTORED", main.hud.banner_text())
+	_check("then HOB speaks", main.voice.busy() and main.voice.current_text().contains("HOB online"), main.voice.current_text())
+	await get_tree().create_timer(1.0).timeout
+	_check("the ship hum has come up", main._ship_hum != null and main._ship_hum.volume_db > -8.0, "%.1f dB" % (main._ship_hum.volume_db if main._ship_hum else -99.0))
+	await _reload()
+	_check("a load restores the powered ship at once", not kestrel.powering_up and _lit(kestrel._aux_lights) == kestrel._aux_lights.size() and _lit(kestrel._emergency_lights) == 0)
+
+
+func _lit(lights: Array) -> int:
+	var n := 0
+	for light in lights:
+		if (light as Node3D).visible:
+			n += 1
+	return n
 
 
 ## Saves, throws the game away and loads the save into a fresh one, as Continue does.
