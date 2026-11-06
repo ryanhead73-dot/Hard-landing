@@ -101,6 +101,17 @@ func _ready() -> void:
 			var c: Vector3 = lk.global_position + Vector3.UP * 0.4
 			cam.look_at_from_position(c - fwd * 3.2 + side * 2.4 + Vector3.UP * 1.3, c)
 			cam.make_current()
+		if shot[0] == "hud":
+			# Typography review: a title card, a subtitle, a prompt and a message together.
+			main.hud.show_banner("AUXILIARY POWER RESTORED", "Lights, fabricator and HOB back online")
+			main.voice.clear()
+			main.voice.say([[Story.HOB, "...HOB online. Systems check. Ah. We appear to be lying in a swamp, face down."]])
+			main.hud.set_prompt("[E] Throw the breaker")
+			main.hud.show_message("Found 12 scrap and a stim.")
+		var pause_menu: PauseMenu = null
+		if shot[0] == "pause":
+			pause_menu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+			pause_menu.open()
 		if shot[0] == "map":
 			for c in main.wildlife.caches:
 				if c.index % 2 == 0:
@@ -147,10 +158,22 @@ func _ready() -> void:
 		await _frames(40)
 		for e in beasts:
 			e.process_mode = Node.PROCESS_MODE_DISABLED
+		if shot[0] == "hud":
+			# Headless frames are slow, so pin the transient text on for the capture.
+			main.hud.show_banner("AUXILIARY POWER RESTORED", "Lights, fabricator and HOB back online")
+			main.hud._banner_time = 99.0
+			main.voice._time = 99.0
+			main.hud.set_prompt("[E] Throw the breaker")
+			main.hud.show_message("Found 12 scrap and a stim.")
+			main.process_mode = Node.PROCESS_MODE_DISABLED
+			await _frames(2)
+			main.process_mode = Node.PROCESS_MODE_INHERIT
 		await RenderingServer.frame_post_draw
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s.png" % [out, shot[0]])
 		print("shot ", shot[0])
+		if pause_menu:
+			pause_menu.close()
 		if main.map_panel.is_open():
 			main.map_panel.close()
 		if cam:
@@ -203,6 +226,8 @@ func _shots() -> Array:
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
+		["hud", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
+		["pause", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["relay_inside", "aux_power", Vector3(-3.0, 0.5, -3.0), Vector3(2.0, 1.5, -8.0)],
 	]
 

@@ -44,7 +44,29 @@ func _run() -> void:
 	await _day_cycle()
 	_world()
 	_set_pieces()
+	_typography()
 	finished = true
+
+
+## M13.8: one type family on a fixed scale. The project theme is Barlow (and matches what
+## UiStyle builds), the HUD uses only the scale's sizes and the Barlow faces, and the title card
+## is the display face.
+func _typography() -> void:
+	var project_theme := ThemeDB.get_project_theme()
+	var built := UiStyle.theme()
+	_check("the project theme is Barlow", project_theme != null and project_theme.default_font.resource_path == UiStyle.BODY.resource_path and project_theme.default_font_size == built.default_font_size)
+	_check("the saved theme matches UiStyle", project_theme.get_font_size("font_size", "Button") == built.get_font_size("font_size", "Button") and project_theme.get_color("font_color", "Label") == built.get_color("font_color", "Label"))
+	var sizes: Array = UiStyle.ROLES.values().map(func(r): return r[1])
+	var faces := [UiStyle.BODY, UiStyle.BODY_STRONG, UiStyle.DISPLAY, UiStyle.DISPLAY_BOLD]
+	var off: PackedStringArray = []
+	for label in main.hud.find_children("*", "Label", true, false):
+		var f: Font = label.get_theme_font("font")
+		var base: Font = f.base_font if f is FontVariation else f
+		if not label.get_theme_font_size("font_size") in sizes or not base in faces:
+			off.append("%s %d" % [label.name, label.get_theme_font_size("font_size")])
+	_check("every HUD label is on the type scale", off.is_empty() and main.hud.find_children("*", "Label", true, false).size() > 15, ", ".join(off))
+	var banner: Label = main.hud._banner
+	_check("title cards use the display face", (banner.get_theme_font("font") as FontVariation).base_font == UiStyle.DISPLAY_BOLD)
 
 
 ## The basin: flat where the game happens, rising elsewhere; the collider matches the mesh;

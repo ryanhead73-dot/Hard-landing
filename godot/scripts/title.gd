@@ -77,13 +77,11 @@ func _build_menu() -> void:
 	layer.add_child(box)
 	var title := Label.new()
 	title.text = "HARD LANDING"
-	title.add_theme_font_size_override("font_size", 64)
-	title.add_theme_color_override("font_color", Color("e9e1cc"))
+	UiStyle.apply(title, "title")
 	box.add_child(title)
 	var sub := Label.new()
 	sub.text = "Kestrel is down on the Kettle. Get her flying."
-	sub.add_theme_font_size_override("font_size", 18)
-	sub.add_theme_color_override("font_color", Color("ffb24d"))
+	UiStyle.apply(sub, "heading", UiStyle.ORANGE)
 	box.add_child(sub)
 	box.add_child(Control.new())
 	continue_button = _button(box, "Continue", start.bind(true))
@@ -116,7 +114,6 @@ func _button(parent: Node, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(260, 44)
-	b.add_theme_font_size_override("font_size", 20)
 	b.pressed.connect(func(): Sfx.play("ui_click", null, -4.0, 0.0))
 	b.pressed.connect(action)
 	parent.add_child(b)
