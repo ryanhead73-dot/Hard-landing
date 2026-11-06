@@ -231,7 +231,7 @@ func _intro() -> void:
 	_check("the intro has its own camera", get_viewport().get_camera_3d() == main._cine_cam)
 	await get_tree().create_timer(main.INTRO_FALL + 0.3).timeout
 	_check("she hits the ground and throws dust", kestrel.global_position.y < rest.origin.y + 1.0 and main._shake > 0.0)
-	await get_tree().create_timer(main.INTRO_SLIDE + main.INTRO_HOLD + 0.5).timeout
+	await get_tree().create_timer(main.INTRO_SLIDE + main.INTRO_HOLD + main.INTRO_REVEAL + 1.3).timeout
 	_check("the intro ends with Kestrel at the crash site", not main.intro_playing and kestrel.global_transform.is_equal_approx(rest))
 	_check("Juno has control again", player.visible and player.is_physics_processing() and get_viewport().get_camera_3d() == player.camera())
 	_check("the HUD comes back", main.hud._objective.is_visible_in_tree())

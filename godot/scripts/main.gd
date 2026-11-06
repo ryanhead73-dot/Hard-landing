@@ -4,7 +4,14 @@ extends Node3D
 ## beacon, recover its component, carry it home and install it. Each repair turns on a benefit.
 ## When all seven are done, the pilot's seat starts the engine spool (Finale), and then launches.
 
+## A repair is about to be installed / has been installed and saved (for staging the payoff).
+signal install_started(id: String)
+signal install_finished(id: String)
+
 const SPAWN := Vector3(-3.0, 0.5, 15.0)
+## After the crash settles, the camera turns from Kestrel to the relay's beacon on the ridge, so
+## the first goal is the first thing the player sees.
+const INTRO_REVEAL := 3.2
 const INTERACT_RANGE := 1.8
 const FABRICATOR_POINT := Vector3(16.2, 0.0, 10.7)
 const ROAMER_POINTS := [Vector3(-28.0, 0.5, 30.0), Vector3(-42.0, 0.5, 22.0)]
@@ -110,6 +117,9 @@ var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
 var missions: MissionRunner
+var onboarding: Onboarding
+## What the intro camera looks at while it turns from the wreck to the first goal.
+var _cine_focus: Node3D
 ## True once the ending card is up; interact then returns to the title.
 var ending_shown := false
 var _cine_cam: Camera3D
@@ -235,6 +245,10 @@ func _ready() -> void:
 	missions.name = "Missions"
 	add_child(missions)
 	missions.setup(self)
+	onboarding = Onboarding.new()
+	onboarding.name = "Onboarding"
+	add_child(onboarding)
+	onboarding.setup(self)
 	kestrel.repair_changed.connect(_on_repair_changed)
 	for id in Kestrel.REPAIR_ORDER:
 		Game.set_repaired(id, kestrel.is_repaired(id))
@@ -257,7 +271,16 @@ func _ready() -> void:
 		Game.intro_pending = false
 		play_intro()
 	else:
+		_face_first_goal()
 		voice.say(Story.OPENING)
+
+
+## Turns Juno toward the current site's beacon, so the first view on control is the way to go.
+func _face_first_goal() -> void:
+	var w = _waypoint()
+	if w is Vector3:
+		var flat: Vector3 = (w as Vector3) - player.global_position
+		player.face(atan2(-flat.x, -flat.z))
 
 
 func _process(_delta: float) -> void:
@@ -268,7 +291,7 @@ func _process(_delta: float) -> void:
 			_daylight_check = 0.5
 			set_daylight(daylight_at(day_time))
 	if _cine_cam:
-		_cine_cam.look_at(kestrel.global_position + Vector3.UP * 2.0)
+		_cine_cam.look_at(_cine_focus.global_position if _cine_focus else kestrel.global_position + Vector3.UP * 2.0)
 		if _shake > 0.0:
 			_shake = maxf(_shake - _delta * 1.6, 0.0)
 			_cine_cam.h_offset = randf_range(-1.0, 1.0) * 0.6 * _shake
@@ -600,6 +623,7 @@ func _take_component(id: String) -> void:
 
 
 func _install(id: String) -> void:
+	install_started.emit(id)
 	Game.install_component()
 	kestrel.set_repaired(id, true)
 	kestrel.play_repair(id)
@@ -610,6 +634,7 @@ func _install(id: String) -> void:
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
 	save_game()
+	install_finished.emit(id)
 
 
 func _search_crate(site: Node3D, i: int) -> void:
@@ -701,7 +726,7 @@ func play_intro() -> void:
 	_intro_tween.tween_callback(_intro_impact)
 	_intro_tween.tween_property(kestrel, "position", rest, INTRO_SLIDE).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	_intro_tween.tween_interval(INTRO_HOLD)
-	_intro_tween.tween_callback(end_intro)
+	_intro_tween.tween_callback(_intro_reveal)
 	Sfx.play("loom_hum", null, -4.0, 0.0)
 
 
@@ -710,6 +735,26 @@ func _intro_impact() -> void:
 	kestrel.set_engine_power(0.0)
 	Vfx.dust(self, Vector3(kestrel.global_position.x, 0.5, kestrel.global_position.z), 1.6)
 	Sfx.play("crash_impact", null, 4.0, 0.0)
+
+
+## The camera swings round to where Juno will stand, and across the basin to the relay's beacon.
+func _intro_reveal() -> void:
+	var goal = _waypoint()
+	if not (goal is Vector3) or _cine_cam == null:
+		end_intro()
+		return
+	var beacon: Vector3 = sites["aux_power"].to_global(sites["aux_power"].beacon_pos) if sites.has("aux_power") else goal
+	_cine_focus = Node3D.new()
+	add_child(_cine_focus)
+	_cine_focus.global_position = kestrel.global_position + Vector3.UP * 2.0
+	var away: Vector3 = (Vector3(SPAWN.x, 0.0, SPAWN.z) - Vector3(beacon.x, 0.0, beacon.z)).normalized()
+	var stand := SPAWN + away * 4.0 + Vector3.UP * 2.6
+	var t := create_tween()
+	_intro_tween = t
+	t.tween_property(_cine_cam, "global_position", stand, INTRO_REVEAL).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.parallel().tween_property(_cine_focus, "global_position", beacon - Vector3.UP * 6.0, INTRO_REVEAL).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_interval(0.8)
+	t.tween_callback(end_intro)
 
 
 ## Ends the intro (or skips it): Kestrel at her crash site, Juno in control, the opening lines.
@@ -730,9 +775,13 @@ func end_intro() -> void:
 	if _cine_cam:
 		_cine_cam.queue_free()
 		_cine_cam = null
+	if _cine_focus:
+		_cine_focus.queue_free()
+		_cine_focus = null
 	player.visible = true
 	player.set_physics_process(true)
 	player.revive(SPAWN, false)
+	_face_first_goal()
 	player.camera().current = true
 	hud.exit_cinematic()
 	voice.say(Story.OPENING)
