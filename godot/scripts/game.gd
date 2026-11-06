@@ -557,7 +557,6 @@ func install_component() -> void:
 	carrying = ""
 	carrying_changed.emit(carrying)
 	message.emit(r.get("done", ""))
-	Sfx.play("power_up")
 
 
 ## Records a story log. Returns true if it's new.
