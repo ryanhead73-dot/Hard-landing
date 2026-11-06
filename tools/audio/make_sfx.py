@@ -667,6 +667,15 @@ def hit_armor(v):
     return place(0.3, (0, knock), (0.012, whine))
 
 
+@sound("arc_jolt", 2)
+def arc_jolt(v):
+    """A creature caught by the lance: a dense spitting crackle over a buzzing 120 Hz, cut short."""
+    d = 0.5
+    crackle = grains(d, 420 + 60 * v, lambda i: hp(white(0.003), 3000) * dsp.rng.uniform(0.2, 1.0)) * env(d, 0.002, 0.42)
+    buzz = bp(osc(120, d, "saw") + 0.4 * osc(240 + 10 * v, d, "saw"), 200, 3000) * env(d, 0.005, 0.4) * 0.35
+    return outdoor(place(d + 0.05, (0, crackle * 0.8), (0, buzz)), 0.2)
+
+
 @sound("skimmer_screech", 2)
 def skimmer_screech(v):
     """A thin rising scream as it hangs before the dive."""
@@ -737,7 +746,7 @@ def hull_groan(v):
 
 
 PEAKS = {
-    "hit_tick": 0.5, "hit_crit": 0.55, "hit_armor": 0.5, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
+    "hit_tick": 0.5, "hit_crit": 0.55, "hit_armor": 0.5, "arc_jolt": 0.45, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
     "stim": 0.6, "acid_splash": 0.7, "spitter_charge": 0.6, "spitter_spit": 0.7, "ram_paw": 0.8, "ram_charge": 0.85,
     "ram_stun": 0.9, "warden_roar": 0.9, "siege_horn": 0.7, "crash_impact": 0.95, "repair_clunk": 0.85, "log_chime": 0.5,

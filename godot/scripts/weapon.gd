@@ -277,7 +277,11 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 			var falloff := 1.0
 			if current == "scattergun":
 				falloff = clampf(1.0 - (origin.distance_to(end) - 8.0) / 20.0, 0.35, 1.0)
-			killed = target.take_damage(damage * falloff, result.position, dir) or killed
+			var dropped: bool = target.take_damage(damage * falloff, result.position, dir)
+			killed = dropped or killed
+			# The lance's charge locks up whatever it passes through and doesn't kill.
+			if current == "arc_lance" and not dropped and target.has_method("shock"):
+				target.shock()
 			crit = crit or bool(target.get("last_hit_crit"))
 			armored = armored and bool(target.get("last_hit_armored"))
 			hit = true

@@ -73,6 +73,10 @@
    "source": "synth_music",
    "tier": "bed"
   },
+  "arc_jolt": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
   "arc_zap": {
    "source": "synth_sfx",
    "tier": "detail"

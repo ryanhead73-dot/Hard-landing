@@ -16,6 +16,7 @@ func _run() -> void:
 	await _weather()
 	await _weak_spots()
 	await _armor()
+	await _arc_shock()
 	await _caches()
 	await _skimmer()
 	await _map()
@@ -345,6 +346,53 @@ func _armor() -> void:
 	w.state = Warden.State.OPEN
 	w.take_damage(10.0, w.global_position + Vector3.UP, Vector3.FORWARD)
 	_check("but not when it opens up", not w.last_hit_armored)
+	_clear_enemies()
+
+
+## The arc lance locks up what it hits but doesn't kill: it stops dead, shakes, crackles, then
+## carries on. Bosses shrug it off faster.
+func _arc_shock() -> void:
+	var open := _open_point()
+	player.revive(open)
+	await _frames(5)
+	var at := open + Vector3(0.0, 0.0, -14.0)
+	at.y = main.site.height_at(at.x, at.z) + 0.2
+	var sc: Scuttler = main.spawn_enemy("scuttler", at)
+	sc.max_health = 9999.0
+	sc.health = 9999.0
+	await _frames(5)
+	sc.alert(false)
+	await get_tree().create_timer(0.4).timeout
+	var w: Weapon = player.weapon
+	Game.give_weapon("arc_lance")
+	w.equip("arc_lance")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.05).timeout
+	var bursts := get_tree().get_nodes_in_group("vfx_burst").size()
+	for i in 4:
+		if sc.shocks_taken > 0:
+			break
+		player.aim_at(sc.global_position + Vector3.UP * 0.5)
+		await get_tree().physics_frame
+		w._cooldown = 0.0
+		w.in_mag = maxi(w.in_mag, 2)
+		w.try_fire(true)
+		await _frames(2)
+	_check("an arc lance hit shocks a scuttler", sc.shocks_taken > 0 and sc.shocked)
+	_check("blue sparks crackle off it", get_tree().get_nodes_in_group("vfx_burst").size() > bursts)
+	var held := sc.global_position
+	await get_tree().create_timer(Enemy.SHOCK_TIME * 0.6).timeout
+	_check("it stops dead while shocked", sc.shocked and _flat_distance(sc.global_position, held) < 0.05, "%.2f m" % _flat_distance(sc.global_position, held))
+	await get_tree().create_timer(Enemy.SHOCK_TIME * 0.4 + 0.6).timeout
+	_check("then it carries on", not sc.shocked and sc.is_physics_processing() and _flat_distance(sc.global_position, held) > 0.5,
+		"%.2f m" % _flat_distance(sc.global_position, held))
+	_clear_enemies()
+	var boss: Warden = main.spawn_enemy("warden", at)
+	await _frames(5)
+	boss.shock()
+	await get_tree().create_timer(Enemy.SHOCK_TIME * 0.5).timeout
+	_check("the Warden shrugs a shock off sooner", not boss.shocked)
+	w.equip("rifle")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.05).timeout
 	_clear_enemies()
 
 

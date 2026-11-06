@@ -52,6 +52,12 @@ const ARMOR_BELOW := 0.7
 ## Whether the last hit glanced off armour.
 var last_hit_armored := false
 var armored_hits := 0
+## Arc lance hits lock a creature up for this long (half for elites, a fraction for bosses).
+const SHOCK_TIME := 0.55
+var shocked := false
+var shocks_taken := 0
+var _shock_tween: Tween
+var _shock_rest := Vector3.ZERO
 var _weak: Node3D
 ## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
 ## circle at a distance and wait their turn, so a pack reads as a pack and not a pile-up.
@@ -202,6 +208,48 @@ func _armor_effect(point: Vector3, dir: Vector3) -> void:
 	Sfx.play("hit_armor", point, -2.0, 0.12)
 
 
+## Caught by the arc lance: it seizes up where it stands, shaking and crackling blue, then carries
+## on (its timers wait too).
+func shock(seconds := SHOCK_TIME) -> void:
+	if dead or not is_inside_tree():
+		return
+	if is_in_group("bosses"):
+		seconds *= 0.3
+	elif is_elite():
+		seconds *= 0.5
+	shocks_taken += 1
+	if not shocked and _rig:
+		_shock_rest = _rig.position
+	shocked = true
+	set_physics_process(false)
+	velocity = Vector3(0.0, minf(velocity.y, 0.0), 0.0)
+	Sfx.play("arc_jolt", global_position, -3.0, 0.1)
+	Vfx.burst(get_parent(), global_position + Vector3.UP * 0.6, Color("9fd8ff"), 18, 3.0, 0.03, seconds, Vector3.UP, 180.0, 0.0)
+	if _shock_tween:
+		_shock_tween.kill()
+	_shock_tween = create_tween()
+	if _rig:
+		_shock_tween.tween_method(func(k: float):
+			if is_instance_valid(_rig):
+				_rig.position = _shock_rest + Vector3(randf_range(-1.0, 1.0), randf_range(-0.5, 0.5), randf_range(-1.0, 1.0)) * 0.05 * (1.0 - k),
+			0.0, 1.0, seconds)
+	else:
+		_shock_tween.tween_interval(seconds)
+	_shock_tween.tween_callback(_end_shock)
+
+
+func _end_shock() -> void:
+	if not shocked:
+		return
+	shocked = false
+	if _shock_tween:
+		_shock_tween.kill()
+		_shock_tween = null
+	if _rig and is_instance_valid(_rig):
+		_rig.position = _shock_rest
+	set_physics_process(true)
+
+
 ## Starts hunting. Nearby wildlife joins in when the alarm spreads.
 func alert(spread := true) -> void:
 	if dead or not _target_alive():
@@ -248,6 +296,7 @@ func _on_calm() -> void:
 
 
 func _die() -> void:
+	_end_shock()
 	_release_slot()
 	dead = true
 	hunting = false
