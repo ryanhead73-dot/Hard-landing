@@ -236,7 +236,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 			killed = target.take_damage(damage * falloff, result.position, dir) or killed
 			crit = crit or bool(target.get("last_hit_crit"))
 			hit = true
-			_impact(result.position, result.normal)
+			_impact(result.position, result.normal, true, dir)
 			exclude.append((target as CollisionObject3D).get_rid())
 			continue
 		if target.has_meta("on_hit"):
@@ -337,7 +337,15 @@ func _line(from: Vector3, to: Vector3, radius: float, mat: Material, life: float
 	get_tree().create_timer(life).timeout.connect(tracer.queue_free)
 
 
-func _impact(pos: Vector3, normal: Vector3) -> void:
+## Sparks where a shot lands. On a creature, a spray of dark ichor out of the far side too, so a
+## hit reads as a hit even at range; on rock, a puff of grit.
+func _impact(pos: Vector3, normal: Vector3, flesh := false, dir := Vector3.ZERO) -> void:
+	if is_inside_tree():
+		var scene := get_tree().current_scene
+		if flesh:
+			Vfx.burst(scene, pos, Color("1d4a44"), 8, 3.2, 0.07, 0.45, (dir + normal * 0.4).normalized(), 35.0, -9.0)
+		elif current != "arc_lance":
+			Vfx.burst(scene, pos + normal * 0.05, Color("6c6a64"), 6, 1.6, 0.12, 0.6, normal, 40.0, -2.0)
 	var sparks := CPUParticles3D.new()
 	sparks.top_level = true
 	sparks.one_shot = true

@@ -131,6 +131,11 @@ func objective() -> String:
 		return ""
 	var s := stage(id)
 	var text: String = s.get("text", "")
+	# On the way out, before anything at the site is touched, name the trip, not the first chore.
+	if stage_index(id) == 0 and Game.mission_done.is_empty() and not _intro_said.has(id):
+		var site: ExpeditionSite = main.sites.get(id)
+		if site and main.player.global_position.distance_to(site.global_position) > site.wake_radius * 0.7:
+			return Campaign.get_repair(id).get("find", text)
 	match s["type"]:
 		"activate", "pulse":
 			var total: int = devices[id][stage_index(id)].size()
@@ -249,6 +254,7 @@ func _process(delta: float) -> void:
 	var pos: Vector3 = main.player.global_position
 	if not _intro_said.has(id) and pos.distance_to(site.global_position) < site.wake_radius * 0.7:
 		_intro_said[id] = true
+		_update_objective()
 		if stage_index(id) == 0 and s.has("say") and s["type"] != "elite":
 			main.voice.interrupt(s["say"])
 	match s["type"]:

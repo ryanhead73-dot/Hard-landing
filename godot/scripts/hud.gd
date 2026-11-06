@@ -3,7 +3,7 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight · F1 dev"
+const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight"
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -186,7 +186,11 @@ func _ready() -> void:
 	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	_voice.add_theme_constant_override("shadow_offset_x", 1)
 	_voice.add_theme_constant_override("shadow_offset_y", 1)
-	_anchor(_voice, 0.5, 1.0, -480, -250, 480, -160)
+	# An outline keeps them legible over bright sky, steam and the cream hull alike.
+	_voice.add_theme_constant_override("outline_size", 6)
+	_voice.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
+	# Low, below Juno's waist and the interaction prompt, as in film subtitles.
+	_anchor(_voice, 0.5, 1.0, -480, -112, 480, -34)
 	_voice.visible = false
 	add_child(_voice)
 

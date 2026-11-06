@@ -3,12 +3,19 @@ extends Enemy
 ## Basalt scuttler: native fauna that hides as rock until something gets close, then rushes it.
 ## Readable at distance by its teal spine glow. Telegraphs every bite with a crouch before lunging.
 
-enum State { IDLE, CHASE, WINDUP, RECOVER, DEAD }
+enum State { IDLE, CHASE, WINDUP, RECOVER, STAGGER, DEAD }
 
 @export var attack_damage := 14.0
 @export var attack_range := 1.9
-@export var windup_time := 0.45
+## Long enough to see and hear coming, and to dodge or shoot it out of.
+@export var windup_time := 0.55
 @export var recover_time := 0.7
+## A hit this hard (or any weak-spot hit) during the wind-up knocks it off its bite.
+@export var stagger_damage := 15.0
+const STAGGER_TIME := 0.4
+## How far a hit shoves it (m/s), and a weak-spot hit.
+const KNOCKBACK := 2.6
+const KNOCKBACK_CRIT := 4.5
 ## Without an attack slot it circles this far out, waiting its turn.
 const RING := 4.2
 
@@ -62,6 +69,11 @@ func _physics_process(delta: float) -> void:
 				_face(target.global_position, delta * 3.0)
 			if _timer <= 0.0:
 				_lunge()
+		State.STAGGER:
+			flat_vel = Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3.ZERO, 10.0 * delta)
+			if _timer <= 0.0:
+				state = State.CHASE
+				_rest = 0.6
 		State.RECOVER:
 			flat_vel = Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3.ZERO, 14.0 * delta)
 			if _timer <= 0.0:
@@ -69,7 +81,7 @@ func _physics_process(delta: float) -> void:
 				# Give someone else a go.
 				_release_slot()
 				_rest = 1.2
-	if state != State.RECOVER:
+	if state != State.RECOVER and state != State.STAGGER:
 		velocity.x = move_toward(velocity.x, flat_vel.x, 25.0 * delta)
 		velocity.z = move_toward(velocity.z, flat_vel.z, 25.0 * delta)
 	else:
@@ -80,8 +92,22 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_hurt(dir: Vector3) -> void:
-	velocity += Vector3(dir.x, 0.0, dir.z).normalized() * 1.5
+	var flat := Vector3(dir.x, 0.0, dir.z).normalized()
+	velocity += flat * (KNOCKBACK_CRIT if last_hit_crit else KNOCKBACK)
 	Sfx.play("scuttler_hurt", global_position, -6.0, 0.15)
+	# A solid hit or a weak-spot hit mid wind-up breaks the bite: shooting a lunging scuttler
+	# is a counter, not just damage.
+	if health > 0.0 and state == State.WINDUP and (last_hit_crit or last_hit_amount >= stagger_damage):
+		stagger()
+
+
+## Knocked off balance: no bite, slides back, then rejoins the circle.
+func stagger() -> void:
+	if state == State.DEAD:
+		return
+	state = State.STAGGER
+	_timer = STAGGER_TIME
+	_release_slot()
 
 
 func _on_alert() -> void:
@@ -169,10 +195,21 @@ func _die() -> void:
 	super._die()
 	Sfx.play("scuttler_death", global_position, 0.0, 0.1)
 	_glow_mat.emission_energy_multiplier = 0.0
+	# Bowled over by the killing shot: flung along it, rolling onto its back, legs curling.
+	var push := Vector3(last_hit_dir.x, 0.0, last_hit_dir.z)
+	if push.length() < 0.1:
+		push = -_forward()
+	push = push.normalized()
+	velocity = push * (6.5 if last_hit_crit else 4.5) + Vector3.UP * 2.6
+	var local := (global_basis.inverse() * push).normalized()
+	var axis := Vector3.UP.cross(local).normalized()
+	if axis.length() < 0.1:
+		axis = Vector3.RIGHT
 	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3(1.2, 0.25, 1.2), 0.25)
-	tween.tween_interval(2.5)
-	tween.tween_property(_visual, "position:y", -0.6, 1.0)
+	tween.tween_property(_visual, "quaternion", Quaternion(axis, PI * randf_range(0.6, 0.95)), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_visual, "position:y", 0.3, 0.4)
+	tween.tween_interval(2.6)
+	tween.tween_property(_visual, "position:y", -0.8, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 
