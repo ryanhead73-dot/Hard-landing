@@ -47,6 +47,11 @@ var _defend_running := false
 var _defend_progress := 0.0
 var _wave_timer := 0.0
 var _wave_index := 0
+## The ring on the ground marking how close Juno must stay during a defend.
+var _ring: MeshInstance3D
+var _ring_mat: StandardMaterial3D
+## The last wave callout ("from the north-east"), for tests.
+var last_callout := ""
 var _elite: Enemy
 var _thief: FuseThief
 var _ping_timer := 0.0
@@ -243,6 +248,8 @@ func thief() -> FuseThief:
 # --- Running --------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if _ring and _ring.visible and not _defend_running:
+		_ring.visible = false
 	_update_objective()
 	var id := Game.current_repair()
 	var hud: Hud = main.hud
@@ -431,6 +438,7 @@ func _run_defend(id: String, site: ExpeditionSite, s: Dictionary, delta: float) 
 		return
 	var d: MissionDevice = devices[id][stage_index(id)][0]
 	var inside := _flat(d.global_position - main.player.global_position) < float(s.get("radius", 10.0))
+	_show_ring(d.global_position, float(s.get("radius", 10.0)), inside)
 	if inside:
 		_defend_progress += delta
 	var ratio := defend_ratio()
@@ -449,6 +457,47 @@ func _run_defend(id: String, site: ExpeditionSite, s: Dictionary, delta: float) 
 		_advance(id)
 
 
+## Where a wave is coming from, as the HUD says it: "north-east" and so on (-Z is north).
+static func compass_word(from: Vector3, to: Vector3) -> String:
+	var d := Vector2(to.x - from.x, to.z - from.z)
+	if d.length() < 0.5:
+		return "all sides"
+	var names := ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
+	var bearing := fposmod(atan2(d.x, -d.y), TAU)
+	return names[int(round(bearing / (TAU / 8.0))) % 8]
+
+
+## The defend ring: amber while Juno is inside it, a pulsing red when she has strayed out.
+func _show_ring(at: Vector3, radius: float, inside: bool) -> void:
+	if _ring == null:
+		_ring_mat = StandardMaterial3D.new()
+		_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ring_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_ring = MeshInstance3D.new()
+		_ring.name = "DefendRing"
+		_ring.top_level = true
+		_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_ring.material_override = _ring_mat
+		add_child(_ring)
+	var torus := _ring.mesh as TorusMesh
+	if torus == null or absf(torus.outer_radius - radius) > 0.01:
+		torus = TorusMesh.new()
+		torus.inner_radius = radius - 0.12
+		torus.outer_radius = radius
+		torus.rings = 64
+		torus.ring_segments = 4
+		_ring.mesh = torus
+	_ring.global_position = at + Vector3.UP * 0.15
+	_ring.visible = true
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
+	_ring_mat.albedo_color = Color(1.0, 0.7, 0.3, 0.45) if inside else Color(1.0, 0.25, 0.15, 0.4 + 0.45 * pulse)
+
+
+func ring_visible() -> bool:
+	return _ring != null and _ring.visible
+
+
 func _spawn_wave(site: ExpeditionSite, s: Dictionary, kinds: Array) -> void:
 	var points: Array[Vector3] = site.ambush_points()
 	if points.is_empty():
@@ -460,6 +509,15 @@ func _spawn_wave(site: ExpeditionSite, s: Dictionary, kinds: Array) -> void:
 	for i in kinds.size():
 		var at: Vector3 = points[(i + _wave_index) % points.size()] + Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(-1.5, 1.5))
 		main.spawn_enemy(kinds[i], at).alert(false)
+	# Say where it's coming from, so the player can turn to meet it.
+	var centre := Vector3.ZERO
+	for i in kinds.size():
+		centre += points[(i + _wave_index) % points.size()]
+	centre /= maxf(kinds.size(), 1)
+	var waves: Array = s.get("waves", [])
+	last_callout = compass_word(main.player.global_position, centre)
+	var last := _wave_index >= waves.size() - 1
+	main.hud.show_message("%s: incoming from the %s" % ["Last wave" if last else "Wave %d of %d" % [_wave_index + 1, waves.size()], last_callout])
 
 
 func _start_defend() -> void:

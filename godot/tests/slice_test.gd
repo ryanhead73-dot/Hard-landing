@@ -29,6 +29,7 @@ func _run() -> void:
 	await _death()
 	await _arrival()
 	await _gamepad()
+	await _relay_flow()
 	await _intro()
 	_install_signals()
 	finished = true
@@ -305,3 +306,70 @@ func _install_signals() -> void:
 	Game.carrying = "aux_cell"
 	main._install("aux_power")
 	_check("install announces start and finish", got == ["start:aux_power", "end:aux_power"], str(got))
+
+
+## Saves, throws the game away and loads the save into a fresh one, as Continue does.
+func _reload() -> void:
+	var data: Dictionary = main.save_state()
+	main.queue_free()
+	await _frames(3)
+	Game.reset()
+	Game.pending_load = JSON.parse_string(JSON.stringify(data))
+	main = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	main.spawn_packs = false
+	main.siege.enabled = false
+	main.weather.enabled = false
+	main.missions.bypass = false
+	kestrel = main.kestrel
+	player = main.player
+	await _frames(20)
+
+
+## The relay mission end to end, with the ways it can go wrong: a save between breakers, going
+## down mid-defend, and a save while carrying the cell home.
+func _relay_flow() -> void:
+	var runner: MissionRunner = main.missions
+	main.siege.enabled = false
+	_clear_enemies()
+	_check("relay: the mission is on the breakers", runner.stage_index("aux_power") == 0 and runner.stage("aux_power")["type"] == "activate")
+	runner._complete_device(0)
+	runner._complete_device(2)
+	await _frames(3)
+	await _reload()
+	runner = main.missions
+	_check("relay: thrown breakers survive a save", Game.mission_done.has(0) and Game.mission_done.has(2) and runner.device("aux_power", 0, 2).state == MissionDevice.State.DONE, str(Game.mission_done))
+	runner._complete_device(1)
+	await _frames(3)
+	_check("relay: three breakers move on to the cradle", runner.stage_index("aux_power") == 1, str(runner.stage_index("aux_power")))
+	var cradle: MissionDevice = runner.device("aux_power", 1, 0)
+	player.revive(cradle.global_position + Vector3(0.0, 0.3, 3.0))
+	await _frames(5)
+	runner._start_defend()
+	await _frames(3)
+	_check("relay: the defend ring shows", runner.ring_visible())
+	await get_tree().create_timer(2.4).timeout
+	_check("relay: the first wave is called out by direction", runner.last_callout != "" and main.hud._message.text.contains("incoming"), main.hud._message.text)
+	# Going down mid-defend resets it cleanly and it can be started again.
+	player.take_damage(9999.0)
+	await _frames(3)
+	_check("relay: going down stops the defend and hides the ring", not runner.defending() and not runner.ring_visible())
+	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout
+	_clear_enemies()
+	_check("relay: the cradle can be started again", runner.stage_index("aux_power") == 1 and runner.device("aux_power", 1, 0).state == MissionDevice.State.PENDING)
+	player.revive(cradle.global_position + Vector3(0.0, 0.3, 3.0))
+	await _frames(5)
+	runner._start_defend()
+	runner._defend_progress = float(runner.stage("aux_power")["seconds"]) - 0.3
+	await get_tree().create_timer(0.8).timeout
+	_check("relay: holding to the end frees the cell", runner.can_take("aux_power") and not runner.ring_visible())
+	_clear_enemies()
+	var site: ExpeditionSite = main.sites["aux_power"]
+	player.revive(site.component_point() + Vector3.UP * 0.2)
+	await _frames(8)
+	await _press("interact")
+	_check("relay: the cell is taken", Game.carrying == "aux_cell", Game.carrying)
+	_clear_enemies()
+	await _reload()
+	_check("relay: still carrying the cell after a save", Game.carrying == "aux_cell" and Game.objective_text().contains("Return"), Game.objective_text())
+	_clear_enemies()
