@@ -134,11 +134,16 @@ func _damage_arcs() -> void:
 
 func _graphics() -> void:
 	var env: Environment = main._env
-	Game.graphics = 1
+	var vp := get_viewport()
+	Game.graphics = Game.GRAPHICS_HIGH
 	Game.graphics_changed.emit()
-	_check("quality turns on indirect light and haze", env.ssil_enabled and env.volumetric_fog_density > 0.0)
-	Game.graphics = 0
+	_check("High adds indirect light, haze, soft shadows and 4x MSAA", env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.light_angular_distance > 0.0 and vp.msaa_3d == Viewport.MSAA_4X)
+	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()
-	_check("performance turns them off", not env.ssil_enabled and env.volumetric_fog_density == 0.0 and env.volumetric_fog_enabled)
-	Game.graphics = 1
+	_check("Medium keeps SSAO and the haze, drops indirect light", not env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.directional_shadow_max_distance == 120.0 and vp.msaa_3d == Viewport.MSAA_2X)
+	Game.graphics = Game.GRAPHICS_LOW
+	Game.graphics_changed.emit()
+	_check("Low drops SSAO, haze and cascades, renders at 85%", not env.ssil_enabled and not env.ssao_enabled and env.volumetric_fog_density == 0.0 and env.volumetric_fog_enabled and main._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS and vp.scaling_3d_scale < 1.0)
+	_check("the presets are named Low, Medium, High", Game.GRAPHICS_NAMES == ["Low", "Medium", "High"])
+	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()

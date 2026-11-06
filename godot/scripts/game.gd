@@ -64,8 +64,13 @@ var music_volume := 0.7
 var difficulty := 1
 ## Camera shake strength (0 turns it off).
 var screen_shake := 1.0
-## 0 = performance (no screen-space GI or volumetric fog), 1 = quality.
-var graphics := 1
+## Graphics preset: 0 Low, 1 Medium (the target: a GTX 1660-class card at 1080p60), 2 High.
+## main.gd applies it; anything with its own cost (particles, shadowed lamps) checks it too.
+const GRAPHICS_LOW := 0
+const GRAPHICS_MEDIUM := 1
+const GRAPHICS_HIGH := 2
+const GRAPHICS_NAMES := ["Low", "Medium", "High"]
+var graphics := GRAPHICS_MEDIUM
 
 var scrap := 0
 ## The component on the player's back (a Campaign component id), or "".
@@ -151,7 +156,7 @@ func load_settings() -> void:
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
-		graphics = clampi(cfg.get_value("video", "graphics", graphics), 0, 1)
+		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
 	apply_settings()
 
 
