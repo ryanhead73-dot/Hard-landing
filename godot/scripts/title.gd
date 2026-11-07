@@ -25,6 +25,8 @@ func _ready() -> void:
 		Game.apply_keys()
 	_build_scene()
 	_build_menu()
+	# Start loading the game in the background while the player is on the menu.
+	ResourceLoader.load_threaded_request(MAIN_SCENE)
 	Sfx.loop_flat("wind_loop", self, -14.0, "Ambience")
 	Sfx.loop_flat("music_calm", self, -10.0, "Music")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -62,10 +64,65 @@ func _new_game() -> void:
 	_warning.visible = true
 
 
+## Shown while the basin loads, one at random.
+const TIPS := [
+	"You can't be hurt in the first third of a dodge roll.",
+	"Shots glance off a ram's head plate. Get round its flank.",
+	"The arc lance locks up anything it doesn't kill, for half a second.",
+	"Crawlways need you to crouch.",
+	"Rest in Kestrel's bunk to save and heal.",
+	"Follow the coloured light column to the site you're heading for.",
+	"Arc charges ignore armour and shove a whole pack back.",
+	"Every repair gives Kestrel something new. Check the fabricator after each one.",
+]
+const MAIN_SCENE := "res://scenes/main.tscn"
+
+var loading: Control
+
+
 func start(load_save: bool) -> void:
+	if loading and loading.visible:
+		return
 	Game.pending_load = Game.read_save() if load_save else {}
 	Game.intro_pending = not load_save
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_show_loading()
+	# Two frames so the loading card is on screen before the load blocks.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var scene: PackedScene
+	if ResourceLoader.load_threaded_get_status(MAIN_SCENE) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		scene = ResourceLoader.load_threaded_get(MAIN_SCENE)
+	if scene == null:
+		scene = load(MAIN_SCENE)
+	get_tree().change_scene_to_packed(scene)
+
+
+func _show_loading() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 20
+	add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.04, 0.05, 0.92)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	loading = dim
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	box.alignment = BoxContainer.ALIGNMENT_END
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 90
+	box.offset_right = -90
+	box.offset_bottom = -80
+	dim.add_child(box)
+	var head := Label.new()
+	head.text = "LOADING"
+	UiStyle.apply(head, "banner", UiStyle.AMBER)
+	box.add_child(head)
+	var tip := Label.new()
+	tip.name = "Tip"
+	tip.text = TIPS[randi() % TIPS.size()]
+	UiStyle.apply(tip, "lead")
+	box.add_child(tip)
 
 
 func _build_scene() -> void:
@@ -86,6 +143,9 @@ func _build_scene() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color("3a3540")
 	env.fog_density = 0.006
+	env.adjustment_enabled = true
+	env.adjustment_brightness = Game.brightness
+	Game.settings_changed.connect(func(): env.adjustment_brightness = Game.brightness)
 	var world := WorldEnvironment.new()
 	world.environment = env
 	add_child(world)
@@ -153,6 +213,12 @@ func _build_menu() -> void:
 	bench.tooltip_text = "A one-minute run through the slice that measures frame times and saves a report."
 	_button(box, "Credits", credits.open).name = "Credits"
 	_button(box, "Quit", func(): get_tree().quit())
+	var version := Label.new()
+	version.name = "Version"
+	version.text = "v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
+	UiStyle.apply(version, "small", UiStyle.DIM)
+	layer.add_child(version)
+	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
 	# Anchor once the contents give it a size: left edge, centred vertically at any resolution.
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 90)

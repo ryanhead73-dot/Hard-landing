@@ -138,6 +138,11 @@ func _ready() -> void:
 		Game.apply_settings())
 	_row_label("Display")
 	_grid.add_child(display)
+	var bright := _slider(_grid, "Brightness", Game.BRIGHTNESS_RANGE.x, Game.BRIGHTNESS_RANGE.y, 0.05, Game.brightness)
+	bright.name = "Brightness"
+	bright.value_changed.connect(func(v: float):
+		Game.brightness = v
+		Game.apply_settings())
 	var cap := OptionButton.new()
 	cap.name = "FpsCap"
 	for c in Game.FPS_CAPS:

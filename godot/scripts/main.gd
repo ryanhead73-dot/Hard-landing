@@ -1041,6 +1041,8 @@ func _build_environment() -> void:
 	_env.adjustment_enabled = true
 	_env.adjustment_contrast = 1.08
 	_env.adjustment_saturation = 1.1
+	_env.adjustment_brightness = Game.brightness
+	Game.settings_changed.connect(func(): _env.adjustment_brightness = Game.brightness)
 	_env.glow_bloom = 0.05
 	_env.glow_hdr_threshold = 0.9
 	# Volumetric fog is always on so local FogVolumes (spore fog) render. On Quality it also

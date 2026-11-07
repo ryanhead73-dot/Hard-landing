@@ -388,6 +388,11 @@ func _display() -> void:
 	Game.apply_settings()
 	Game.save_settings()
 	_check("lifting the cap frees the engine", Engine.max_fps == Game.fps_cap)
+	var b := Game.brightness
+	(menu.find_child("Brightness", true, false) as HSlider).value = 1.3
+	_check("brightness reaches the picture", is_equal_approx(main._env.adjustment_brightness, 1.3), str(main._env.adjustment_brightness))
+	Game.brightness = b
+	Game.apply_settings()
 
 
 func _has_key(action: String, key: int) -> bool:

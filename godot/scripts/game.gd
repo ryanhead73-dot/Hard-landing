@@ -91,6 +91,9 @@ var vsync := true
 ## Frame-rate cap; 0 means none.
 const FPS_CAPS := [0, 30, 60, 120, 144]
 var fps_cap := 0
+## Picture brightness (the environment's brightness adjustment), 1.0 as graded.
+const BRIGHTNESS_RANGE := Vector2(0.7, 1.4)
+var brightness := 1.0
 var _shown_window := -1
 
 var scrap := 0
@@ -327,6 +330,7 @@ func load_settings() -> void:
 		window_mode = clampi(cfg.get_value("video", "window_mode", window_mode), 0, WINDOW_NAMES.size() - 1)
 		vsync = cfg.get_value("video", "vsync", vsync)
 		fps_cap = int(cfg.get_value("video", "fps_cap", fps_cap))
+		brightness = clampf(cfg.get_value("video", "brightness", brightness), BRIGHTNESS_RANGE.x, BRIGHTNESS_RANGE.y)
 		if fps_cap not in FPS_CAPS:
 			fps_cap = 0
 		key_overrides = {}
@@ -409,6 +413,7 @@ func save_settings() -> void:
 	cfg.set_value("video", "window_mode", window_mode)
 	cfg.set_value("video", "vsync", vsync)
 	cfg.set_value("video", "fps_cap", fps_cap)
+	cfg.set_value("video", "brightness", brightness)
 	if cfg.has_section("keys"):
 		cfg.erase_section("keys")
 	for action in key_overrides:

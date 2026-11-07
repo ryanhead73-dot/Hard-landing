@@ -5,7 +5,8 @@ config_version=5
 [application]
 
 config/name="Hard Landing"
-config/description="Kestrel greybox: walkable blockout generated from the deck plan."
+config/description="Third-person sci-fi shooter: restore the crashed salvage ship Kestrel and get off the Kettle."
+config/version="0.9.0-rc1"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
