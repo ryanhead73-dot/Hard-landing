@@ -444,17 +444,22 @@ func _save_load() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
+	# Hold the re-armed siege while the load settles: on a slow machine 20 frames is enough
+	# physics time for it to start and change the scrap being checked.
+	main.siege.set_physics_process(false)
 	kestrel = main.kestrel
 	player = main.player
 	await _frames(20)
 	_check("load restores repairs", kestrel.is_repaired("canopy") and not kestrel.is_repaired("landing_gear") and Game.current_repair() == "landing_gear")
-	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.carrying == "struts" and Game.phase() == "return")
+	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.carrying == "struts" and Game.phase() == "return",
+		"scrap %d, mag %s, stims %d, charges %d, carrying %s, phase %s" % [Game.scrap, Game.has_upgrade("extended_mag"), Game.stims, Game.charges, Game.carrying, Game.phase()])
 	_check("load restores weapons and ammo", Game.owns_weapon("scattergun") and Game.ammo_in_mag("scattergun") == 3 and Game.ammo_reserve("scattergun") == 20 and player.weapon.current == "scattergun")
 	var gear2: QuarryCrawler = main.sites["landing_gear"]
 	_check("load restores site state", not gear2.has_component() and gear2.crate_searched(1) and not gear2.crate_searched(0))
 	_check("load re-arms the pending siege", main.siege.pending == 1)
 	_check("loaded game starts at Kestrel", player.global_position.distance_to(main.SPAWN) < 2.0, str(player.global_position))
 	main.siege.pending = -1
+	main.siege.set_physics_process(true)
 	player.revive(main.install_point("bunk") + Vector3.UP * 0.2)
 	await _frames(10)
 	_check("bunk offers rest and save", _label().contains("Rest"), _label())
