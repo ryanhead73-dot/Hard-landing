@@ -3,7 +3,14 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight"
+## The keyboard controls line, from the player's current key bindings.
+static func help_text() -> String:
+	var k := func(a: String) -> String: return Game.key_label(a)
+	return "%s%s%s%s move · Mouse look · RMB aim · LMB fire · %s reload · %s/%s/%s, wheel weapons · %s stim · %s arc charge · %s inventory · %s map · %s logs · %s sprint · %s jump · %s roll · %s crouch · %s interact · %s flashlight" % [
+		k.call("move_forward"), k.call("move_left"), k.call("move_back"), k.call("move_right"), k.call("reload"),
+		k.call("weapon_1"), k.call("weapon_2"), k.call("weapon_3"), k.call("stim"), k.call("throw"), k.call("inventory"),
+		k.call("map"), k.call("logs"), k.call("sprint"), k.call("jump"), k.call("dodge"), k.call("crouch"),
+		k.call("interact"), k.call("flashlight")]
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
@@ -74,7 +81,8 @@ func _ready() -> void:
 	_help = _label("small")
 	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_help.text = HELP_TEXT
+	_help.text = help_text()
+	Game.keys_changed.connect(func(): _help.text = PAD_HELP_TEXT if Game.using_pad else help_text())
 	# The full list lives in the pause menu; play teaches through one-at-a-time hints instead.
 	_help.visible = false
 	_help_time = 0.0
@@ -677,7 +685,7 @@ func _anchor(control: Control, ax: float, ay: float, left: float, top: float, ri
 
 
 func _on_device_changed(pad: bool) -> void:
-	_help.text = PAD_HELP_TEXT if pad else HELP_TEXT
+	_help.text = PAD_HELP_TEXT if pad else help_text()
 	set_prompt(_prompt_raw)
 	set_stims(_stims_last.x, _stims_last.y)
 	set_charges(_charges_last.x, _charges_last.y)

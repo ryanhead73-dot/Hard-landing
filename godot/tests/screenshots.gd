@@ -117,9 +117,12 @@ func _ready() -> void:
 			main.hud.set_prompt("[E] Throw the breaker")
 			main.hud.show_message("Found 12 scrap and a stim.")
 		var pause_menu: PauseMenu = null
-		if shot[0] == "pause":
+		if shot[0] == "pause" or shot[0] == "keys":
 			pause_menu = main.get_children().filter(func(c): return c is PauseMenu)[0]
 			pause_menu.open()
+			if shot[0] == "keys":
+				pause_menu._open_bindings()
+				pause_menu.bindings._listen("interact")
 		if shot[0] == "map":
 			for c in main.wildlife.caches:
 				if c.index % 2 == 0:
@@ -237,6 +240,7 @@ func _shots() -> Array:
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
 		["hud", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["pause", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
+		["keys", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["relay_inside", "aux_power", Vector3(-3.0, 0.5, -3.0), Vector3(2.0, 1.5, -8.0)],
 	]
 

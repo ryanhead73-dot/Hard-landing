@@ -69,7 +69,7 @@ func finish() -> void:
 
 func _show() -> void:
 	if current != "":
-		main.hud.show_hint(HINTS[current][1 if Game.using_pad else 0])
+		main.hud.show_hint(HINTS[current][1] if Game.using_pad else Game.keyboard_text(HINTS[current][0]))
 
 
 func _on_hurt() -> void:

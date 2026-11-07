@@ -951,10 +951,9 @@ func _dev_text() -> String:
 func _setup_input() -> void:
 	for action in KEYS:
 		_ensure_action(action)
-		for key in KEYS[action]:
-			var ev := InputEventKey.new()
-			ev.physical_keycode = key
-			InputMap.action_add_event(action, ev)
+	# The keyboard keys come from Game, which layers the player's bindings over these defaults.
+	Game.default_keys = KEYS.duplicate(true)
+	Game.apply_keys()
 	for action in BUTTONS:
 		_ensure_action(action)
 		for button in BUTTONS[action]:

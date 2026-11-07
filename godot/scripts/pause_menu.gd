@@ -14,6 +14,7 @@ var _music: HSlider
 var _difficulty: OptionButton
 var _controls: Label
 var _grid: GridContainer
+var bindings: KeyBindMenu
 
 
 func _ready() -> void:
@@ -62,6 +63,12 @@ func _ready() -> void:
 		Game.apply_settings())
 	_row_label("Aim")
 	_grid.add_child(aim_mode)
+	var keys := Button.new()
+	keys.name = "KeyBindings"
+	keys.text = "Key bindings…"
+	keys.pressed.connect(_open_bindings)
+	_row_label("Keyboard")
+	_grid.add_child(keys)
 	_section("AUDIO")
 	_volume = _slider(_grid, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
 	_music = _slider(_grid, "Music", 0.0, 1.0, 0.05, Game.music_volume)
@@ -145,7 +152,18 @@ func _ready() -> void:
 	_music.value_changed.connect(func(v: float):
 		Game.music_volume = v
 		Game.apply_settings())
+	# A sibling layer, not a child: it shows while this menu hides.
+	bindings = KeyBindMenu.new()
+	get_parent().add_child.call_deferred(bindings)
+	bindings.closed.connect(func():
+		_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.help_text())
+		visible = true)
 	visible = false
+
+
+func _open_bindings() -> void:
+	visible = false
+	bindings.open()
 
 
 ## A section head spanning both columns.
@@ -177,7 +195,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open() -> void:
-	_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.HELP_TEXT)
+	_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.help_text())
 	visible = true
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

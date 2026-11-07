@@ -22,6 +22,7 @@ func _run() -> void:
 	await _weapon_swap()
 	await _hit_stop()
 	await _accessibility()
+	await _key_bindings()
 	_graphics()
 	finished = true
 
@@ -283,3 +284,41 @@ func _accessibility() -> void:
 	Game.subtitles = 1
 	Game.save_settings()
 	Game.apply_settings()
+
+
+## Rebinding: a new key drives the action, the old one stops, a clash swaps, prompts and the
+## help line follow, it saves, and reset puts everything back.
+func _key_bindings() -> void:
+	_check("default bindings come from the game's key table", Game.primary_key("interact") == KEY_E and Game.key_label("interact") == "E")
+	Game.rebind("interact", KEY_H)
+	_check("rebinding moves the action to the new key", _has_key("interact", KEY_H) and not _has_key("interact", KEY_E))
+	Game.rebind("reload", KEY_H)
+	_check("taking a key in use swaps it over", Game.primary_key("reload") == KEY_H and Game.primary_key("interact") == KEY_R,
+		"%s %s" % [Game.key_label("reload"), Game.key_label("interact")])
+	_check("prompts follow the binding", Game.device_text("[E] Open the armoury locker") == "[R] Open the armoury locker", Game.device_text("[E] Open the armoury locker"))
+	_check("the controls line follows it", Hud.help_text().contains("H reload") and Hud.help_text().contains("R interact"), Hud.help_text())
+	Game.save_settings()
+	var cfg := ConfigFile.new()
+	cfg.load(Game.SETTINGS_PATH)
+	_check("bindings are saved", int(cfg.get_value("keys", "reload", 0)) == KEY_H)
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	menu.open()
+	menu._open_bindings()
+	await _frames(2)
+	_check("the pause menu opens the bindings list", menu.bindings.visible and not menu.visible and menu.bindings._buttons.size() == Game.REBINDABLE.size())
+	menu.bindings._listen("jump")
+	var ev := InputEventKey.new()
+	ev.physical_keycode = KEY_J
+	ev.pressed = true
+	menu.bindings._input(ev)
+	_check("pressing a key while listening binds it", Game.primary_key("jump") == KEY_J and menu.bindings.listening == "")
+	Game.reset_keys()
+	_check("reset puts the defaults back", Game.primary_key("interact") == KEY_E and Game.primary_key("reload") == KEY_R and Game.primary_key("jump") == KEY_SPACE and _has_key("interact", KEY_E))
+	menu.bindings.close()
+	await _frames(2)
+	_check("closing it returns to the pause menu", menu.visible and not menu.bindings.visible)
+	menu.close()
+
+
+func _has_key(action: String, key: int) -> bool:
+	return InputMap.action_get_events(action).any(func(e): return e is InputEventKey and e.physical_keycode == key)

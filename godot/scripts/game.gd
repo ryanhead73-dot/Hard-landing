@@ -126,11 +126,114 @@ func key_name(action: String) -> String:
 	return names[1 if using_pad else 0]
 
 
-## Rewrites keyboard prompts ("[E] ...", "[Hold E] ...") for the current device.
+## Rewrites keyboard prompts ("[E] ...", "[Hold E] ...") for the current device and the
+## player's key bindings.
 func device_text(text: String) -> String:
 	if not using_pad:
-		return text
+		return keyboard_text(text)
 	return text.replace("[Hold E]", "[Hold %s]" % key_name("interact")).replace("[E]", "[%s]" % key_name("interact"))
+
+
+# --- Key bindings ---------------------------------------------------------------------------
+
+## Keyboard actions the player can rebind, in the order the bindings menu lists them, with
+## their names there. Each has one primary key (rebindable) after main.KEYS' defaults; any
+## secondary default key (arrows, Ctrl, Alt, I) stays as it is.
+const REBINDABLE := [
+	["move_forward", "Move forward"], ["move_back", "Move back"], ["move_left", "Move left"],
+	["move_right", "Move right"], ["sprint", "Sprint"], ["jump", "Jump"], ["crouch", "Crouch"],
+	["dodge", "Roll"], ["interact", "Interact"], ["reload", "Reload"], ["stim", "Use stim"],
+	["throw", "Throw arc charge"], ["flashlight", "Flashlight"], ["weapon_1", "Rifle"],
+	["weapon_2", "Scattergun"], ["weapon_3", "Arc lance"], ["inventory", "Inventory"],
+	["map", "Map"], ["logs", "Logs"],
+]
+## Defaults, filled from main.KEYS when the game scene first sets up input.
+var default_keys: Dictionary = {}
+## action -> physical keycode the player chose.
+var key_overrides: Dictionary = {}
+signal keys_changed
+
+
+func primary_key(action: String) -> int:
+	if key_overrides.has(action):
+		return key_overrides[action]
+	var keys: Array = default_keys.get(action, [])
+	return keys[0] if keys.size() > 0 else KEY_NONE
+
+
+func key_label(action: String) -> String:
+	var k := primary_key(action)
+	return OS.get_keycode_string(k) if k != KEY_NONE else "?"
+
+
+## Binds `action`'s primary key to `key`. A key already on another action swaps over, so no key
+## does two things and nothing is left unbound.
+func rebind(action: String, key: int) -> void:
+	var old := primary_key(action)
+	for pair in REBINDABLE:
+		var other: String = pair[0]
+		if other != action and primary_key(other) == key:
+			_set_key(other, old)
+	_set_key(action, key)
+	apply_keys()
+	keys_changed.emit()
+
+
+func reset_keys() -> void:
+	key_overrides.clear()
+	apply_keys()
+	keys_changed.emit()
+
+
+func _set_key(action: String, key: int) -> void:
+	var keys: Array = default_keys.get(action, [])
+	if keys.size() > 0 and keys[0] == key:
+		key_overrides.erase(action)
+	else:
+		key_overrides[action] = key
+
+
+## Puts the bindings into the InputMap: the primary key (chosen or default) plus the defaults'
+## secondary keys, unless one of those is now another action's primary.
+func apply_keys() -> void:
+	var taken := {}
+	for action in default_keys:
+		taken[primary_key(action)] = action
+	for action in default_keys:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for ev in InputMap.action_get_events(action):
+			if ev is InputEventKey:
+				InputMap.action_erase_event(action, ev)
+		var keys: Array = [primary_key(action)]
+		for k in default_keys[action].slice(1):
+			if not taken.has(k):
+				keys.append(k)
+		for k in keys:
+			var ev := InputEventKey.new()
+			ev.physical_keycode = k
+			InputMap.action_add_event(action, ev)
+
+
+## Rewrites the default key names in keyboard text ("[E]", "[Hold E]", "[Shift]") to the
+## player's bindings.
+func keyboard_text(text: String) -> String:
+	if key_overrides.is_empty() or not text.contains("["):
+		return text
+	# Two passes through placeholders, so swapped keys (E->R, R->H) don't chain.
+	var out := text
+	var now: Array[String] = []
+	for action in key_overrides:
+		var keys: Array = default_keys.get(action, [])
+		if keys.is_empty():
+			continue
+		var was := OS.get_keycode_string(keys[0])
+		var mark := "\u0001%d\u0001" % now.size()
+		now.append(key_label(action))
+		out = out.replace("[%s]" % was, "[%s]" % mark).replace("[Hold %s]" % was, "[Hold %s]" % mark)
+	for i in now.size():
+		out = out.replace("\u0001%d\u0001" % i, now[i])
+	return out
 
 
 ## True for the B button press that backs out of a menu.
@@ -205,6 +308,10 @@ func load_settings() -> void:
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
 		subtitles = clampi(cfg.get_value("access", "subtitles", subtitles), 0, SUBTITLE_NAMES.size() - 1)
 		toggle_aim = cfg.get_value("access", "toggle_aim", toggle_aim)
+		key_overrides = {}
+		if cfg.has_section("keys"):
+			for action in cfg.get_section_keys("keys"):
+				key_overrides[action] = int(cfg.get_value("keys", action))
 	apply_settings()
 
 
@@ -278,6 +385,10 @@ func save_settings() -> void:
 	cfg.set_value("video", "graphics", graphics)
 	cfg.set_value("access", "subtitles", subtitles)
 	cfg.set_value("access", "toggle_aim", toggle_aim)
+	if cfg.has_section("keys"):
+		cfg.erase_section("keys")
+	for action in key_overrides:
+		cfg.set_value("keys", action, key_overrides[action])
 	cfg.save(SETTINGS_PATH)
 
 
