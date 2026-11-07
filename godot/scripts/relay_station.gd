@@ -8,7 +8,7 @@ extends ExpeditionSite
 const CELL_POSITION := Vector3(0.0, 1.35, -7.6)
 const CRATE_SCRAP := 10
 ## The station's console, on the desk at the back of the hut: once the generator is back, its
-## traffic log points at Ilse's listening post up the north-east slope.
+## traffic log points at Ilse's listening post up the south-east slope.
 const CONSOLE_STAND := Vector3(-2.5, 0.0, -7.4)
 const CONSOLE_RANGE := 1.8
 

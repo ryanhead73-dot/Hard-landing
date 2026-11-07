@@ -63,9 +63,9 @@ const FINALE_START: Array = [
 ## The relay's console, once the generator is back: Ilse's last traffic points up the slope.
 const RELAY_CONSOLE_LINES := [
 	[JUNO, "Station log. Last outbound traffic: 'Post Seven, hold your carrier, I'm still listening.'"],
-	[JUNO, "Post Seven's up the north-east slope. Somebody kept a listening post running out here."],
+	[JUNO, "Post Seven's up the south-east slope. Somebody kept a listening post running out here."],
 ]
-## Waking Ilse's listening post on the north-east slope.
+## Waking Ilse's listening post on the south-east slope.
 const POST_LINES := [
 	[HOB, "That's one of Ilse Marrow's listening posts. Still logging, after all this time."],
 	[JUNO, "There's something under the basin, HOB. Way down. It answers every pulse."],

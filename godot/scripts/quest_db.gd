@@ -67,24 +67,24 @@ const EXTRA: Array[Dictionary] = [
 	},
 	{
 		"id": "listening_post", "title": "The listening post", "act": 1, "kind": "discovery", "region": "kettle",
-		"summary": "A mast blinks amber high on the north-east slope. Someone left equipment running.",
+		"summary": "A mast blinks amber high on the south-east slope. Someone left equipment running.",
 		"requires": [{"type": "any", "of": [{"type": "flag", "id": "seen_listening_post"}, {"type": "flag", "id": "post_located"}]}],
 		"steps": [{"text": "Climb to the listening post and wake its terminal", "done": {"type": "flag", "id": "post_awake"}, "at": "listening_post"}],
 		"rewards": {"scrap": 25, "flags": {"heard_the_hollow": true}},
 	},
 	{
 		"id": "last_drop", "title": "The last supply drop", "act": 1, "kind": "side", "region": "kettle",
-		"summary": "The listening post picked up a distress beacon on the west flats: one of Reyes's drop pods.",
+		"summary": "The listening post picked up a distress beacon on the north-west flats: one of Reyes's drop pods.",
 		"requires": [{"type": "flag", "id": "post_awake"}],
 		"steps": [
-			{"text": "Find the drop pod on the west flats", "done": {"type": "flag", "id": "pod_found"}, "at": "drop_pod"},
+			{"text": "Find the drop pod on the north-west flats", "done": {"type": "flag", "id": "pod_found"}, "at": "drop_pod"},
 			{"text": "Pull the pod's flight recorder and hold the ground while it downloads", "done": {"type": "flag", "id": "pod_downloaded"}, "at": "drop_pod"},
 		],
 		"rewards": {"scrap": 30, "flags": {"knows_greenhouses": true}},
 	},
 	{
 		"id": "survey_depot", "title": "The sealed depot", "act": 1, "kind": "discovery", "region": "kettle",
-		"summary": "A survey depot on the southern flats, locked tight with an old HOB-series lock.",
+		"summary": "A survey depot on the northern flats, locked tight with an old HOB-series lock.",
 		"requires": [{"type": "flag", "id": "seen_survey_depot"}],
 		"steps": [
 			{"text": "Get the depot open: HOB knows the lock, once he has power", "done": {"type": "flag", "id": "depot_open"}, "at": "survey_depot"},

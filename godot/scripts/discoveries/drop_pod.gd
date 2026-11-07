@@ -1,6 +1,6 @@
 class_name DropPod
 extends Node3D
-## Kettle side mission (X2.3): the last of Lt. Reyes's supply drops, half-buried on the west
+## Kettle side mission (X2.3): the last of Lt. Reyes's supply drops, half-buried on the north-west
 ## flats with its green distress light still blinking. The listening post picks up its beacon
 ## once it's awake. Juno pulls the pod's flight recorder: a download she has to hold the ground
 ## for while the noise draws scuttlers (and spitters, later in the campaign) out of the flats.

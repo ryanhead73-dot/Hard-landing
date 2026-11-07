@@ -1,6 +1,6 @@
 class_name ListeningPost
 extends Node3D
-## Kettle discovery (X2.2): one of Ilse Marrow's seismic listening posts, up on the north-east
+## Kettle discovery (X2.2): one of Ilse Marrow's seismic listening posts, up on the south-east
 ## slope of the basin. A tall mast with a slow amber blink makes it a landmark from Kestrel; a
 ## metal walkway climbs the slope to a deck with a hut, dark but for a red emergency lamp, and a
 ## terminal. Waking the terminal (hold E) brings the post's lights up and gives Ilse's log.

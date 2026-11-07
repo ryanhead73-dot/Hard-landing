@@ -1,6 +1,6 @@
 class_name SurveyDepot
 extends Node3D
-## Kettle discovery (X2.6): an abandoned survey depot on the southern flats, from an expedition
+## Kettle discovery (X2.5): an abandoned survey depot on the northern flats, from an expedition
 ## that came before Ilse's. A squat ivory block with oxide trim, its door held by an old
 ## HOB-series lock: dead until Kestrel's aux power brings HOB back, after which HOB can talk it
 ## open. Inside, red emergency lamps, a broken console, storage racks and a dormant ship-mind

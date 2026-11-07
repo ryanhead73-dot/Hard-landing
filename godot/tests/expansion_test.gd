@@ -447,7 +447,7 @@ func _survey_depot() -> void:
 	_clear_enemies()
 	main.quests.restore()
 	var depot: SurveyDepot = main.discoveries.built["survey_depot"]
-	_check("the depot stands on the southern flats", depot != null and absf(depot.global_position.y - main.site.height_at(depot.global_position.x, depot.global_position.z)) < 0.1)
+	_check("the depot stands on the northern flats", depot != null and absf(depot.global_position.y - main.site.height_at(depot.global_position.x, depot.global_position.z)) < 0.1)
 	_place(depot.door_pos + Vector3(0.0, 0.5, 0.0), 0.0)
 	await _frames(5)
 	_check("seeing it starts the discovery", main.quests.state_of("survey_depot") == QuestLog.ACTIVE)
