@@ -8,6 +8,7 @@ signal closed
 
 var _grid: GridContainer
 var _buttons: Dictionary = {}
+var _back: Button
 ## The action waiting for a key press, or "".
 var listening := ""
 
@@ -34,7 +35,7 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var note := Label.new()
-	note.text = "Click a key, then press the new one. Esc cancels. A key in use swaps over."
+	note.text = "Click a key, then press the new one. Esc (or B) cancels. A key in use swaps over."
 	UiStyle.apply(note, "small", UiStyle.DIM)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(note)
@@ -67,7 +68,9 @@ func _ready() -> void:
 		Game.reset_keys())
 	row.add_child(reset)
 	var back := Button.new()
+	back.name = "Back"
 	back.text = "Back"
+	_back = back
 	back.pressed.connect(close)
 	row.add_child(back)
 	for b in [reset, back]:
@@ -90,6 +93,11 @@ func close() -> void:
 	closed.emit()
 
 
+func _process(_delta: float) -> void:
+	if visible:
+		UiStyle.keep_pad_focus(self, _back)
+
+
 func _listen(action: String) -> void:
 	listening = action
 	_refresh()
@@ -106,6 +114,10 @@ func _input(event: InputEvent) -> void:
 	if listening != "" and event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode != KEY_ESCAPE:
 			Game.rebind(listening, event.physical_keycode)
+		listening = ""
+		_refresh()
+		get_viewport().set_input_as_handled()
+	elif listening != "" and Game.is_pad_back(event):
 		listening = ""
 		_refresh()
 		get_viewport().set_input_as_handled()

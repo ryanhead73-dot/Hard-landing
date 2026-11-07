@@ -23,6 +23,7 @@ func _run() -> void:
 	await _hit_stop()
 	await _accessibility()
 	await _key_bindings()
+	await _pad_focus()
 	_graphics()
 	finished = true
 
@@ -318,6 +319,49 @@ func _key_bindings() -> void:
 	await _frames(2)
 	_check("closing it returns to the pause menu", menu.visible and not menu.bindings.visible)
 	menu.close()
+
+
+## With a pad, every menu holds a focused control so the d-pad and A work; focus comes back
+## after a panel rebuilds its buttons, and B backs out of listening for a key.
+func _pad_focus() -> void:
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	var vp := get_viewport()
+	Game.using_pad = true
+	menu.open()
+	await _frames(2)
+	var owner := vp.gui_get_focus_owner()
+	_check("the pause menu focuses Resume on a pad", owner != null and owner.name == "Resume", str(owner))
+	menu._open_bindings()
+	await _frames(2)
+	owner = vp.gui_get_focus_owner()
+	_check("the bindings list takes focus", owner != null and menu.bindings.is_ancestor_of(owner), str(owner))
+	menu.bindings._listen("jump")
+	var back := InputEventJoypadButton.new()
+	back.button_index = JOY_BUTTON_B
+	back.pressed = true
+	menu.bindings._input(back)
+	_check("B stops listening without closing", menu.bindings.listening == "" and menu.bindings.visible and Game.primary_key("jump") == KEY_SPACE)
+	menu.bindings.close()
+	await _frames(2)
+	menu.close()
+	await _frames(1)
+	var fab: FabricatorMenu = main.fabricator
+	var was := [Game.scrap, Game.stims]
+	Game.scrap = 999
+	Game.stims = 0
+	fab.open()
+	await _frames(2)
+	owner = vp.gui_get_focus_owner()
+	_check("the fabricator focuses a build button", owner is Button and fab.is_ancestor_of(owner), str(owner))
+	fab._refresh()
+	await _frames(3)
+	owner = vp.gui_get_focus_owner()
+	_check("focus comes back after the list rebuilds", owner != null and fab.is_ancestor_of(owner) and not owner.is_queued_for_deletion(), str(owner))
+	fab.close()
+	Game.scrap = was[0]
+	Game.stims = was[1]
+	Game.using_pad = false
+	await _frames(1)
 
 
 func _has_key(action: String, key: int) -> bool:

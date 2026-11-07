@@ -99,3 +99,32 @@ static func theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", panel)
 	_theme = t
 	return t
+
+
+## Gamepad focus. While a pad is in use and `root` is showing, keeps the focus on one of its
+## controls so the d-pad moves between them and A presses them; `prefer` gets it first. Menus call
+## this every frame, so focus comes back after a panel rebuilds its buttons or the player picks up
+## a pad mid-menu.
+static func keep_pad_focus(root: Node, prefer: Control = null) -> void:
+	if not Game.using_pad:
+		return
+	var current := root.get_viewport().gui_get_focus_owner()
+	if current and focusable(current) and root.is_ancestor_of(current):
+		return
+	var c := prefer if prefer and focusable(prefer) else first_focusable(root)
+	if c:
+		c.grab_focus()
+
+
+static func first_focusable(root: Node) -> Control:
+	for child in root.get_children():
+		if child is Control and focusable(child):
+			return child
+		var found := first_focusable(child)
+		if found:
+			return found
+	return null
+
+
+static func focusable(c: Control) -> bool:
+	return c.is_visible_in_tree() and c.focus_mode != Control.FOCUS_NONE and not (c is BaseButton and c.disabled)

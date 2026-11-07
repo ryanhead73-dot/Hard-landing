@@ -93,6 +93,8 @@ Every session is recorded for playtest review: objectives and how long each took
 | F | Flashlight |
 | F1 | Dev panel |
 
+A gamepad works throughout. In menus and panels the d-pad or left stick moves between options, A selects and B backs out (or cancels a key capture in the bindings list). A kill shows a longer, heavier hit marker than a normal hit, so it reads without relying on colour.
+
 The basin drifts from day into a long amber dusk and back over a 20 minute cycle, and the moss glows brighter as the light goes. With the dev panel open: 1-7 toggle each repair (the campaign follows), N jumps between day and dusk (and stops the cycle), K gives 50 scrap, T jumps to the current site's component and H jumps home. The panel also shows the camera boom length and says SQUEEZED when a wall pushes the camera in.
 
 ## What each repair changes

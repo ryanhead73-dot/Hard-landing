@@ -413,7 +413,7 @@ func hurt_mark_count() -> int:
 
 
 func hitmarker(killed: bool) -> void:
-	_hit_time = 0.15
+	_hit_time = 0.22 if killed else 0.15
 	_hit_killed = killed
 	_hit_crit = false
 	_hit_armor = false
@@ -657,9 +657,14 @@ func _draw_crosshair() -> void:
 		_crosshair.draw_line(c + Vector2(-9.0, 16.0), c + Vector2(9.0, 16.0), grey, 2.0)
 	elif _hit_time > 0.0:
 		var hit_col := Color("ff5a3a") if _hit_killed else (Color("ffc84a") if _hit_crit else Color.WHITE)
-		var reach := 19.0 if _hit_crit else 15.0
+		# A kill is told apart by shape as well as colour (long, heavy strokes with a dark edge),
+		# so it reads for colour-blind players too.
+		var reach := 22.0 if _hit_killed else (19.0 if _hit_crit else 15.0)
+		var width := 4.0 if _hit_killed else (3.0 if _hit_crit else 2.5)
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-			_crosshair.draw_line(c + d * 8.0, c + d * reach, hit_col, 3.0 if _hit_crit else 2.5)
+			if _hit_killed:
+				_crosshair.draw_line(c + d * 7.0, c + d * (reach + 1.0), Color(0, 0, 0, 0.55), width + 2.5)
+			_crosshair.draw_line(c + d * 8.0, c + d * reach, hit_col, width)
 		if _hit_crit:
 			_crosshair.draw_arc(c, 24.0, 0.0, TAU, 24, Color(1.0, 0.78, 0.29, _hit_time / 0.22 * 0.8), 2.0, true)
 

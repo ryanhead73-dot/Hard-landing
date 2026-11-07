@@ -15,6 +15,7 @@ var _difficulty: OptionButton
 var _controls: Label
 var _grid: GridContainer
 var bindings: KeyBindMenu
+var _resume: Button
 
 
 func _ready() -> void:
@@ -124,7 +125,9 @@ func _ready() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(buttons)
 	var resume := Button.new()
+	resume.name = "Resume"
 	resume.text = "Resume"
+	_resume = resume
 	resume.pressed.connect(close)
 	buttons.add_child(resume)
 	var title_button := Button.new()
@@ -159,6 +162,11 @@ func _ready() -> void:
 		_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.help_text())
 		visible = true)
 	visible = false
+
+
+func _process(_delta: float) -> void:
+	if visible:
+		UiStyle.keep_pad_focus(self, _resume)
 
 
 func _open_bindings() -> void:
