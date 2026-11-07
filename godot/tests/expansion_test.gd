@@ -247,6 +247,15 @@ func _regions() -> void:
 	_check("the region has its own look", absf(main._env.fog_density - rm.scene.look["fog_density"]) < 0.0001)
 	_check("the region keeps to its budget", _region_budget(rm.scene))
 
+	# The pocket's own wildlife belongs to it.
+	var residents: Array[Enemy] = rm.scene.spawn_residents(main)
+	await _frames(3)
+	_check("the Shatterlands has its own wildlife", residents.size() == rm.scene.residents.size() and residents.all(func(e): return is_instance_valid(e) and e.get_parent() == rm.scene))
+	_check("which stands on the region's ground", residents.all(func(e): return e.global_position.distance_to(rm.scene.global_position) < 90.0 and e.global_position.y > rm.scene.global_position.y - 0.5), str(residents.map(func(e): return e.global_position)))
+	for e in residents:
+		e.queue_free()
+	await _frames(2)
+
 	# Voss's greenhouses: the Act 2 hub, reached and hailed.
 	_check("opening the canyon starts Act 2's first quest", main.quests.state_of("the_lost") == QuestLog.ACTIVE)
 	var gh: Greenhouses = (rm.scene as ShatterlandsThreshold).greenhouses

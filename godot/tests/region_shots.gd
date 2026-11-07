@@ -22,10 +22,12 @@ func _ready() -> void:
 		s.queue_free()
 	main.day_cycle = false
 	main.set_daylight(0.0)
-	# `-- <out_dir> greenhouses` renders only Voss's greenhouses.
-	if args.size() > 1 and args[1] == "greenhouses":
+	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket.
+	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands"]:
 		Game.set_flag("shatterlands_open")
 		await main.regions.travel("shatterlands", true)
+		if args[1] == "shatterlands":
+			await _pocket(out, main.regions.scene)
 		await _greenhouses(out, main.regions.scene)
 		Game.delete_save()
 		get_tree().quit()
@@ -64,12 +66,16 @@ func _ready() -> void:
 	await _shot(out, "gate_open", gate.to_global(Vector3(-3.0, 0.5, 16.0)), gate.to_global(Vector3(0.0, 5.0, -3.0)))
 	await main.regions.travel("shatterlands", true)
 	var r: RegionScene = main.regions.scene
-	await _shot(out, "shatter_arrival", r.to_global(r.entry), r.to_global(Vector3(-6.0, 8.0, -20.0)))
-	await _shot(out, "shatter_wreck", r.to_global(Vector3(4.0, 0.3, 14.0)), r.to_global(Vector3(16.0, 3.0, -10.0)))
-	await _shot(out, "shatter_shelves", r.to_global(Vector3(-24.0, 9.3, -38.0)), r.to_global(Vector3(10.0, 2.0, 10.0)))
+	await _pocket(out, r)
 	await _greenhouses(out, r)
 	Game.delete_save()
 	get_tree().quit()
+
+
+func _pocket(out: String, r: RegionScene) -> void:
+	await _shot(out, "shatter_arrival", r.to_global(r.entry), r.to_global(Vector3(-6.0, 8.0, -20.0)))
+	await _shot(out, "shatter_wreck", r.to_global(Vector3(4.0, 0.3, 14.0)), r.to_global(Vector3(16.0, 3.0, -10.0)))
+	await _shot(out, "shatter_shelves", r.to_global(Vector3(-24.0, 9.3, -38.0)), r.to_global(Vector3(10.0, 2.0, 10.0)))
 
 
 ## Voss's greenhouses: from the shelves' foot across the pocket, and at the gate.

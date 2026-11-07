@@ -15,6 +15,8 @@ const GILLS := Color("3fd1b5")
 const STEM := Color("8d86a6")
 const HULL := Color("d9d2c2")
 const OXIDE := Color("bf6835")
+const RIM := Color("a49cff")
+const SPOT := Color("e6dcff")
 
 ## Giant fungi: [local position, stem height, cap radius].
 const FUNGI := [
@@ -35,6 +37,7 @@ const WRECK_POS := Vector3(16.0, 0.0, -10.0)
 ## Voss's greenhouses, the Act 2 hub (greybox).
 var greenhouses: Greenhouses
 var _rng := RandomNumberGenerator.new()
+var _spots: Array[Transform3D] = []
 var _mats := {}
 
 
@@ -43,11 +46,17 @@ func _init() -> void:
 	entry_yaw = 0.0
 	exit_point = Vector3(0.0, 0.0, 45.0)
 	# The waypoint leads to the greenhouse gate.
+	# A pack round the wreck and a spitter up on the middle shelf.
+	residents = [
+		["scuttler", Vector3(9.0, 0.5, -3.0)], ["scuttler", Vector3(21.0, 0.5, -1.0)],
+		["scuttler", Vector3(23.0, 0.5, -17.0)], ["scuttler", Vector3(7.0, 0.5, -22.0)],
+		["spitter", Vector3(-30.0, 6.5, -24.0)],
+	]
 	goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
 	look = {
-		"fog_light_color": Color("2a2442"), "fog_density": 0.02,
-		"ambient_light_color": Color("6a5f9a"), "ambient_light_energy": 0.5,
-		"background_energy_multiplier": 0.3,
+		"fog_light_color": Color("3a3160"), "fog_density": 0.017,
+		"ambient_light_color": Color("7d72b4"), "ambient_light_energy": 0.8,
+		"background_energy_multiplier": 0.45,
 		"sun_energy": 0.3, "sun_color": Color("a49cff"), "sun_rotation": Vector3(-24.0, 120.0, 0.0),
 	}
 
@@ -61,9 +70,11 @@ func build() -> void:
 	_ramp(Vector3(-15.0, 0.0, -2.0), Vector3(-19.0, 3.0, -8.0), 5.0)
 	_ramp(Vector3(-30.0, 3.0, -12.0), Vector3(-30.0, 6.0, -16.0), 5.0)
 	_ramp(Vector3(-24.0, 6.0, -26.0), Vector3(-17.0, 9.0, -34.0), 5.0)
+	_spots.clear()
 	for f in FUNGI:
 		var base: Vector3 = f[0]
 		_fungus(base, f[1], f[2])
+	_build_spots()
 	_wreck()
 	greenhouses = Greenhouses.new()
 	greenhouses.name = "Greenhouses"
@@ -148,6 +159,46 @@ func _fungus(base: Vector3, height: float, radius: float) -> void:
 	cap_mi.material_override = _mat(CAP_TOP, 0.6)
 	cap_mi.position = base + Vector3(0.0, height, 0.0)
 	add_child(cap_mi)
+	# A bulb where the stem meets the ground, a ragged skirt (annulus) under the cap, and a pale
+	# glowing rim so the canopy reads against the sky.
+	var bulb := SphereMesh.new()
+	bulb.radius = radius * 0.32
+	bulb.height = radius * 0.4
+	bulb.radial_segments = 12
+	bulb.rings = 5
+	var bulb_mi := MeshInstance3D.new()
+	bulb_mi.mesh = bulb
+	bulb_mi.material_override = _mat(STEM.darkened(0.25), 0.8)
+	bulb_mi.position = base + Vector3(0.0, radius * 0.08, 0.0)
+	add_child(bulb_mi)
+	var skirt := TorusMesh.new()
+	skirt.inner_radius = radius * 0.13
+	skirt.outer_radius = radius * 0.32
+	skirt.rings = 16
+	skirt.ring_segments = 6
+	var skirt_mi := MeshInstance3D.new()
+	skirt_mi.mesh = skirt
+	skirt_mi.material_override = _mat(STEM.lightened(0.15), 0.7)
+	skirt_mi.scale = Vector3(1.0, 0.35, 1.0)
+	skirt_mi.position = base + Vector3(0.0, height * 0.72, 0.0)
+	add_child(skirt_mi)
+	var rim := TorusMesh.new()
+	rim.inner_radius = radius * 0.94
+	rim.outer_radius = radius * 1.0
+	rim.rings = 28
+	rim.ring_segments = 4
+	var rim_mi := MeshInstance3D.new()
+	rim_mi.mesh = rim
+	rim_mi.material_override = _glow(RIM, 1.2)
+	rim_mi.position = base + Vector3(0.0, height - radius * 0.05, 0.0)
+	add_child(rim_mi)
+	# Pale spots on the cap's crown, gathered into one multimesh for the whole pocket.
+	for i in int(radius * 1.2):
+		var a := _rng.randf() * TAU
+		var d := sqrt(_rng.randf()) * radius * 0.75
+		var y := sqrt(maxf(1.0 - (d / radius) * (d / radius), 0.0)) * radius * 0.35
+		var sz := _rng.randf_range(0.25, 0.7) * radius * 0.08 + 0.15
+		_spots.append(Transform3D(Basis().scaled(Vector3(sz, sz * 0.4, sz)), base + Vector3(cos(a) * d, height + y - 0.05, sin(a) * d)))
 	# The glowing gills underneath: a flatter disc just under the cap.
 	var gills := CylinderMesh.new()
 	gills.top_radius = radius * 0.92
@@ -167,6 +218,24 @@ func _fungus(base: Vector3, height: float, radius: float) -> void:
 		light.shadow_enabled = false
 		light.position = base + Vector3(0.0, height - radius * 0.4, 0.0)
 		add_child(light)
+
+
+func _build_spots() -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	var sphere := SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	sphere.radial_segments = 8
+	sphere.rings = 4
+	mm.mesh = sphere
+	mm.instance_count = _spots.size()
+	for i in _spots.size():
+		mm.set_instance_transform(i, _spots[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = _glow(SPOT, 0.6)
+	add_child(mmi)
 
 
 ## A survey hauler that came down nose-first into the growth: a long ivory hull with oxide

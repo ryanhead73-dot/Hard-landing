@@ -141,6 +141,8 @@ func _enter_scene(id: String) -> void:
 	_old_look = scene.apply_environment(main._env, main._sun)
 	main.player.revive(scene.entry_global(), false)
 	main.player.face(scene.entry_yaw)
+	if main.spawn_packs:
+		scene.spawn_residents(main)
 
 
 func _leave_scene() -> void:

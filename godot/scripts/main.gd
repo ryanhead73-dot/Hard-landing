@@ -459,7 +459,8 @@ func _wake_packs() -> void:
 
 
 ## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer" or "warden". A name makes it an elite.
-func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
+## `parent`, when given, owns it instead of main (a region scene, so it goes when the region does).
+func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = null) -> Enemy:
 	var e: Enemy
 	match kind:
 		"spitter":
@@ -477,18 +478,19 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "") -> Enemy:
 		_:
 			e = Scuttler.new()
 	e.elite_name = elite_name
-	return spawn_enemy_node(e, at)
+	return spawn_enemy_node(e, at, parent)
 
 
 ## Puts a made enemy in the world (a thief comes with its burrows already set).
-func spawn_enemy_node(e: Enemy, at: Vector3) -> Enemy:
-	# Out among the hummocks, start on the ground, not inside it.
-	var ground := site.height_at(at.x, at.z)
-	if at.y < ground + 0.3:
-		at.y = ground + 0.5
+func spawn_enemy_node(e: Enemy, at: Vector3, parent: Node = null) -> Enemy:
+	# Out among the hummocks, start on the ground, not inside it (the Kettle's ground only).
+	if parent == null:
+		var ground := site.height_at(at.x, at.z)
+		if at.y < ground + 0.3:
+			at.y = ground + 0.5
 	e.target = player
 	e.home = at
-	add_child(e)
+	(parent if parent else self).add_child(e)
 	e.global_position = at
 	e.died.connect(_on_enemy_died)
 	return e
