@@ -73,6 +73,11 @@ func _ready() -> void:
 
 
 func _pocket(out: String, r: RegionScene) -> void:
+	# A drifter, held still for its portrait.
+	var d: Drifter = main.spawn_enemy("drifter", r.to_global(Vector3(-1.5, 2.6, 33.0)), "", r)
+	d.set_physics_process(false)
+	await _shot(out, "shatter_drifter", r.to_global(Vector3(2.0, 0.3, 39.0)), d.global_position)
+	d.queue_free()
 	await _shot(out, "shatter_arrival", r.to_global(r.entry), r.to_global(Vector3(-6.0, 8.0, -20.0)))
 	await _shot(out, "shatter_wreck", r.to_global(Vector3(4.0, 0.3, 14.0)), r.to_global(Vector3(16.0, 3.0, -10.0)))
 	await _shot(out, "shatter_shelves", r.to_global(Vector3(-24.0, 9.3, -38.0)), r.to_global(Vector3(10.0, 2.0, 10.0)))

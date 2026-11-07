@@ -27,6 +27,7 @@ func _run() -> void:
 	await _survey_depot()
 	await _relay()
 	await _landmarks()
+	await _drifters()
 	finished = true
 
 
@@ -567,4 +568,47 @@ func _landmarks() -> void:
 	await _frames(120)
 	_check("and she comes down unhurt", not player.dead and player.health >= hp, "health %.1f -> %.1f" % [hp, player.health])
 	_check("one burst throws her once", g.launches == 1)
+	Game.reset()
+
+
+func _drifters() -> void:
+	Game.reset()
+	_clear_enemies()
+	var at := Vector3(12.0, 0.0, 12.0)
+	at.y = main.site.height_at(at.x, at.z)
+	_place(at + Vector3(0.0, 0.5, 0.0), 0.0)
+	player.velocity = Vector3.ZERO
+	await _frames(5)
+	var d: Drifter = main.spawn_enemy("drifter", at + Vector3(11.0, 3.0, 0.0))
+	await get_tree().create_timer(1.0).timeout
+	var ground: float = main.site.height_at(d.global_position.x, d.global_position.z)
+	_check("a drifter hangs in the air", d.global_position.y - ground > 1.5, "%.1f m up" % (d.global_position.y - ground))
+	var hp := player.health
+	var t := 0.0
+	var swelled := false
+	while t < 14.0 and d.bursts == 0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		swelled = swelled or d.state == Drifter.State.SWELL
+		player.global_position = at + Vector3(0.0, 0.1, 0.0)
+	_check("it drifts in, swells, and bursts on Juno", swelled and d.bursts == 1 and d.dead, "after %.1f s, bursts %d" % [t, d.bursts])
+	_check("the burst hurts", player.health < hp - 5.0, "%.0f -> %.0f" % [hp, player.health])
+	player.health = hp
+	await _frames(30)
+	# Shot over a pack, it takes the pack with it, and Juno, far off, is untouched.
+	var far := at + Vector3(0.0, 0.0, -25.0)
+	far.y = main.site.height_at(far.x, far.z)
+	var bug: Enemy = main.spawn_enemy("scuttler", far + Vector3(0.0, 0.5, 0.0))
+	var d2: Drifter = main.spawn_enemy("drifter", far + Vector3(0.6, 2.4, 0.0))
+	var d3: Drifter = main.spawn_enemy("drifter", far + Vector3(-1.4, 2.6, 1.0))
+	await _frames(3)
+	var bug_hp := bug.health
+	hp = player.health
+	d2.take_damage(100.0, d2.global_position, Vector3.FORWARD)
+	await _frames(3)
+	_check("shot, it bursts where it hangs", d2.dead and d2.bursts == 1)
+	_check("the cloud hurts the creatures under it", bug.dead or bug.health < bug_hp, "%.0f -> %.0f" % [bug_hp, bug.health])
+	_check("and sets off its neighbours", d3.dead and d3.bursts == 1)
+	_check("Juno, well away, takes nothing", player.health >= hp)
+	_clear_enemies()
 	Game.reset()

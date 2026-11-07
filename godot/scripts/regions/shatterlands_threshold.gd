@@ -46,11 +46,14 @@ func _init() -> void:
 	entry_yaw = 0.0
 	exit_point = Vector3(0.0, 0.0, 45.0)
 	# The waypoint leads to the greenhouse gate.
-	# A pack round the wreck and a spitter up on the middle shelf.
+	# A pack round the wreck, a spitter up on the middle shelf, drifters under the caps.
 	residents = [
 		["scuttler", Vector3(9.0, 0.5, -3.0)], ["scuttler", Vector3(21.0, 0.5, -1.0)],
 		["scuttler", Vector3(23.0, 0.5, -17.0)], ["scuttler", Vector3(7.0, 0.5, -22.0)],
 		["spitter", Vector3(-30.0, 6.5, -24.0)],
+		# Drifters hang under the big caps.
+		["drifter", Vector3(-6.0, 3.0, -26.0)], ["drifter", Vector3(-2.0, 3.0, -34.0)],
+		["drifter", Vector3(-20.0, 3.0, 6.0)],
 	]
 	goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
 	look = {
