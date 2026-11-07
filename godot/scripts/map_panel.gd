@@ -97,6 +97,9 @@ func marks() -> Array:
 		for pool in w.lurker_pools:
 			if pool[2]:
 				out.append({"kind": "lurker", "pos": pool[0]})
+	if main.get("landmarks"):
+		for lm in main.landmarks.map_marks():
+			out.append({"kind": "landmark", "pos": lm["pos"], "label": lm["label"]})
 	if main.get("quests"):
 		for qm in main.quests.markers():
 			out.append({"kind": "quest", "pos": qm["pos"], "label": qm["title"]})
@@ -143,6 +146,10 @@ class MapView:
 					var lc := Color("d0574a")
 					draw_line(at + Vector2(-5, -5), at + Vector2(5, 5), lc, 2.0)
 					draw_line(at + Vector2(5, -5), at + Vector2(-5, 5), lc, 2.0)
+				"landmark":
+					var lc2 := Color(0.82, 0.8, 0.9, 0.85)
+					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(6, 5), at + Vector2(-6, 5)]), lc2)
+					draw_string(font, at + Vector2(9, 4), m["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, lc2)
 				"quest":
 					var qc := Color("9fe8d8")
 					draw_polyline(PackedVector2Array([at + Vector2(0, -8), at + Vector2(8, 0), at + Vector2(0, 8), at + Vector2(-8, 0), at + Vector2(0, -8)]), qc, 2.0)

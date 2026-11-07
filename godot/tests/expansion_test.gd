@@ -26,6 +26,7 @@ func _run() -> void:
 	await _drop_pod()
 	await _survey_depot()
 	await _relay()
+	await _landmarks()
 	finished = true
 
 
@@ -503,4 +504,42 @@ func _relay() -> void:
 	_check("the post is marked for the journal and map", marks.any(func(m): return m["id"] == "listening_post"), str(marks))
 	_check("the console only reads once", _label() == "" or not _label().contains("traffic log"), _label())
 	_clear_enemies()
+	Game.reset()
+
+
+func _landmarks() -> void:
+	Game.reset()
+	_clear_enemies()
+	var lm: Landmarks = main.landmarks
+	var top := -INF
+	for n in lm.split.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		top = maxf(top, (mi.global_transform * mi.get_aabb().get_center()).y)
+	_check("the Split towers over the rim", top > 35.0, "top %.1f" % top)
+	var gate: Node3D = main.regions.gates["shatterlands"]
+	_check("the Split stands either side of the canyon", lm.split.global_position.distance_to(Vector3(gate.global_position.x, 0.0, gate.global_position.z)) < 0.1)
+	var names: Array = main.map_panel.marks().filter(func(m): return m["kind"] == "landmark").map(func(m): return m["label"])
+	_check("the map names both landmarks", names.has("The Split") and names.has("The Chimney"), str(names))
+	var g := lm.chimney
+	_check("the Chimney sits on the basin floor", absf(g.global_position.y - main.site.height_at(g.global_position.x, g.global_position.z)) < 0.1)
+	for id in main.sites:
+		var site: Node3D = main.sites[id]
+		_check("the Chimney is clear of the %s site" % id, _flat_distance(site.global_position, g.global_position) > 25.0)
+	for id in main.discoveries.built:
+		_check("the Chimney is clear of %s" % id, _flat_distance(main.discoveries.built[id].global_position, g.global_position) > 20.0)
+	# Stand on the vent and let it go.
+	g.set_time(Geyser.IDLE + Geyser.RUMBLE - 0.3)
+	_place(g.vent_point() + Vector3(0.0, 0.3, 0.0), 0.0)
+	player.velocity = Vector3.ZERO
+	await _frames(5)
+	var start_y := player.global_position.y
+	var hp := player.health
+	var peak := start_y
+	for i in 90:
+		await get_tree().physics_frame
+		peak = maxf(peak, player.global_position.y)
+	_check("the Chimney throws Juno high", g.launches == 1 and peak - start_y > 8.0, "rose %.1f m" % (peak - start_y))
+	await _frames(120)
+	_check("and she comes down unhurt", not player.dead and player.health >= hp, "health %.1f -> %.1f" % [hp, player.health])
+	_check("one burst throws her once", g.launches == 1)
 	Game.reset()

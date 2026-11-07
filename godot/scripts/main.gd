@@ -130,6 +130,8 @@ var quests: QuestLog
 var regions: RegionManager
 ## Optional places off the repair routes (Discoveries).
 var discoveries: Discoveries
+## The Kettle's big shapes: the Split round the canyon gate and the Chimney geyser.
+var landmarks: Landmarks
 var onboarding: Onboarding
 ## Records the session for playtest review (only when this is the scene being played).
 var playtest: PlaytestLog
@@ -294,6 +296,9 @@ func _ready() -> void:
 	discoveries.name = "Discoveries"
 	add_child(discoveries)
 	discoveries.setup(self)
+	landmarks = Landmarks.new()
+	add_child(landmarks)
+	landmarks.setup(self)
 	_update_active_site()
 	_set_dusk(false)
 	_start_playtest.call_deferred(not Game.pending_load.is_empty())
