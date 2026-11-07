@@ -280,7 +280,7 @@ func _accessibility() -> void:
 	Game.toggle_aim = true
 	Game.subtitles = 2
 	Game.save_settings()
-	cfg.load(Game.SETTINGS_PATH)
+	cfg.load(Game.settings_path)
 	_check("both are saved", cfg.get_value("access", "toggle_aim") == true and cfg.get_value("access", "subtitles") == 2)
 	Game.toggle_aim = false
 	Game.subtitles = 1
@@ -301,7 +301,7 @@ func _key_bindings() -> void:
 	_check("the controls line follows it", Hud.help_text().contains("H reload") and Hud.help_text().contains("R interact"), Hud.help_text())
 	Game.save_settings()
 	var cfg := ConfigFile.new()
-	cfg.load(Game.SETTINGS_PATH)
+	cfg.load(Game.settings_path)
 	_check("bindings are saved", int(cfg.get_value("keys", "reload", 0)) == KEY_H)
 	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
 	menu.open()

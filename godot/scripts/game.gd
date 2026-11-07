@@ -46,7 +46,7 @@ const NEEDS_TEXT := {
 	"engine": "top-tier builds need engine bleed power",
 }
 
-const SETTINGS_PATH := "user://settings.cfg"
+var settings_path := "user://settings.cfg"
 ## The save format this build writes; older saves are upgraded by SaveMigrations.
 const SAVE_VERSION := SaveMigrations.CURRENT
 
@@ -339,13 +339,26 @@ func _process(_delta: float) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_isolate_test_files()
 	load_settings()
 	add_child(FpsOverlay.new())
 
 
+## A test scene (res://tests/...) gets its own settings and save files, so suites run side by side
+## can't read each other's saves, and no test touches the player's real ones.
+func _isolate_test_files() -> void:
+	for arg in OS.get_cmdline_args():
+		if arg.begins_with("res://tests/"):
+			var test_name := arg.get_file().get_basename()
+			DirAccess.make_dir_recursive_absolute("user://tests")
+			settings_path = "user://tests/%s_settings.cfg" % test_name
+			save_path = "user://tests/%s_save.json" % test_name
+			return
+
+
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) == OK:
+	if cfg.load(settings_path) == OK:
 		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
 		vibration = cfg.get_value("controls", "vibration", vibration)
@@ -452,7 +465,7 @@ func save_settings() -> void:
 		cfg.erase_section("keys")
 	for action in key_overrides:
 		cfg.set_value("keys", action, key_overrides[action])
-	cfg.save(SETTINGS_PATH)
+	cfg.save(settings_path)
 
 
 func apply_settings() -> void:
