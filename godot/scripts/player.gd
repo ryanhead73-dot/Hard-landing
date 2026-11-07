@@ -55,6 +55,8 @@ const CLIMB_RECOVER := 0.8
 
 var crouching := false
 var aiming := false
+## Toggle-aim mode: whether a press has latched aim on.
+var _aim_latched := false
 var dead := false
 var health := 100.0
 var weapon: Weapon
@@ -261,6 +263,7 @@ func start_roll() -> bool:
 	dir.y = 0.0
 	_roll_dir = dir.normalized()
 	roll_t = 0.0
+	_aim_latched = false
 	_body.rotation.y = atan2(-_roll_dir.x, -_roll_dir.z)
 	Sfx.play("roll_whoosh", global_position, -4.0, 0.1)
 	return true
@@ -316,6 +319,7 @@ func throw_charge() -> ArcCharge:
 ## Back on your feet at `at`. A loaded game keeps its saved ammo, so it passes refill = false.
 func revive(at: Vector3, refill := true) -> void:
 	dead = false
+	_aim_latched = false
 	health = max_health()
 	velocity = Vector3.ZERO
 	global_position = at
@@ -448,7 +452,13 @@ func _physics_process(delta: float) -> void:
 		_jump_buffer = 0.0
 		_since_floor = COYOTE_TIME + 1.0
 	_update_crouch(Input.is_action_pressed("crouch"))
-	aiming = Input.is_action_pressed("aim")
+	if Game.toggle_aim:
+		if Input.is_action_just_pressed("aim"):
+			_aim_latched = not _aim_latched
+		aiming = _aim_latched
+	else:
+		_aim_latched = false
+		aiming = Input.is_action_pressed("aim")
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
 	if _hold_fire and not Input.is_action_pressed("fire"):
 		_hold_fire = false

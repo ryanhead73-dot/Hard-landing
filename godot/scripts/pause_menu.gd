@@ -1,6 +1,7 @@
 class_name PauseMenu
 extends CanvasLayer
-## Esc pauses the game and opens settings: mouse sensitivity, invert Y, volume and difficulty.
+## Esc pauses the game and opens settings: mouse sensitivity, invert Y, hold or toggle aim,
+## volumes, subtitles (off, on, large, largest), difficulty, shake, graphics and the fps readout.
 ## Settings are saved to user://settings.cfg when the menu closes.
 
 signal quit_to_title
@@ -51,6 +52,16 @@ func _ready() -> void:
 	_invert.button_pressed = Game.invert_y
 	_row_label("")
 	_grid.add_child(_invert)
+	var aim_mode := OptionButton.new()
+	aim_mode.name = "AimMode"
+	aim_mode.add_item("Hold")
+	aim_mode.add_item("Toggle")
+	aim_mode.selected = 1 if Game.toggle_aim else 0
+	aim_mode.item_selected.connect(func(i: int):
+		Game.toggle_aim = i == 1
+		Game.apply_settings())
+	_row_label("Aim")
+	_grid.add_child(aim_mode)
 	_section("AUDIO")
 	_volume = _slider(_grid, "Volume", 0.0, 1.0, 0.05, Game.master_volume)
 	_music = _slider(_grid, "Music", 0.0, 1.0, 0.05, Game.music_volume)
@@ -59,6 +70,16 @@ func _ready() -> void:
 	effects.value_changed.connect(func(v: float):
 		Game.sfx_volume = v
 		Game.apply_settings())
+	var subs := OptionButton.new()
+	subs.name = "Subtitles"
+	for t in Game.SUBTITLE_NAMES:
+		subs.add_item(t)
+	subs.selected = Game.subtitles
+	subs.item_selected.connect(func(i: int):
+		Game.subtitles = i
+		Game.apply_settings())
+	_row_label("Subtitles")
+	_grid.add_child(subs)
 	_section("GAME")
 	_difficulty = OptionButton.new()
 	for d in Game.DIFFICULTY_NAMES:

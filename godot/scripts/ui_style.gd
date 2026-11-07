@@ -91,7 +91,7 @@ static func theme() -> Theme:
 	t.set_color("font_focus_color", "Button", AMBER)
 	t.set_color("font_pressed_color", "Button", ORANGE)
 	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.05, 0.06, 0.07, 0.94)
+	panel.bg_color = Color(0.05, 0.06, 0.07, 0.985)
 	panel.border_color = Color(ORANGE, 0.8)
 	panel.border_width_top = 3
 	panel.set_corner_radius_all(3)

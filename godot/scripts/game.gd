@@ -65,6 +65,12 @@ var music_volume := 0.7
 var sfx_volume := 1.0
 ## The frame-rate readout (F3).
 var show_fps := false
+## Subtitles: 0 off, 1 on, 2 large, 3 largest.
+const SUBTITLE_NAMES := ["Off", "On", "Large", "Largest"]
+const SUBTITLE_SCALE := [1.0, 1.0, 1.25, 1.5]
+var subtitles := 1
+## Aim by holding the button (false) or press once to aim, again to stop (true).
+var toggle_aim := false
 var difficulty := 1
 ## Camera shake strength (0 turns it off).
 var screen_shake := 1.0
@@ -197,6 +203,8 @@ func load_settings() -> void:
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
+		subtitles = clampi(cfg.get_value("access", "subtitles", subtitles), 0, SUBTITLE_NAMES.size() - 1)
+		toggle_aim = cfg.get_value("access", "toggle_aim", toggle_aim)
 	apply_settings()
 
 
@@ -268,6 +276,8 @@ func save_settings() -> void:
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.set_value("game", "screen_shake", screen_shake)
 	cfg.set_value("video", "graphics", graphics)
+	cfg.set_value("access", "subtitles", subtitles)
+	cfg.set_value("access", "toggle_aim", toggle_aim)
 	cfg.save(SETTINGS_PATH)
 
 

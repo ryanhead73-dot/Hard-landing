@@ -201,6 +201,11 @@ func _ready() -> void:
 	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	_voice.add_theme_constant_override("shadow_offset_x", 1)
 	_voice.add_theme_constant_override("shadow_offset_y", 1)
+	_size_subtitles()
+	Game.settings_changed.connect(func():
+		_size_subtitles()
+		if Game.subtitles == 0:
+			_voice.visible = false)
 	# An outline keeps them legible over bright sky, steam and the cream hull alike.
 	_voice.add_theme_constant_override("outline_size", 6)
 	_voice.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
@@ -492,12 +497,19 @@ func ending_text() -> String:
 
 
 func set_voice(speaker: String, text: String) -> void:
-	_voice.visible = text != ""
+	_voice.visible = text != "" and Game.subtitles > 0
 	if text == "":
 		_voice.text = ""
 		return
 	var colour := "9fe8d8" if speaker == Story.HOB else "ffd08a"
 	_voice.text = "[center][b][color=#%s]%s[/color][/b]   %s[/center]" % [colour, speaker.to_upper(), text]
+
+
+## Subtitle size from the accessibility setting.
+func _size_subtitles() -> void:
+	var k: float = Game.SUBTITLE_SCALE[Game.subtitles]
+	_voice.add_theme_font_size_override("normal_font_size", roundi((UiStyle.size("body") + 1) * k))
+	_voice.add_theme_font_size_override("bold_font_size", roundi((UiStyle.size("body") + 3) * k))
 
 
 func voice_text() -> String:

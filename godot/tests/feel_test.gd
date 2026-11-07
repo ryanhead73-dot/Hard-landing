@@ -21,6 +21,7 @@ func _run() -> void:
 	await _rifle()
 	await _weapon_swap()
 	await _hit_stop()
+	await _accessibility()
 	_graphics()
 	finished = true
 
@@ -237,3 +238,48 @@ func _hit_stop() -> void:
 	Engine.time_scale = 0.3
 	await get_tree().create_timer(0.05, true, false, true).timeout
 	_check("a stray slow-down is put right", Engine.time_scale == 1.0, str(Engine.time_scale))
+
+
+## Accessibility settings: toggle aim latches and unlatches, subtitles hide or grow, and both
+## are in the pause menu and saved.
+func _accessibility() -> void:
+	player.revive(_ground(main.SPAWN + Vector3(8.0, 0.0, 8.0)))
+	await _frames(5)
+	Game.toggle_aim = true
+	await _press("aim")
+	await _frames(3)
+	_check("toggle aim: one press aims and it stays on", player.aiming)
+	await _press("aim")
+	await _frames(3)
+	_check("a second press lets go", not player.aiming)
+	await _press("aim")
+	player.revive(player.global_position)
+	await _frames(3)
+	_check("going down drops toggled aim", not player.aiming)
+	Game.toggle_aim = false
+	var hud: Hud = main.hud
+	var base: int = hud._voice.get_theme_font_size("normal_font_size")
+	Game.subtitles = 3
+	Game.apply_settings()
+	_check("largest subtitles are half as big again", hud._voice.get_theme_font_size("normal_font_size") >= roundi(base * 1.45), "%d vs %d" % [hud._voice.get_theme_font_size("normal_font_size"), base])
+	Game.subtitles = 0
+	Game.apply_settings()
+	hud.set_voice("Juno", "Testing.")
+	_check("subtitles off hides them", not hud._voice.visible)
+	Game.subtitles = 1
+	Game.apply_settings()
+	hud.set_voice("Juno", "Testing.")
+	_check("and on shows them", hud._voice.visible)
+	hud.set_voice("", "")
+	var menu: Node = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	_check("the pause menu has aim mode and subtitles", menu.find_child("AimMode", true, false) != null and menu.find_child("Subtitles", true, false) != null)
+	var cfg := ConfigFile.new()
+	Game.toggle_aim = true
+	Game.subtitles = 2
+	Game.save_settings()
+	cfg.load(Game.SETTINGS_PATH)
+	_check("both are saved", cfg.get_value("access", "toggle_aim") == true and cfg.get_value("access", "subtitles") == 2)
+	Game.toggle_aim = false
+	Game.subtitles = 1
+	Game.save_settings()
+	Game.apply_settings()
