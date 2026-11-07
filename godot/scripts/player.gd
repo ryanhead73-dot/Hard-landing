@@ -353,7 +353,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Right-stick look: a power-1.6 response curve for fine aim near the centre, full speed at the
-## edge. Slower while aiming, like the mouse, and scaled by the sensitivity setting.
+## edge. Slower while aiming, like the mouse, and scaled by the controller sensitivity setting.
 func _pad_look(delta: float) -> void:
 	if dead or Game.dev_panel_open or get_tree().paused:
 		return
@@ -361,7 +361,7 @@ func _pad_look(delta: float) -> void:
 	if v == Vector2.ZERO:
 		return
 	v *= pow(v.length(), 0.6)
-	var speed := Game.pad_look_speed * (Game.mouse_sensitivity / 0.0025) * (aim_fov / fov if aiming else 1.0)
+	var speed := Game.pad_look_speed * Game.pad_sensitivity * (aim_fov / fov if aiming else 1.0)
 	var look_y := -v.y if Game.invert_y else v.y
 	_yaw.rotate_y(-v.x * speed * delta)
 	_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * speed * 0.7 * delta, deg_to_rad(-70.0), deg_to_rad(50.0))

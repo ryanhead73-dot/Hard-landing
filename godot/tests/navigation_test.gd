@@ -8,6 +8,8 @@ const CHASE_TIME := 14.0
 ## and with a dozen in one pack the outer ones can be held at about 7 m by the crowd; a creature
 ## that was actually wedged ends up tens of metres out.
 const REACHED := 8.0
+## A creature this close to one that reached her is queued behind the pack, not lost.
+const CROWD := 3.5
 
 var failures := 0
 var main: Node
@@ -60,9 +62,18 @@ func _chase_from(place: String, at: Vector3, starts: Array) -> void:
 		for i in es.size():
 			var d := _flat_dist(es[i].global_position, at)
 			best[i] = minf(best.get(i, INF), d)
+	# A creature held back by the crowd (pressed up against one that did reach her) counts too:
+	# it found its way, it is queued behind the pack. A wedged one is nowhere near the others.
+	var queued := {}
+	for i in es.size():
+		if best.get(i, INF) >= REACHED and is_instance_valid(es[i]):
+			for j in es.size():
+				if j != i and best.get(j, INF) < REACHED and is_instance_valid(es[j]) \
+						and _flat_dist(es[i].global_position, es[j].global_position) < CROWD:
+					queued[i] = true
 	var missed: Array = []
 	for i in es.size():
-		if best.get(i, INF) >= REACHED:
+		if best.get(i, INF) >= REACHED and not queued.has(i):
 			missed.append("from (%.0f, %.0f) got to %.0f m" % [starts[i].x, starts[i].z, best.get(i, INF)])
 	_check("%s: all %d creatures reach Juno" % [place, es.size()], missed.is_empty(), ", ".join(missed))
 

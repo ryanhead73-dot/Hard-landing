@@ -368,6 +368,7 @@ func _pad_focus() -> void:
 	_check("vibration can be turned off", Game.rumbles == n + 1)
 	Game.vibration = true
 	_check("the pause menu has a vibration switch", menu.find_child("Vibration", true, false) != null)
+	_check("the pause menu has controller look sensitivity", menu.find_child("PadSensitivity", true, false) != null)
 	Game.scrap = was[0]
 	Game.stims = was[1]
 	Game.using_pad = false

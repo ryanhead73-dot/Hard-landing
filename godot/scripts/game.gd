@@ -59,6 +59,9 @@ var using_pad := false
 signal input_device_changed(pad: bool)
 ## Right-stick look speed in radians per second at full deflection (the settings slider scales it).
 var pad_look_speed := 3.2
+## Controller look sensitivity, a multiplier on pad_look_speed (separate from the mouse).
+const PAD_SENSITIVITY_RANGE := Vector2(0.4, 2.0)
+var pad_sensitivity := 1.0
 ## Key or button names shown in prompts, keyboard first, then gamepad.
 const PROMPT_KEYS := {
 	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"],
@@ -335,6 +338,7 @@ func load_settings() -> void:
 		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
 		vibration = cfg.get_value("controls", "vibration", vibration)
+		pad_sensitivity = clampf(cfg.get_value("controls", "pad_sensitivity", pad_sensitivity), PAD_SENSITIVITY_RANGE.x, PAD_SENSITIVITY_RANGE.y)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
@@ -419,6 +423,7 @@ func save_settings() -> void:
 	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("controls", "invert_y", invert_y)
 	cfg.set_value("controls", "vibration", vibration)
+	cfg.set_value("controls", "pad_sensitivity", pad_sensitivity)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("audio", "sfx_volume", sfx_volume)

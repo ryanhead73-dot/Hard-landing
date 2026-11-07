@@ -65,6 +65,11 @@ func _ready() -> void:
 	_grid = grids[0]
 	_section("CONTROLS")
 	_sensitivity = _slider(_grid, "Mouse sensitivity", 0.0005, 0.006, 0.0001, Game.mouse_sensitivity)
+	var pad_sens := _slider(_grid, "Controller look", Game.PAD_SENSITIVITY_RANGE.x, Game.PAD_SENSITIVITY_RANGE.y, 0.05, Game.pad_sensitivity)
+	pad_sens.name = "PadSensitivity"
+	pad_sens.value_changed.connect(func(v: float):
+		Game.pad_sensitivity = v
+		Game.apply_settings())
 	_invert = CheckBox.new()
 	_invert.text = "Invert look Y"
 	_invert.button_pressed = Game.invert_y
