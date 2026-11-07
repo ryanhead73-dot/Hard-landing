@@ -45,7 +45,8 @@ const NEEDS_TEXT := {
 }
 
 const SETTINGS_PATH := "user://settings.cfg"
-const SAVE_VERSION := 1
+## The save format this build writes; older saves are upgraded by SaveMigrations.
+const SAVE_VERSION := SaveMigrations.CURRENT
 
 var mouse_sensitivity := 0.0025
 var invert_y := false
@@ -140,6 +141,14 @@ var mission_done: Array = []
 var mission_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
 var intro_pending := false
+
+## Expansion state (save v2). The region Juno is in (see RegionDB), the campaign act (1-4),
+## world flags (id -> value, set by quests, discoveries and dialogue) and the quest log
+## (quest id -> {state, step}; see QuestDB).
+var region := SaveMigrations.DEFAULT_REGION
+var act := 1
+var flags: Dictionary = {}
+var quests: Dictionary = {}
 
 
 ## The name to show for an action's key on the current device.
@@ -483,6 +492,10 @@ func reset() -> void:
 	mission_stage.clear()
 	mission_done.clear()
 	mission_objective = ""
+	region = SaveMigrations.DEFAULT_REGION
+	act = 1
+	flags.clear()
+	quests.clear()
 	inventory_changed.emit()
 	repairs_changed.emit()
 	scrap_changed.emit(scrap)
@@ -529,6 +542,10 @@ func session_state() -> Dictionary:
 		"hints_seen": hints_seen.duplicate(),
 		"mission_stage": mission_stage.duplicate(),
 		"mission_done": mission_done.duplicate(),
+		"region": region,
+		"act": act,
+		"flags": flags.duplicate(true),
+		"quests": quests.duplicate(true),
 	}
 
 
@@ -567,6 +584,10 @@ func apply_session(data: Dictionary) -> void:
 	hints_seen.clear()
 	for h in data.get("hints_seen", []):
 		hints_seen.append(String(h))
+	region = String(data.get("region", SaveMigrations.DEFAULT_REGION))
+	act = clampi(int(data.get("act", 1)), 1, 4)
+	flags = (data.get("flags", {}) as Dictionary).duplicate(true)
+	quests = (data.get("quests", {}) as Dictionary).duplicate(true)
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
@@ -609,8 +630,9 @@ func read_save() -> Dictionary:
 func _read_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != SAVE_VERSION:
+	# Older saves are upgraded in place; a newer build's save or a damaged file comes back {}.
+	var data := SaveMigrations.migrate(JSON.parse_string(FileAccess.get_file_as_string(path)))
+	if int(data.get("version", 0)) != SAVE_VERSION:
 		return {}
 	return data
 
