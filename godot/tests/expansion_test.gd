@@ -23,6 +23,7 @@ func _run() -> void:
 	await _regions()
 	await _journal()
 	await _listening_post()
+	await _drop_pod()
 	finished = true
 
 
@@ -386,4 +387,41 @@ func _listening_post() -> void:
 	_check("holding E wakes the post", post.is_awake() and Game.has_log("post_1"))
 	_check("waking it finishes the discovery and pays once", main.quests.is_done("listening_post") and Game.scrap == scrap + 25 and Game.flags.get("heard_the_hollow") == true, str(Game.scrap - scrap))
 	_check("HOB has something to say about it", main.voice.history.any(func(h): return String(h).contains("listening posts")))
+	Game.reset()
+
+
+func _drop_pod() -> void:
+	Game.reset()
+	_clear_enemies()
+	main.quests.restore()
+	var pod: DropPod = main.discoveries.built["drop_pod"]
+	_check("the drop pod lies out on the flats, clear of the pools", pod != null and not main.site.in_pool(pod.global_position))
+	_place(pod.recorder_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(5)
+	_check("the pod is silent until the listening post hears it", not pod.transmitting() and _label() == "" and main.quests.state_of("last_drop") == QuestLog.LOCKED, _label())
+	Game.set_flag("post_awake")
+	await _frames(5)
+	_check("waking the post starts the side mission and the pod reaching", main.quests.state_of("last_drop") == QuestLog.ACTIVE and Game.flags.get("pod_found") == true and main.quests.step_of("last_drop") == 1)
+	_check("the recorder can be pulled", _label().contains("flight recorder"), _label())
+	await _press("interact")
+	_check("pulling it starts the download", pod.downloading())
+	await get_tree().create_timer(5.0).timeout
+	_check("the noise brings a wave", pod.waves >= 1 and _enemy_count() >= 2, "%d waves, %d enemies" % [pod.waves, _enemy_count()])
+	_clear_enemies()
+	var before := pod.progress
+	_place(pod.global_position + Vector3(25.0, 1.0, 0.0), 0.0)
+	await get_tree().create_timer(1.0).timeout
+	_check("walking off stalls the download", is_equal_approx(pod.progress, before) or absf(pod.progress - before) < 0.1, "%.2f -> %.2f" % [before, pod.progress])
+	_place(pod.recorder_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await get_tree().create_timer(0.5).timeout
+	_check("coming back picks it up again", pod.progress > before)
+	pod.progress = DropPod.DOWNLOAD - 0.3
+	var scrap := Game.scrap
+	var charges := Game.charges
+	await get_tree().create_timer(1.0).timeout
+	_clear_enemies()
+	_check("a full download gives Reyes's last log", pod.is_done() and Game.has_log("pod_1"))
+	_check("and the pod's locker", Game.charges > charges)
+	_check("the side mission completes and pays", main.quests.is_done("last_drop") and Game.scrap == scrap + 30 and Game.flags.get("knows_greenhouses") == true)
+	_check("the pod goes quiet", not pod.transmitting() and _label() == "")
 	Game.reset()

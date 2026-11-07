@@ -66,6 +66,12 @@ const POST_LINES := [
 	[JUNO, "There's something under the basin, HOB. Way down. It answers every pulse."],
 	[HOB, "Noted. I'd rather not go and say hello just yet."],
 ]
+## Pulling the flight recorder from Reyes's drop pod.
+const POD_LINES := [
+	[HOB, "Got it all. Juno, Reyes's people are alive. Eleven of them, past the north-east canyon."],
+	[JUNO, "The one that's full of rockfall."],
+	[HOB, "That one. One thing at a time. Ship first, then rescues."],
+]
 const FINALE_HALF := [HOB, "Halfway. The Loom's beat is steady. Hold them off."]
 const FINALE_LATE := [HOB, "Ten seconds left on the spool. Start heading for the cockpit."]
 const FINALE_READY := [HOB, "Spool's full! Get to the pilot's seat. Now, Juno!"]
@@ -208,6 +214,11 @@ const LOGS: Array[Dictionary] = [
 		"id": "post_1", "site": "discovery", "source": "listening_post",
 		"title": "Listening post three", "author": "Ilse Marrow",
 		"text": "Third post up and listening. The lattice doesn't stop at the basin floor. Under every pulse there's an echo that comes back late, from somewhere a long way down, as if the Kettle sits on a hollow. All three posts hear it. Pell says I should stop putting microphones on a planet that pulls ships out of the sky. Pell is probably right. I've left this one running in case anyone else wants to listen.",
+	},
+	{
+		"id": "pod_1", "site": "discovery", "source": "drop_pod",
+		"title": "Supply drop, six of six", "author": "Lt. Sana Reyes",
+		"text": "Last drop, and the pod's going down hard. If you've pulled this recorder, you've met the welcoming committee. We're not at the Long Patience any more. Marrow found Voss's old greenhouses on the far side of the north-east canyon, under the big fungus, and they're holding. Eleven of us. The canyon came down behind us in the last quake. If you have a way through it, we have a way off this rock. Reyes out.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

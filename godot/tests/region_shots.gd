@@ -37,6 +37,12 @@ func _ready() -> void:
 	await _shot(out, "post_far", Vector3(10.0, 0.5, 20.0), post.global_position + Vector3(0.0, 6.0, 0.0))
 	await _shot(out, "post_walk", Vector3(ListeningPost.WALK_FROM.x - 6.0, 1.0, ListeningPost.WALK_FROM.y - 8.0), post.global_position + Vector3(0.0, 3.0, 0.0))
 	await _shot(out, "post_hut", post.to_global(Vector3(-1.0, 0.5, 3.5)), post.to_global(Vector3(0.6, 1.2, -3.0)))
+	# Reyes's drop pod, transmitting, at dusk so the green lamp reads.
+	Game.set_flag("post_awake")
+	main.set_daylight(1.0)
+	var pod: DropPod = main.discoveries.built["drop_pod"]
+	await _shot(out, "pod", pod.to_global(Vector3(4.0, 0.5, 9.0)), pod.global_position + Vector3(0.0, 1.0, 0.0))
+	main.set_daylight(0.0)
 	var gate: Node3D = main.regions.gates["shatterlands"]
 	# The gate, shut, then open, from out on the basin floor.
 	await _shot(out, "gate_shut", gate.to_global(Vector3(-3.0, 0.5, 16.0)), gate.to_global(Vector3(0.0, 5.0, -3.0)))

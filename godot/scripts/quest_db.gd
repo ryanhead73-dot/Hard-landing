@@ -70,6 +70,16 @@ const EXTRA: Array[Dictionary] = [
 		"rewards": {"scrap": 25, "flags": {"heard_the_hollow": true}},
 	},
 	{
+		"id": "last_drop", "title": "The last supply drop", "act": 1, "kind": "side", "region": "kettle",
+		"summary": "The listening post picked up a distress beacon on the west flats: one of Reyes's drop pods.",
+		"requires": [{"type": "flag", "id": "post_awake"}],
+		"steps": [
+			{"text": "Find the drop pod on the west flats", "done": {"type": "flag", "id": "pod_found"}},
+			{"text": "Pull the pod's flight recorder and hold the ground while it downloads", "done": {"type": "flag", "id": "pod_downloaded"}},
+		],
+		"rewards": {"scrap": 30, "flags": {"knows_greenhouses": true}},
+	},
+	{
 		"id": "drift_salvage", "title": "Drift salvage", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "Cargo from every ship the Loom pulled down lies half-buried across the basin.",
 		"requires": [{"type": "caches", "count": 1}],
