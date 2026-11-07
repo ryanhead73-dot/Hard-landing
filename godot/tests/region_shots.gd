@@ -32,6 +32,11 @@ func _ready() -> void:
 	get_viewport().get_texture().get_image().save_png("%s/journal.png" % out)
 	print("shot journal")
 	main.journal.close()
+	# Ilse's listening post: from Kestrel's side door, from the foot of the walkway, at the hut.
+	var post: ListeningPost = main.discoveries.built["listening_post"]
+	await _shot(out, "post_far", Vector3(10.0, 0.5, 20.0), post.global_position + Vector3(0.0, 6.0, 0.0))
+	await _shot(out, "post_walk", Vector3(ListeningPost.WALK_FROM.x - 6.0, 1.0, ListeningPost.WALK_FROM.y - 8.0), post.global_position + Vector3(0.0, 3.0, 0.0))
+	await _shot(out, "post_hut", post.to_global(Vector3(-1.0, 0.5, 3.5)), post.to_global(Vector3(0.6, 1.2, -3.0)))
 	var gate: Node3D = main.regions.gates["shatterlands"]
 	# The gate, shut, then open, from out on the basin floor.
 	await _shot(out, "gate_shut", gate.to_global(Vector3(-3.0, 0.5, 16.0)), gate.to_global(Vector3(0.0, 5.0, -3.0)))

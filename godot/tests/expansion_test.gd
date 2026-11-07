@@ -22,6 +22,7 @@ func _run() -> void:
 	await _quest_flow()
 	await _regions()
 	await _journal()
+	await _listening_post()
 	finished = true
 
 
@@ -344,4 +345,45 @@ func _journal() -> void:
 	await _frames(2)
 	_check("the logs list links to the journal (the pad's way in)", _panel_text(main.logs_panel).contains("Journal"))
 	main.logs_panel.close()
+	Game.reset()
+
+
+func _listening_post() -> void:
+	Game.reset()
+	main.quests.restore()
+	var post: ListeningPost = main.discoveries.built["listening_post"]
+	_check("the listening post stands on the slope", post != null and post.global_position.y > 8.0, str(post.global_position))
+	_check("its mast is tall enough to see from Kestrel", post.global_position.distance_to(kestrel.global_position) < 140.0)
+	_check("the post's quest waits until Juno notices it", main.quests.state_of("listening_post") == QuestLog.LOCKED)
+	# The walkway: Juno can stand on every plank from the basin floor up.
+	var start := Vector3(ListeningPost.WALK_FROM.x, 0.0, ListeningPost.WALK_FROM.y)
+	var top := post.to_global(Vector3(0.0, 0.0, 5.6))
+	var ok := true
+	for i in 6:
+		var p := start.lerp(top, (i + 0.5) / 7.0)
+		p.y = maxf(main.site.height_at(p.x, p.z), top.y if i == 6 else 0.0) + 2.0
+		_place(p, 0.0)
+		await get_tree().create_timer(0.6).timeout
+		if not player.is_on_floor() or player.global_position.y < p.y - 2.6:
+			ok = false
+			print("  walkway gap at ", p, " juno ", player.global_position)
+	_check("the walkway carries Juno up the slope", ok and player.global_position.y > main.site.height_at(start.x, start.z) + 4.0, str(player.global_position))
+	await _frames(5)
+	_check("coming close starts the discovery", main.quests.state_of("listening_post") == QuestLog.ACTIVE)
+	_place(post.terminal_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(5)
+	_check("the terminal asks for a hold", _label().contains("Wake the listening post"), _label())
+	var scrap := Game.scrap
+	Input.action_press("interact")
+	await get_tree().create_timer(ListeningPost.HOLD * 0.5).timeout
+	_check("letting go early doesn't wake it", not post.is_awake())
+	Input.action_release("interact")
+	await _frames(3)
+	Input.action_press("interact")
+	await get_tree().create_timer(ListeningPost.HOLD + 0.4).timeout
+	Input.action_release("interact")
+	await _frames(5)
+	_check("holding E wakes the post", post.is_awake() and Game.has_log("post_1"))
+	_check("waking it finishes the discovery and pays once", main.quests.is_done("listening_post") and Game.scrap == scrap + 25 and Game.flags.get("heard_the_hollow") == true, str(Game.scrap - scrap))
+	_check("HOB has something to say about it", main.voice.history.any(func(h): return String(h).contains("listening posts")))
 	Game.reset()

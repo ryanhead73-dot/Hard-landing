@@ -60,6 +60,12 @@ const FINALE_START: Array = [
 	[HOB, "Engine spool started. Ninety seconds. Every animal in the basin is going to feel this."],
 	[JUNO, "Then we keep them off you. Let's go."],
 ]
+## Waking Ilse's listening post on the north-east slope.
+const POST_LINES := [
+	[HOB, "That's one of Ilse Marrow's listening posts. Still logging, after all this time."],
+	[JUNO, "There's something under the basin, HOB. Way down. It answers every pulse."],
+	[HOB, "Noted. I'd rather not go and say hello just yet."],
+]
 const FINALE_HALF := [HOB, "Halfway. The Loom's beat is steady. Hold them off."]
 const FINALE_LATE := [HOB, "Ten seconds left on the spool. Start heading for the cockpit."]
 const FINALE_READY := [HOB, "Spool's full! Get to the pilot's seat. Now, Juno!"]
@@ -196,6 +202,12 @@ const LOGS: Array[Dictionary] = [
 		"id": "loom_3", "site": "navigation", "source": "component",
 		"title": "The cradle", "author": "Ilse Marrow",
 		"text": "The core goes in a ship's nav bay. Any ship mind will understand it. Wait for the beat and fly in the gap. I'm not coming down from the spire the way I came up. When the pulse goes through the top, there's a moment where the Loom reaches all the way to orbit. I think I can ride it. If you're reading this and I was wrong, tell Reyes I'm sorry. If I was right, look up.",
+	},
+	# Discoveries ("discovery", the discovery's id): places off the repair routes.
+	{
+		"id": "post_1", "site": "discovery", "source": "listening_post",
+		"title": "Listening post three", "author": "Ilse Marrow",
+		"text": "Third post up and listening. The lattice doesn't stop at the basin floor. Under every pulse there's an echo that comes back late, from somewhere a long way down, as if the Kettle sits on a hollow. All three posts hear it. Pell says I should stop putting microphones on a planet that pulls ships out of the sky. Pell is probably right. I've left this one running in case anyone else wants to listen.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

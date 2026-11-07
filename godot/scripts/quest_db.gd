@@ -35,7 +35,7 @@ const ACTS := {
 const KINDS := ["main", "side", "discovery"]
 
 ## Ilse Marrow's own logs, in the order she wrote them.
-const ILSE_LOGS := ["relay_1", "relay_2", "relay_3", "freighter_3", "loom_1", "loom_2", "loom_3"]
+const ILSE_LOGS := ["relay_1", "relay_2", "relay_3", "post_1", "freighter_3", "loom_1", "loom_2", "loom_3"]
 
 ## Quests beyond the seven repairs. New content goes here.
 const EXTRA: Array[Dictionary] = [
@@ -61,6 +61,13 @@ const EXTRA: Array[Dictionary] = [
 			{"text": "Find out where Reyes's people sheltered", "done": {"type": "logs", "ids": ["freighter_3"]}},
 		],
 		"rewards": {"scrap": 30, "flags": {"knows_survivors": true}},
+	},
+	{
+		"id": "listening_post", "title": "The listening post", "act": 1, "kind": "discovery", "region": "kettle",
+		"summary": "A mast blinks amber high on the north-east slope. Someone left equipment running.",
+		"requires": [{"type": "flag", "id": "seen_listening_post"}],
+		"steps": [{"text": "Climb to the listening post and wake its terminal", "done": {"type": "flag", "id": "post_awake"}}],
+		"rewards": {"scrap": 25, "flags": {"heard_the_hollow": true}},
 	},
 	{
 		"id": "drift_salvage", "title": "Drift salvage", "act": 1, "kind": "discovery", "region": "kettle",

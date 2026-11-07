@@ -128,6 +128,8 @@ var missions: MissionRunner
 var quests: QuestLog
 ## Travel between the Kettle and the other regions (RegionDB / RegionManager).
 var regions: RegionManager
+## Optional places off the repair routes (Discoveries).
+var discoveries: Discoveries
 var onboarding: Onboarding
 ## Records the session for playtest review (only when this is the scene being played).
 var playtest: PlaytestLog
@@ -288,6 +290,10 @@ func _ready() -> void:
 	regions.name = "Regions"
 	add_child(regions)
 	regions.setup(self)
+	discoveries = Discoveries.new()
+	discoveries.name = "Discoveries"
+	add_child(discoveries)
+	discoveries.setup(self)
 	_update_active_site()
 	_set_dusk(false)
 	_start_playtest.call_deferred(not Game.pending_load.is_empty())
@@ -595,6 +601,9 @@ func _find_interaction() -> Dictionary:
 	var gate := regions.interaction(pos)
 	if not gate.is_empty() or not regions.in_kettle():
 		return gate
+	var found := discoveries.interaction(pos)
+	if not found.is_empty():
+		return found
 	var current := Game.current_repair()
 	# The mission's own devices come first: near the component, the clamp you're cutting wins.
 	var device := missions.interaction(pos)

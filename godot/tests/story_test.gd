@@ -37,6 +37,10 @@ func _data() -> void:
 			if not cache_src.begins_with("cache:") or int(cache_src.substr(6)) >= main.wildlife.caches.size():
 				bad.append("no drift cache for " + key)
 			continue
+		if l["site"] == "discovery":
+			if not main.discoveries.ids().has(l["source"]):
+				bad.append("no discovery " + key)
+			continue
 		if Campaign.index_of(l["site"]) < 0:
 			bad.append("unknown site " + l["site"])
 			continue
