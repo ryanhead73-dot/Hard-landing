@@ -32,6 +32,9 @@ var _water_mat: ShaderMaterial
 var pools: Array = []
 var _hills: FastNoiseLite
 var _rough: FastNoiseLite
+## Moss and puddle patches on the flat ground (sites and the plain round the ship).
+var _patch: FastNoiseLite
+var _puddle: FastNoiseLite
 var _heights: Dictionary = {}
 
 
@@ -54,6 +57,13 @@ func build() -> void:
 	_rough.seed = SEED + 1
 	_rough.frequency = 0.006
 	_rough.fractal_octaves = 4
+	_patch = FastNoiseLite.new()
+	_patch.seed = SEED + 7
+	_patch.frequency = 0.045
+	_patch.fractal_octaves = 2
+	_puddle = FastNoiseLite.new()
+	_puddle.seed = SEED + 8
+	_puddle.frequency = 0.07
 	_moss_mat = _emissive(Color("3fd1b5"), 1.2)
 	_rim_mat = _emissive(Color("3fd1b5"), 0.5)
 	_place_pools(rng)
@@ -119,6 +129,22 @@ func flatness(x: float, z: float) -> float:
 		var pc := Vector2(pool[0].x, pool[0].z)
 		f = maxf(f, 1.0 - smoothstep(pool[1] + 2.0, pool[1] + 9.0, p.distance_to(pc)))
 	return f
+
+
+## Distance to the nearest walk from the ship to a site (the straight line out to it).
+func path_distance(x: float, z: float) -> float:
+	var p := Vector2(x, z)
+	var best := INF
+	for zone in KEEP_CLEAR:
+		var c := Vector2(zone[0].x, zone[0].z)
+		var t := clampf(p.dot(c) / c.length_squared(), 0.0, 1.0)
+		var d := p.distance_to(c * t)
+		# The track runs out at the site's edge: the site floor itself isn't a path.
+		var r: float = zone[1]
+		if p.distance_to(c) < r:
+			d = maxf(d, 6.0 + (r - p.distance_to(c)))
+		best = minf(best, d)
+	return best
 
 
 ## True on the walk from the ship to any site (props keep off it).
@@ -265,7 +291,18 @@ func _masks(x: float, z: float, h: float, normal: Vector3) -> Color:
 	var slope := 1.0 - normal.y
 	moss = maxf(moss, smoothstep(0.03, 0.12, slope) * (1.0 - smoothstep(0.25, 0.4, slope)) * 0.8)
 	var cliff := smoothstep(0.3, 0.55, slope)
-	return Color(wet, moss, cliff)
+	# The flat ground at the sites and round the ship would read as bare grey: moss gathers in
+	# patches and rain lies in shallow puddles, except on the worn tracks between the ship and
+	# each site, which stay bare so the way reads at a glance.
+	var flat := flatness(x, z)
+	var track := 1.0 - smoothstep(2.5, 6.0, path_distance(x, z))
+	if flat > 0.0:
+		var patch := _patch.get_noise_2d(x, z) * 0.5 + 0.5
+		var puddle := _puddle.get_noise_2d(x, z) * 0.5 + 0.5
+		moss = maxf(moss, smoothstep(0.5, 0.62, patch) * flat * (1.0 - track))
+		wet = maxf(wet, smoothstep(0.64, 0.76, puddle) * 0.75 * flat * (1.0 - track * 0.6))
+	# Alpha carries the track (1 off it, 0 on it), worn paler by boots and the hauler's wheels.
+	return Color(wet, moss, cliff, 1.0 - track * flat)
 
 
 func _noise_texture(seed_value: int, frequency: float, normal: bool) -> NoiseTexture2D:
