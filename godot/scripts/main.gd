@@ -119,6 +119,8 @@ var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
 var missions: MissionRunner
+## Every quest's state (QuestDB / QuestLog), rebuilt from the game after a load.
+var quests: QuestLog
 var onboarding: Onboarding
 ## Records the session for playtest review (only when this is the scene being played).
 var playtest: PlaytestLog
@@ -268,6 +270,10 @@ func _ready() -> void:
 	weather.name = "Weather"
 	add_child(weather)
 	weather.setup(self)
+	quests = QuestLog.new()
+	quests.name = "Quests"
+	quests.main = self
+	add_child(quests)
 	_update_active_site()
 	_set_dusk(false)
 	_start_playtest.call_deferred(not Game.pending_load.is_empty())
@@ -280,6 +286,7 @@ func _ready() -> void:
 	else:
 		_face_first_goal()
 		voice.say(Story.OPENING)
+	quests.restore()
 
 
 func _start_playtest(continued: bool, force := false) -> void:

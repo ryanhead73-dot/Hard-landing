@@ -1,0 +1,187 @@
+class_name QuestDB
+extends RefCounted
+## Every quest in the game as data: main story quests, side missions and discoveries, grouped
+## into the four acts. QuestLog tracks their state in Game.quests; this file only describes them.
+##
+## A quest:
+##   id        unique id (also the key in Game.quests and the save).
+##   title     what the journal calls it.
+##   act       1-4 (see ACTS).
+##   kind      "main", "side" or "discovery".
+##   region    where it happens (a RegionDB id).
+##   summary   one line for the journal.
+##   requires  conditions that must all hold before it starts (see below). Empty: from the start.
+##   steps     worked in order; each is {"text": objective line, "done": condition}.
+##   rewards   optional: {"scrap": n, "flags": {id: value}} given once, on completion.
+##
+## Conditions (one dictionary each):
+##   {"type": "quest", "id"}            that quest is done.
+##   {"type": "repair", "id"}           that Kestrel repair is in (a Campaign repair id).
+##   {"type": "flag", "id", "value"?}   Game.flags[id] equals value (true when value is left out).
+##   {"type": "logs", "ids"}            every one of those Story logs has been found.
+##   {"type": "caches", "count"}        that many drift caches opened (-1: every cache).
+##   {"type": "launched"}               Kestrel has left the Kettle.
+##
+## The seven repairs are built from Campaign.REPAIRS so the repair campaign stays the one source
+## of truth for them: a repair quest is done exactly when Game.is_repaired() says so.
+
+const ACTS := {
+	1: {"name": "Stranded", "summary": "Crash, survive the Kettle and bring Kestrel back to life."},
+	2: {"name": "The Lost", "summary": "Follow the other castaways out into the Shatterlands."},
+	3: {"name": "Beneath the Kettle", "summary": "Go down into the Loom Expanse and learn what the Loom is."},
+	4: {"name": "The Last Departure", "summary": "Thread the gap between pulses and leave."},
+}
+
+const KINDS := ["main", "side", "discovery"]
+
+## Ilse Marrow's own logs, in the order she wrote them.
+const ILSE_LOGS := ["relay_1", "relay_2", "relay_3", "freighter_3", "loom_1", "loom_2", "loom_3"]
+
+## Quests beyond the seven repairs. New content goes here.
+const EXTRA: Array[Dictionary] = [
+	{
+		"id": "escape", "title": "The gap between pulses", "act": 1, "kind": "main", "region": "kettle",
+		"summary": "Take the pilot's seat and fly Kestrel out between two Loom pulses.",
+		"requires": [{"type": "quest", "id": "repair_navigation"}],
+		"steps": [{"text": "Take the pilot's seat and launch", "done": {"type": "launched"}}],
+	},
+	{
+		"id": "ilse_trail", "title": "Ilse Marrow's trail", "act": 1, "kind": "discovery", "region": "kettle",
+		"summary": "The relay technician left notes everywhere she went. Find them all.",
+		"requires": [{"type": "logs", "ids": ["relay_1"]}],
+		"steps": [{"text": "Find every log Ilse Marrow left", "done": {"type": "logs", "ids": ILSE_LOGS}}],
+		"rewards": {"scrap": 40, "flags": {"ilse_trail_read": true}},
+	},
+	{
+		"id": "survivors", "title": "Reyes's people", "act": 1, "kind": "side", "region": "kettle",
+		"summary": "Lt. Reyes's rescue team never left the planet. Learn where they went.",
+		"requires": [{"type": "logs", "ids": ["moss_1"]}],
+		"steps": [
+			{"text": "Learn what happened to the Ferro-9's crew", "done": {"type": "logs", "ids": ["moss_3"]}},
+			{"text": "Find out where Reyes's people sheltered", "done": {"type": "logs", "ids": ["freighter_3"]}},
+		],
+		"rewards": {"scrap": 30, "flags": {"knows_survivors": true}},
+	},
+	{
+		"id": "drift_salvage", "title": "Drift salvage", "act": 1, "kind": "discovery", "region": "kettle",
+		"summary": "Cargo from every ship the Loom pulled down lies half-buried across the basin.",
+		"requires": [{"type": "caches", "count": 1}],
+		"steps": [{"text": "Open every drift cache in the basin", "done": {"type": "caches", "count": -1}}],
+		"rewards": {"scrap": 50},
+	},
+]
+
+## Journal titles for the repair quests (by Campaign repair id).
+const REPAIR_TITLES := {
+	"aux_power": "Lights on", "cooling": "Hot springs", "canopy": "Up the spires",
+	"landing_gear": "The quarry", "wing": "The moss field", "engine": "The graveyard",
+	"navigation": "The Loom spire",
+}
+
+static var _all: Array[Dictionary] = []
+static var _by_id: Dictionary = {}
+
+
+## Every quest, repairs first in campaign order, then EXTRA.
+static func all() -> Array[Dictionary]:
+	if _all.is_empty():
+		var prev := ""
+		for r in Campaign.REPAIRS:
+			var q := {
+				"id": repair_quest(r["id"]), "title": REPAIR_TITLES.get(r["id"], String(r["banner"][0]).capitalize()), "act": 1,
+				"kind": "main", "region": "kettle", "summary": r["find"],
+				"requires": [] if prev == "" else [{"type": "quest", "id": repair_quest(prev)}],
+				"steps": [
+					{"text": r["find"], "done": {"type": "repair", "id": r["id"]}},
+				],
+				"repair": r["id"],
+			}
+			_all.append(q)
+			prev = r["id"]
+		_all.append_array(EXTRA)
+		for q in _all:
+			_by_id[q["id"]] = q
+	return _all
+
+
+static func get_quest(id: String) -> Dictionary:
+	all()
+	return _by_id.get(id, {})
+
+
+static func repair_quest(repair_id: String) -> String:
+	return "repair_" + repair_id
+
+
+static func in_act(act: int) -> Array[Dictionary]:
+	return all().filter(func(q): return int(q["act"]) == act)
+
+
+## Problems with the data, as readable lines; empty when every reference resolves, every quest
+## can be reached and no requirement loops. The content test fails on any line.
+static func validate(region_ids: Array, cache_count: int) -> PackedStringArray:
+	var bad: PackedStringArray = []
+	var ids := {}
+	for q in all():
+		var id := String(q.get("id", ""))
+		if id == "" or ids.has(id):
+			bad.append("missing or duplicate quest id '%s'" % id)
+		ids[id] = true
+	for q in all():
+		var id: String = q["id"]
+		for key in ["title", "summary"]:
+			if String(q.get(key, "")) == "":
+				bad.append("%s has no %s" % [id, key])
+		if not ACTS.has(int(q.get("act", 0))):
+			bad.append("%s is in no act" % id)
+		if not String(q.get("kind", "")) in KINDS:
+			bad.append("%s has an unknown kind" % id)
+		if not String(q.get("region", "")) in region_ids:
+			bad.append("%s is in unknown region '%s'" % [id, q.get("region", "")])
+		if (q.get("steps", []) as Array).is_empty():
+			bad.append("%s has no steps" % id)
+		var conds: Array = (q.get("requires", []) as Array).duplicate()
+		for s in q.get("steps", []):
+			if String(s.get("text", "")) == "":
+				bad.append("%s has a step with no objective text" % id)
+			conds.append(s.get("done", {}))
+		for c in conds:
+			var problem := _check_condition(c, ids, cache_count)
+			if problem != "":
+				bad.append("%s: %s" % [id, problem])
+	# Requirement loops: a quest that (through others) needs itself can never start.
+	for q in all():
+		if _needs_itself(q["id"], q["id"], {}):
+			bad.append("%s needs itself to start" % q["id"])
+	return bad
+
+
+static func _check_condition(c: Dictionary, ids: Dictionary, cache_count: int) -> String:
+	match String(c.get("type", "")):
+		"quest":
+			return "" if ids.has(c.get("id", "")) else "needs unknown quest '%s'" % c.get("id", "")
+		"repair":
+			return "" if Campaign.index_of(String(c.get("id", ""))) >= 0 else "needs unknown repair '%s'" % c.get("id", "")
+		"flag":
+			return "" if String(c.get("id", "")) != "" else "flag condition with no id"
+		"logs":
+			for l in c.get("ids", []):
+				if Story.get_log(String(l)).is_empty():
+					return "needs unknown log '%s'" % l
+			return "" if not (c.get("ids", []) as Array).is_empty() else "logs condition with no logs"
+		"caches":
+			return "" if int(c.get("count", 0)) <= cache_count else "needs %d caches, the basin has %d" % [c["count"], cache_count]
+		"launched":
+			return ""
+	return "unknown condition type '%s'" % c.get("type", "")
+
+
+static func _needs_itself(start: String, id: String, seen: Dictionary) -> bool:
+	if seen.has(id):
+		return false
+	seen[id] = true
+	for c in get_quest(id).get("requires", []):
+		if c.get("type") == "quest":
+			if c["id"] == start or _needs_itself(start, c["id"], seen):
+				return true
+	return false

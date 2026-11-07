@@ -12,6 +12,8 @@ signal graphics_changed
 signal repairs_changed
 signal inventory_changed
 signal log_found(id: String)
+## A world flag changed (see set_flag).
+signal flag_changed(id: String, value: Variant)
 
 ## Physics layer bits shared by every script.
 const LAYER_WORLD := 1
@@ -860,6 +862,14 @@ func install_component() -> void:
 
 
 ## Records a story log. Returns true if it's new.
+## Sets a world flag (quests, discoveries and dialogue read them; they save with the session).
+func set_flag(id: String, value: Variant = true) -> void:
+	if flags.get(id) == value:
+		return
+	flags[id] = value
+	flag_changed.emit(id, value)
+
+
 func find_log(id: String) -> bool:
 	if id == "" or id in logs or Story.get_log(id).is_empty():
 		return false

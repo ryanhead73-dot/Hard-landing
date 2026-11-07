@@ -17,6 +17,8 @@ func _run() -> void:
 	_migrations()
 	await _load_v1_save()
 	_round_trip()
+	_content()
+	await _quest_flow()
 	finished = true
 
 
@@ -78,6 +80,10 @@ func _load_v1_save() -> void:
 	_check("v1 load restores logs and caches", Game.logs.size() == 3 and Game.caches_opened == [0, 3])
 	_check("v1 load restores site state", not (main.sites["aux_power"] as ExpeditionSite).has_component() and (main.sites["aux_power"] as ExpeditionSite).crate_searched(2))
 	_check("v1 load lands in the Kettle, Act 1", Game.region == "kettle" and Game.act == 1)
+	var q: QuestLog = main.quests
+	_check("v1 load rebuilds the quest log from the repairs", q.is_done("repair_aux_power") and q.is_done("repair_cooling") and q.state_of("repair_canopy") == QuestLog.ACTIVE and q.state_of("repair_landing_gear") == QuestLog.LOCKED)
+	_check("v1 load starts discoveries the save had already begun", q.state_of("ilse_trail") == QuestLog.ACTIVE and q.state_of("survivors") == QuestLog.LOCKED)
+	_check("the quiet rebuild gives no rewards", Game.scrap == 64, str(Game.scrap))
 	Game.delete_save()
 
 
@@ -95,5 +101,90 @@ func _round_trip() -> void:
 	_check("act survives save and load", Game.act == 2)
 	_check("flags survive save and load", Game.flags.get("met_reyes") == true and int(Game.flags.get("signal_count", 0)) == 3)
 	_check("quest log survives save and load", (Game.quests.get("side_test", {}) as Dictionary).get("state") == "active" and int(Game.quests["side_test"].get("step", 0)) == 1)
+	Game.delete_save()
+	Game.reset()
+
+
+func _content() -> void:
+	var bad := QuestDB.validate(["kettle"], main.wildlife.caches.size())
+	_check("every quest's references resolve and nothing loops", bad.is_empty(), "; ".join(bad))
+	var repairs := QuestDB.all().filter(func(q): return q.has("repair"))
+	_check("each of the seven repairs is a main quest", repairs.size() == Campaign.REPAIRS.size() and repairs.all(func(q): return q["kind"] == "main"))
+	for a in QuestDB.ACTS:
+		_check("act %d has a name" % a, String(QuestDB.ACTS[a]["name"]) != "")
+	# Every main quest can be reached by finishing the ones before it.
+	var reach := {}
+	var grew := true
+	while grew:
+		grew = false
+		for q in QuestDB.all():
+			if reach.has(q["id"]):
+				continue
+			if q["requires"].all(func(c): return c["type"] != "quest" or reach.has(c["id"])):
+				reach[q["id"]] = true
+				grew = true
+	var stuck := QuestDB.all().filter(func(q): return not reach.has(q["id"])).map(func(q): return q["id"])
+	_check("every quest is reachable", stuck.is_empty(), str(stuck))
+	_check("a broken reference is caught", not QuestDB._check_condition({"type": "logs", "ids": ["no_such_log"]}, {}, 8).is_empty() and not QuestDB._check_condition({"type": "repair", "id": "warp_drive"}, {}, 8).is_empty())
+
+
+func _quest_flow() -> void:
+	# The v1 load left Kestrel part-repaired; start from the crash.
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, false)
+	Game.reset()
+	main.quests.restore()
+	var q: QuestLog = main.quests
+	await _frames(2)
+	_check("a new game starts on the first repair", q.state_of("repair_aux_power") == QuestLog.ACTIVE and q.state_of("repair_cooling") == QuestLog.LOCKED)
+	_check("the escape is locked until navigation", q.state_of("escape") == QuestLog.LOCKED)
+	_check("the active list leads with the main quest", not q.active().is_empty() and q.active()[0]["id"] == "repair_aux_power")
+	_check("the journal line is the repair objective", q.objective("repair_aux_power") == Campaign.REPAIRS[0]["find"])
+
+	var started: Array = []
+	var completed: Array = []
+	q.quest_started.connect(func(id): started.append(id))
+	q.quest_completed.connect(func(id): completed.append(id))
+	kestrel.set_repaired("aux_power", true)
+	await _frames(3)
+	_check("installing a repair completes its quest", q.is_done("repair_aux_power") and "repair_aux_power" in completed)
+	_check("and starts the next repair", q.state_of("repair_cooling") == QuestLog.ACTIVE and "repair_cooling" in started)
+
+	# A side quest: locked, then started by its first log, stepped, and rewarded once.
+	_check("a side quest waits for its trigger", q.state_of("survivors") == QuestLog.LOCKED)
+	Game.find_log("moss_1")
+	await _frames(3)
+	_check("finding its first log starts it", q.state_of("survivors") == QuestLog.ACTIVE and q.step_of("survivors") == 0)
+	Game.find_log("moss_3")
+	await _frames(3)
+	_check("its steps advance in order", q.step_of("survivors") == 1 and q.objective("survivors").contains("sheltered"))
+	var scrap := Game.scrap
+	Game.find_log("freighter_3")
+	await _frames(3)
+	_check("finishing it pays its reward once", q.is_done("survivors") and Game.scrap == scrap + 30 and Game.flags.get("knows_survivors") == true)
+	q.refresh()
+	_check("a finished quest doesn't pay again", Game.scrap == scrap + 30)
+
+	# Flags start quests that wait on them.
+	_check("set_flag records a flag once", not Game.flags.has("probe"))
+	Game.set_flag("probe")
+	_check("flags read back", Game.flags.get("probe") == true)
+
+	# The quest log saves and comes back.
+	main.save_game()
+	var data := Game.read_save()
+	_check("the save holds the quest log", (data.get("quests", {}) as Dictionary).has("survivors"))
+	Game.reset()
+	Game.apply_session(data)
+	_check("quest state comes back from the save", q.is_done("survivors") and q.state_of("repair_cooling") == QuestLog.ACTIVE)
+
+	# Every repair in, then the launch, finishes the main line.
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, true)
+	await _frames(3)
+	_check("all repairs open the escape", q.state_of("escape") == QuestLog.ACTIVE)
+	Game.launched = true
+	await _frames(3)
+	_check("launching completes the escape", q.is_done("escape"))
 	Game.delete_save()
 	Game.reset()
