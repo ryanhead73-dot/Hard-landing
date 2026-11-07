@@ -5,6 +5,8 @@ extends CanvasLayer
 ## Settings are saved to user://settings.cfg when the menu closes.
 
 signal quit_to_title
+## Main saves on this before the game quits.
+signal quit_to_desktop
 
 var _panel: PanelContainer
 var _sensitivity: HSlider
@@ -186,8 +188,12 @@ func _ready() -> void:
 		quit_to_title.emit())
 	buttons.add_child(title_button)
 	var quit := Button.new()
-	quit.text = "Quit to desktop"
-	quit.pressed.connect(func(): get_tree().quit())
+	quit.name = "QuitDesktop"
+	quit.text = "Save and quit to desktop"
+	quit.pressed.connect(func():
+		if not from_title:
+			quit_to_desktop.emit()
+		get_tree().quit())
 	buttons.add_child(quit)
 	for b in [resume, title_button, quit]:
 		b.custom_minimum_size = Vector2(0, 44)
@@ -216,6 +222,13 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if visible:
 		UiStyle.keep_pad_focus(self, _resume)
+
+
+## Alt-tabbing out of a game in progress pauses it.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and not from_title and not visible and not get_tree().paused \
+			and DisplayServer.get_name() != "headless":
+		open()
 
 
 func _open_bindings() -> void:
@@ -257,6 +270,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func open() -> void:
 	_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.help_text())
 	_resume.text = "Back" if from_title else "Resume"
+	(find_child("QuitDesktop", true, false) as Button).text = "Quit to desktop" if from_title else "Save and quit to desktop"
 	_title_button.visible = not from_title
 	(_panel.find_child("Heading", true, false) as Label).text = "SETTINGS" if from_title else "PAUSED"
 	_difficulty.selected = Game.difficulty

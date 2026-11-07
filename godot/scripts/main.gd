@@ -194,6 +194,7 @@ func _ready() -> void:
 	pause.quit_to_title.connect(func():
 		save_game()
 		get_tree().change_scene_to_file("res://scenes/title.tscn"))
+	pause.quit_to_desktop.connect(save_game)
 	add_child(pause)
 	fabricator = FabricatorMenu.new()
 	add_child(fabricator)
@@ -494,6 +495,12 @@ static func daylight_at(t: float) -> float:
 	if x < 0.35:
 		return 0.0
 	return smoothstep(0.0, 1.0, sin((x - 0.35) / 0.65 * PI))
+
+
+## Closing the window mid-game keeps the progress, as Save and quit does.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		save_game()
 
 
 func save_game() -> bool:

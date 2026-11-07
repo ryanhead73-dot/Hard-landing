@@ -470,6 +470,13 @@ func _save_load() -> void:
 	_check("a damaged save falls back to the backup", not Game.read_save().is_empty())
 	Game.delete_save()
 	_check("deleting a save removes its backup too", not Game.has_save() and Game.read_save().is_empty())
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	menu.quit_to_desktop.emit()
+	_check("save and quit to desktop saves", Game.has_save())
+	Game.delete_save()
+	main._notification(NOTIFICATION_WM_CLOSE_REQUEST)
+	_check("closing the window saves", Game.has_save())
+	Game.delete_save()
 
 
 func _title() -> void:
