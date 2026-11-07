@@ -384,6 +384,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		player.revive(SPAWN)
 	elif key == KEY_M:
 		missions.complete_stage()
+	elif key == KEY_U and regions.in_kettle():
+		# Expansion preview: open the canyon to the Shatterlands and stand at its mouth.
+		Game.set_flag("shatterlands_open")
+		var gate: Node3D = regions.gates["shatterlands"]
+		player.revive(gate.to_global(Vector3(0.0, 0.5, 5.0)), false)
+		player.face(gate.global_rotation.y)
 
 
 func spawn_scuttler(at: Vector3) -> Scuttler:
@@ -965,7 +971,7 @@ func _on_player_died() -> void:
 # --- Setup --------------------------------------------------------------------------------
 
 func _dev_text() -> String:
-	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home · M skip stage"]
+	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home · M skip stage · U Shatterlands gate"]
 	for i in Kestrel.REPAIR_ORDER.size():
 		var id := Kestrel.REPAIR_ORDER[i]
 		lines.append("%d %s %s" % [i + 1, Kestrel.REPAIR_NAMES[id], "■" if kestrel.is_repaired(id) else "□"])
