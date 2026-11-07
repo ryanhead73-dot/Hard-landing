@@ -802,6 +802,19 @@ func _relay() -> void:
 	var marks: Array = main.quests.markers()
 	_check("the post is marked for the journal and map", marks.any(func(m): return m["id"] == "listening_post"), str(marks))
 	_check("the console only reads once", _label() == "" or not _label().contains("traffic log"), _label())
+	# The cradle defend: the second wave comes round the back, the third brings an elite.
+	var waves: Array = relay.mission[1]["waves"]
+	_check("the relay defend has three waves", waves.size() == 3)
+	_clear_enemies()
+	main.missions._spawn_wave(relay, relay.mission[1], waves[1])
+	await _frames(2)
+	var behind := get_tree().get_nodes_in_group("enemies").filter(func(e): return relay.to_local(e.global_position).z < -4.0)
+	_check("the second wave comes round the back of the hut", behind.size() == 4, "%d of %d" % [behind.size(), _enemy_count()])
+	_clear_enemies()
+	main.missions._spawn_wave(relay, relay.mission[1], waves[2])
+	await _frames(2)
+	var elites := get_tree().get_nodes_in_group("enemies").filter(func(e): return (e as Enemy).is_elite())
+	_check("the last wave is led by an elite", elites.size() == 1 and (elites[0] as Enemy).display_name() == "PACK MOTHER", str(elites.size()))
 	_clear_enemies()
 	Game.reset()
 

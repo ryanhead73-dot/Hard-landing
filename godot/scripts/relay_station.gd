@@ -160,7 +160,21 @@ func _mission() -> Array:
 			"running_text": "Hold the station while the cradle releases the cell",
 			"device": {"pos": Vector3(2.4, 0.1, -8.0), "kind": "cradle", "label": "Start the cradle release", "yaw": PI},
 			"bar": "CRADLE RELEASE", "seconds": 35.0, "radius": 11.0, "wave_every": 10.0, "lift": 0.0,
-			"waves": [["scuttler", "scuttler", "scuttler"], ["scuttler", "scuttler", "scuttler", "scuttler"], ["scuttler", "scuttler", "scuttler"]],
+			# The first wave crosses the flats in front; the second comes round the back of the hut,
+			# past the side door; the third follows a big one in, a first taste of an elite.
+			"waves": [
+				["scuttler", "scuttler", "scuttler"],
+				{
+					"kinds": ["scuttler", "scuttler", "scuttler", "scuttler"],
+					"spawns": [Vector3(9.5, 0.3, -6.0), Vector3(2.0, 0.3, -14.0), Vector3(-8.0, 0.3, -13.5)],
+					"say": [[J, "Round the back! They're coming past the hut."]],
+				},
+				{
+					"kinds": ["scuttler", "scuttler", "scuttler"], "elite": "PACK MOTHER",
+					"spawns": [Vector3(0.0, 0.3, 13.0), Vector3(-5.0, 0.3, 12.0), Vector3(5.0, 0.3, 12.0)],
+					"say": [[J, "That one's huge. Go for the glow on its back."]],
+				},
+			],
 			"say": [[J, "Lights. Good. The cradle wants half a minute to let go of the cell."]],
 			"start_say": [[J, "And that whine's going to carry for kilometres. Here they come."]],
 			"done_say": [[J, "Cradle's open. Now to haul this thing home."]],

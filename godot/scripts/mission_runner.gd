@@ -6,6 +6,8 @@ extends Node
 ##   activate work every device (E, or hold E for `hold` seconds; a hit or walking off interrupts).
 ##   pulse    as activate, but a Loom pulse during the hold knocks it out of tune.
 ##   defend   start the device, then stay within `radius` for `seconds` while waves come in.
+##            A wave is a list of kinds, or {kinds, spawns?, elite?, say?}: its own spawn points
+##            (site-local), a name that makes its first creature an elite, and a line as it comes.
 ##   elite    kill a named elite (`kind`, `name`, `pos`).
 ##   search   search spots (hold E) for the one thing hidden in one of them (`answer`); a signal
 ##            meter climbs as Juno closes on it, the waypoint only points at the area (`pos`)
@@ -498,17 +500,23 @@ func ring_visible() -> bool:
 	return _ring != null and _ring.visible
 
 
-func _spawn_wave(site: ExpeditionSite, s: Dictionary, kinds: Array) -> void:
+func _spawn_wave(site: ExpeditionSite, s: Dictionary, wave: Variant) -> void:
+	var spec: Dictionary = wave if wave is Dictionary else {"kinds": wave}
+	var kinds: Array = spec.get("kinds", [])
 	var points: Array[Vector3] = site.ambush_points()
 	if points.is_empty():
 		points = site.spawn_points()
-	if s.has("spawns"):
+	var spawns: Array = spec.get("spawns", s.get("spawns", []))
+	if not spawns.is_empty():
 		points.clear()
-		for p in s["spawns"]:
+		for p in spawns:
 			points.append(site.to_global(p))
 	for i in kinds.size():
 		var at: Vector3 = points[(i + _wave_index) % points.size()] + Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(-1.5, 1.5))
-		main.spawn_enemy(kinds[i], at).alert(false)
+		var elite: String = spec.get("elite", "") if i == 0 else ""
+		main.spawn_enemy(kinds[i], at, elite).alert(false)
+	if spec.has("say"):
+		main.voice.say(spec["say"])
 	# Say where it's coming from, so the player can turn to meet it.
 	var centre := Vector3.ZERO
 	for i in kinds.size():
