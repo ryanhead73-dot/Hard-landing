@@ -72,6 +72,12 @@ const POD_LINES := [
 	[JUNO, "The one that's full of rockfall."],
 	[HOB, "That one. One thing at a time. Ship first, then rescues."],
 ]
+## Taking the dormant core from the survey depot.
+const DEPOT_LINES := [
+	[HOB, "A WREN-series core. Older than me, and very tired. I'll keep it safe in my spare bay."],
+	[JUNO, "Is there really a song on it?"],
+	[HOB, "There is. I'll play it for you when we're off this rock. Not before; I'm superstitious."],
+]
 const FINALE_HALF := [HOB, "Halfway. The Loom's beat is steady. Hold them off."]
 const FINALE_LATE := [HOB, "Ten seconds left on the spool. Start heading for the cockpit."]
 const FINALE_READY := [HOB, "Spool's full! Get to the pilot's seat. Now, Juno!"]
@@ -219,6 +225,11 @@ const LOGS: Array[Dictionary] = [
 		"id": "pod_1", "site": "discovery", "source": "drop_pod",
 		"title": "Supply drop, six of six", "author": "Lt. Sana Reyes",
 		"text": "Last drop, and the pod's going down hard. If you've pulled this recorder, you've met the welcoming committee. We're not at the Long Patience any more. Marrow found Voss's old greenhouses on the far side of the north-east canyon, under the big fungus, and they're holding. Eleven of us. The canyon came down behind us in the last quake. If you have a way through it, we have a way off this rock. Reyes out.",
+	},
+	{
+		"id": "depot_1", "site": "discovery", "source": "survey_depot",
+		"title": "Depot core, last state", "author": "WREN, survey ship mind",
+		"text": "Crew of four went north to the spire on day nineteen. Crew of four did not come back. I have kept the lamps on the emergency circuit for six hundred and two days so the door would be easy to find. I am shutting down to save what is left. If you are a ship mind, take my core: the pulse timings for nineteen days are in it, and so is a song the geologist liked. If you are not a ship mind, please find one. I would like the song to be heard.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

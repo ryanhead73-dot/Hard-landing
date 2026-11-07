@@ -43,6 +43,12 @@ func _ready() -> void:
 	var pod: DropPod = main.discoveries.built["drop_pod"]
 	await _shot(out, "pod", pod.to_global(Vector3(4.0, 0.5, 9.0)), pod.global_position + Vector3(0.0, 1.0, 0.0))
 	main.set_daylight(0.0)
+	# The survey depot, outside (shut) and inside (open).
+	var depot: SurveyDepot = main.discoveries.built["survey_depot"]
+	await _shot(out, "depot_out", depot.to_global(Vector3(-3.0, 0.5, 12.0)), depot.to_global(Vector3(0.0, 1.5, 0.0)))
+	Game.set_flag("depot_open")
+	depot.open_door()
+	await _shot(out, "depot_in", depot.to_global(Vector3(1.0, 0.3, 2.5)), depot.to_global(Vector3(0.0, 1.0, -3.0)))
 	var gate: Node3D = main.regions.gates["shatterlands"]
 	# The gate, shut, then open, from out on the basin floor.
 	await _shot(out, "gate_shut", gate.to_global(Vector3(-3.0, 0.5, 16.0)), gate.to_global(Vector3(0.0, 5.0, -3.0)))

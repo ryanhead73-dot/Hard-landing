@@ -82,6 +82,16 @@ const EXTRA: Array[Dictionary] = [
 		"rewards": {"scrap": 30, "flags": {"knows_greenhouses": true}},
 	},
 	{
+		"id": "survey_depot", "title": "The sealed depot", "act": 1, "kind": "discovery", "region": "kettle",
+		"summary": "A survey depot on the southern flats, locked tight with an old HOB-series lock.",
+		"requires": [{"type": "flag", "id": "seen_survey_depot"}],
+		"steps": [
+			{"text": "Get the depot open: HOB knows the lock, once he has power", "done": {"type": "flag", "id": "depot_open"}, "at": "survey_depot"},
+			{"text": "Search the depot", "done": {"type": "flag", "id": "depot_core_taken"}, "at": "survey_depot"},
+		],
+		"rewards": {"scrap": 20, "flags": {"hob_has_wren": true}},
+	},
+	{
 		"id": "drift_salvage", "title": "Drift salvage", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "Cargo from every ship the Loom pulled down lies half-buried across the basin.",
 		"requires": [{"type": "caches", "count": 1}],

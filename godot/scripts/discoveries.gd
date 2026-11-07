@@ -7,6 +7,7 @@ extends Node
 const SCENES := {
 	"listening_post": preload("res://scripts/discoveries/listening_post.gd"),
 	"drop_pod": preload("res://scripts/discoveries/drop_pod.gd"),
+	"survey_depot": preload("res://scripts/discoveries/survey_depot.gd"),
 }
 
 var main: Node

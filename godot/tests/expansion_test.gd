@@ -24,6 +24,7 @@ func _run() -> void:
 	await _journal()
 	await _listening_post()
 	await _drop_pod()
+	await _survey_depot()
 	finished = true
 
 
@@ -435,4 +436,47 @@ func _drop_pod() -> void:
 	_check("and the pod's locker", Game.charges > charges)
 	_check("the side mission completes and pays", main.quests.is_done("last_drop") and Game.scrap == scrap + 30 and Game.flags.get("knows_greenhouses") == true)
 	_check("the pod goes quiet", not pod.transmitting() and _label() == "")
+	Game.reset()
+
+
+func _survey_depot() -> void:
+	Game.reset()
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, false)
+	_clear_enemies()
+	main.quests.restore()
+	var depot: SurveyDepot = main.discoveries.built["survey_depot"]
+	_check("the depot stands on the southern flats", depot != null and absf(depot.global_position.y - main.site.height_at(depot.global_position.x, depot.global_position.z)) < 0.1)
+	_place(depot.door_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(5)
+	_check("seeing it starts the discovery", main.quests.state_of("survey_depot") == QuestLog.ACTIVE)
+	_check("without power the lock is dead", _label().contains("Dead") and not depot.is_open(), _label())
+	Input.action_press("interact")
+	await get_tree().create_timer(SurveyDepot.HOLD + 0.3).timeout
+	Input.action_release("interact")
+	_check("holding E without power does nothing", not depot.is_open())
+	kestrel.set_repaired("aux_power", true)
+	await _frames(3)
+	_check("with aux power HOB can try the lock", _label().contains("Let HOB talk to the lock"), _label())
+	Input.action_press("interact")
+	await get_tree().create_timer(SurveyDepot.HOLD + 0.3).timeout
+	Input.action_release("interact")
+	await _frames(3)
+	_check("HOB opens the door", depot.is_open() and main.quests.step_of("survey_depot") == 1)
+	# Walk in: the doorway is open now.
+	var inside := depot.to_global(Vector3(0.0, 0.5, 0.5))
+	_place(depot.door_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	player.velocity = Vector3.ZERO
+	var dir := (inside - player.global_position)
+	for i in 40:
+		player.global_position += Vector3(dir.x, 0.0, dir.z) / 40.0
+		await get_tree().physics_frame
+	_check("Juno can step through the doorway", _flat_distance(player.global_position, inside) < 1.0, str(player.global_position))
+	_place(depot.core_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("the core can be taken", _label().contains("ship-mind core"), _label())
+	var scrap := Game.scrap
+	await _press("interact")
+	await _frames(3)
+	_check("taking it gives WREN's log and finishes the discovery", depot.core_taken() and Game.has_log("depot_1") and main.quests.is_done("survey_depot") and Game.scrap == scrap + 15 + 20)
 	Game.reset()
