@@ -12,6 +12,7 @@ func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
 	_check_sites()
+	_check_beacons()
 	await _check_routes()
 	await _check_hazards()
 	await _check_pack_wakes()
@@ -293,3 +294,35 @@ func _check_benefit(id: String) -> void:
 			_check("engine: top fabricator tier unlocks", Game.can_fabricate("rapid_cycler") and Game.can_fabricate("plating_2"))
 		"navigation":
 			_check("navigation: departure is ready", Game.phase() == "launch" and Game.objective_text().contains("engine spool"))
+
+
+## Every site can be found from the walk out: along the route from the ship, its strobe or the
+## light column above it is in view most of the way. Only the site being headed for shows the
+## column.
+func _check_beacons() -> void:
+	var space := get_viewport().get_world_3d().direct_space_state
+	var ship: Vector3 = kestrel.global_position
+	for id in main.sites:
+		var s: ExpeditionSite = main.sites[id]
+		var at := s.to_global(s.beacon_pos)
+		var seen := 0
+		var total := 0
+		for k in range(3, 19):
+			var p: Vector3 = ship.lerp(s.global_position, k / 20.0)
+			p.y = main.site.height_at(p.x, p.z) + 1.6
+			total += 1
+			for lift in [0.0, 6.0, 12.0, 20.0]:
+				var target: Vector3 = at + Vector3.UP * lift
+				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p, target, Game.LAYER_WORLD))
+				if hit.is_empty() or hit.position.distance_to(target) < 2.0:
+					seen += 1
+					break
+		_check("%s: the beacon or its light column is in view along %d%% of the walk out" % [id, roundi(100.0 * seen / total)], seen >= total * 0.8, "%d/%d" % [seen, total])
+	var heading: ExpeditionSite = main.current_site()
+	_check_beam(heading)
+
+
+func _check_beam(heading: ExpeditionSite) -> void:
+	_check("the site being headed for sends up a light column", heading.beam != null and heading.active)
+	var others: Array = main.sites.values().filter(func(s): return s != heading)
+	_check("the others don't", others.all(func(s): return not s.active))

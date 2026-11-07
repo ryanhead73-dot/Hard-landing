@@ -85,6 +85,12 @@ func _process(delta: float) -> void:
 	if _beacon_mat:
 		var lit := phase < beacon_on
 		_beacon_mat.emission_energy_multiplier = (8.0 if lit else 0.5) if active else (1.2 if lit else 0.2)
+	if beam:
+		_beam_level = move_toward(_beam_level, 1.0 if active else 0.0, delta * 0.5)
+		beam.visible = _beam_level > 0.0
+		if beam.visible:
+			var pulse := 1.0 if phase < beacon_on else 0.55
+			_beam_mat.set_shader_parameter("strength", 0.35 * _beam_level * pulse)
 	if phase < before and not Engine.is_editor_hint():
 		beacon_flashed.emit(to_global(beacon_pos))
 
@@ -234,6 +240,25 @@ func _build_crates() -> void:
 		_crate_searched.append(false)
 
 
+## The site you're heading for also sends up a faint column of its beacon colour, so it can be
+## found from the ship even when ridges, columns or a quarry wall hide the strobe itself.
+const BEAM_HEIGHT := 60.0
+const BEAM_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform vec3 tint : source_color = vec3(1.0);
+uniform float strength = 0.0;
+void fragment() {
+	// UV.y runs 0 at the top to 1 at the base: bright low down, fading out up high.
+	float up = pow(UV.y, 1.6);
+	ALBEDO = tint * strength * up;
+}
+"""
+var beam: MeshInstance3D
+var _beam_mat: ShaderMaterial
+var _beam_level := 0.0
+
+
 func _build_beacon() -> void:
 	var beacon := MeshInstance3D.new()
 	beacon.name = "Beacon"
@@ -246,6 +271,26 @@ func _build_beacon() -> void:
 	beacon.material_override = _beacon_mat
 	beacon.position = beacon_pos
 	add_child(beacon)
+	beam = MeshInstance3D.new()
+	beam.name = "BeaconBeam"
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.5
+	cyl.bottom_radius = 0.18
+	cyl.height = BEAM_HEIGHT
+	cyl.radial_segments = 12
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	beam.mesh = cyl
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var sh := Shader.new()
+	sh.code = BEAM_SHADER
+	_beam_mat = ShaderMaterial.new()
+	_beam_mat.shader = sh
+	_beam_mat.set_shader_parameter("tint", beacon_color)
+	beam.material_override = _beam_mat
+	beam.position = beacon_pos + Vector3.UP * BEAM_HEIGHT * 0.5
+	beam.visible = false
+	add_child(beam)
 
 
 # --- Helpers ------------------------------------------------------------------------------
