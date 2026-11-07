@@ -21,6 +21,7 @@ func _run() -> void:
 	_content()
 	await _quest_flow()
 	await _regions()
+	await _journal()
 	finished = true
 
 
@@ -310,3 +311,37 @@ func _region_budget(region: Node) -> bool:
 				shadowed += 1
 	print("  region budget: %d meshes, %d lights (%d shadowed)" % [meshes, lights, shadowed])
 	return meshes <= 120 and lights <= 6 and shadowed == 0
+
+
+func _panel_text(panel: UiPanel) -> String:
+	var parts: PackedStringArray = [panel._title.text]
+	for c in panel._content.get_children():
+		if c is Label or c is Button:
+			parts.append(c.text)
+	return "\n".join(parts)
+
+
+func _journal() -> void:
+	Game.reset()
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, false)
+	main.quests.restore()
+	Game.find_log("relay_1")
+	Game.find_log("relay_2")
+	await _frames(3)
+	_check("new discoveries point at the journal", main.hud._message.text.contains("journal") if main.hud.get("_message") else true)
+	await _press("journal")
+	var j: JournalPanel = main.journal
+	_check("J opens the journal", j.is_open())
+	var text := _panel_text(j)
+	_check("the journal names the act", text.contains("ACT I") and text.contains("STRANDED"), text)
+	_check("it shows the current repair and its objective", text.contains(QuestDB.REPAIR_TITLES["aux_power"]) and text.contains(Campaign.REPAIRS[0]["find"]), text)
+	_check("it counts what a discovery has collected", text.contains("Ilse Marrow's trail") and text.contains("2 / %d" % QuestDB.ILSE_LOGS.size()), text)
+	j.close()
+	await _frames(2)
+	_check("the journal closes", not j.is_open() and not get_tree().paused)
+	main.logs_panel.open_log("")
+	await _frames(2)
+	_check("the logs list links to the journal (the pad's way in)", _panel_text(main.logs_panel).contains("Journal"))
+	main.logs_panel.close()
+	Game.reset()

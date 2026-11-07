@@ -72,6 +72,28 @@ func objective(id: String) -> String:
 	return String(steps[i]["text"]) if state_of(id) == ACTIVE and i < steps.size() else ""
 
 
+## How far an active quest's current step has got, as (have, need), for steps that collect
+## things (logs, caches); (0, 0) for the rest.
+func progress(id: String) -> Vector2i:
+	var steps: Array = QuestDB.get_quest(id).get("steps", [])
+	var i := step_of(id)
+	if state_of(id) != ACTIVE or i >= steps.size():
+		return Vector2i.ZERO
+	var c: Dictionary = steps[i]["done"]
+	match String(c.get("type", "")):
+		"logs":
+			var ids: Array = c["ids"]
+			if ids.size() < 2:
+				return Vector2i.ZERO
+			return Vector2i(ids.filter(func(l): return Game.has_log(String(l))).size(), ids.size())
+		"caches":
+			var need := int(c["count"])
+			if need < 0:
+				need = cache_total()
+			return Vector2i(mini(Game.caches_opened.size(), need), need)
+	return Vector2i.ZERO
+
+
 ## Checks every quest until nothing more changes (one quest finishing can start the next).
 func refresh() -> void:
 	var changed := true
@@ -96,7 +118,7 @@ func _advance(q: Dictionary) -> bool:
 		if not quiet:
 			quest_started.emit(id)
 			if q["kind"] != "main":
-				_say("New %s: %s" % ["discovery" if q["kind"] == "discovery" else "side mission", q["title"]])
+				_say("New %s: %s   [%s] journal" % ["discovery" if q["kind"] == "discovery" else "side mission", q["title"], Game.key_name("journal")])
 		return true
 	var steps: Array = q["steps"]
 	var i := step_of(id)

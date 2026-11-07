@@ -90,7 +90,8 @@ Every session is recorded for playtest review: objectives and how long each took
 | G | Throw an arc charge: bounces, then discharges after 1.6 s or on hitting a creature. 5.5 m blast that ignores armour plates and shoves survivors; it stings you up close. Carry 3. |
 | M | Survey map: the basin in relief, Kestrel, every site (mended, next, to come), drift caches you've spotted, lurker pools you've found, your heading and where you're bound |
 | Tab or I | Inventory: weapons, ammo, stims, arc charges, upgrades, components |
-| L | Logs: read the newest data slate, or the list of all of them |
+| L | Logs: read the newest data slate, or the list of all of them (the list also opens the journal) |
+| J | Journal: the current act, what each active quest wants next (with counts for collections) and what is done. On a pad, open it from the Logs list |
 | Shift / Space / C | Sprint / jump / crouch (crawlways need crouch) |
 | V or Alt | Dodge roll: you can't be hurt in the first third of it |
 | E | Interact: take components, search crates, install, fabricate, rest in the bunk (saves) |

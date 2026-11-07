@@ -47,6 +47,7 @@ const KEYS := {
 	"inventory": [KEY_TAB, KEY_I],
 	"logs": [KEY_L],
 	"map": [KEY_M],
+	"journal": [KEY_J],
 }
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
@@ -69,6 +70,8 @@ const PAD_BUTTONS := {
 	"crouch": [JOY_BUTTON_RIGHT_STICK],
 	"weapon_next": [JOY_BUTTON_DPAD_RIGHT],
 	"logs": [JOY_BUTTON_DPAD_LEFT],
+	# Shares the logs button: on a pad, Logs opens first and its list links to the journal.
+	"journal": [JOY_BUTTON_DPAD_LEFT],
 	"flashlight": [JOY_BUTTON_DPAD_UP],
 	"map": [JOY_BUTTON_DPAD_DOWN],
 	"inventory": [JOY_BUTTON_BACK],
@@ -115,6 +118,8 @@ var weather: Weather
 var voice: Voice
 var logs_panel: LogPanel
 var map_panel: MapPanel
+## J: the quest journal (on a pad, from the Logs panel).
+var journal: JournalPanel
 var finale: Finale
 var music: MusicDirector
 var ambience: Ambience
@@ -210,6 +215,9 @@ func _ready() -> void:
 	map_panel = MapPanel.new()
 	map_panel.main = self
 	add_child(map_panel)
+	journal = JournalPanel.new()
+	journal.main = self
+	add_child(journal)
 	voice = Voice.new()
 	voice.hud = hud
 	add_child(voice)
@@ -344,6 +352,8 @@ func _process(_delta: float) -> void:
 		logs_panel.open_latest()
 	elif Input.is_action_just_pressed("map") and not player.dead and not Game.launched:
 		map_panel.open()
+	elif Input.is_action_just_pressed("journal") and not player.dead and not Game.launched:
+		journal.open()
 	hud.set_waypoint(_waypoint())
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta

@@ -67,7 +67,7 @@ const PAD_SENSITIVITY_RANGE := Vector2(0.4, 2.0)
 var pad_sensitivity := 1.0
 ## Key or button names shown in prompts, keyboard first, then gamepad.
 const PROMPT_KEYS := {
-	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"],
+	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"], "journal": ["J", "D-pad left"],
 	"map": ["M", "D-pad down"], "inventory": ["Tab", "View"], "reload": ["R", "X"], "dodge": ["V", "B"],
 }
 var master_volume := 0.8
@@ -178,7 +178,7 @@ const REBINDABLE := [
 	["dodge", "Roll"], ["interact", "Interact"], ["reload", "Reload"], ["stim", "Use stim"],
 	["throw", "Throw arc charge"], ["flashlight", "Flashlight"], ["weapon_1", "Rifle"],
 	["weapon_2", "Scattergun"], ["weapon_3", "Arc lance"], ["inventory", "Inventory"],
-	["map", "Map"], ["logs", "Logs"],
+	["map", "Map"], ["logs", "Logs"], ["journal", "Journal"],
 ]
 ## Defaults, filled from main.KEYS when the game scene first sets up input.
 var default_keys: Dictionary = {}

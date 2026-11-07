@@ -22,6 +22,16 @@ func _ready() -> void:
 		s.queue_free()
 	main.day_cycle = false
 	main.set_daylight(0.0)
+	# The journal, with a discovery under way.
+	Game.find_log("relay_1")
+	Game.find_log("relay_2")
+	await _frames(5)
+	main.journal.open()
+	await _frames(5)
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/journal.png" % out)
+	print("shot journal")
+	main.journal.close()
 	var gate: Node3D = main.regions.gates["shatterlands"]
 	# The gate, shut, then open, from out on the basin floor.
 	await _shot(out, "gate_shut", gate.to_global(Vector3(-3.0, 0.5, 16.0)), gate.to_global(Vector3(0.0, 5.0, -3.0)))
