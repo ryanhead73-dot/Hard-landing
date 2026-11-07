@@ -10,6 +10,9 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out := args[0] if args.size() > 0 else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
+	# Shots are taken at the --resolution asked for, never the player's fullscreen setting.
+	Game.window_mode = 0
+	Game.apply_settings()
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false

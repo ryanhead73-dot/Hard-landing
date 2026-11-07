@@ -82,6 +82,17 @@ const GRAPHICS_HIGH := 2
 const GRAPHICS_NAMES := ["Low", "Medium", "High"]
 var graphics := GRAPHICS_MEDIUM
 
+## Display. Fullscreen is borderless at the desktop resolution; Exclusive hands the monitor to
+## the game. Alt+Enter flips between windowed and fullscreen.
+const WINDOW_NAMES := ["Windowed", "Fullscreen", "Exclusive fullscreen"]
+const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+var window_mode := 1
+var vsync := true
+## Frame-rate cap; 0 means none.
+const FPS_CAPS := [0, 30, 60, 120, 144]
+var fps_cap := 0
+var _shown_window := -1
+
 var scrap := 0
 ## The component on the player's back (a Campaign component id), or "".
 var carrying := ""
@@ -246,6 +257,11 @@ func _input(event: InputEvent) -> void:
 		show_fps = not show_fps
 		apply_settings()
 		save_settings()
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ENTER and event.alt_pressed:
+		window_mode = 0 if window_mode != 0 else 1
+		apply_settings()
+		save_settings()
+		get_viewport().set_input_as_handled()
 	var pad := using_pad
 	if event is InputEventJoypadButton and event.pressed:
 		pad = true
@@ -308,6 +324,11 @@ func load_settings() -> void:
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
 		subtitles = clampi(cfg.get_value("access", "subtitles", subtitles), 0, SUBTITLE_NAMES.size() - 1)
 		toggle_aim = cfg.get_value("access", "toggle_aim", toggle_aim)
+		window_mode = clampi(cfg.get_value("video", "window_mode", window_mode), 0, WINDOW_NAMES.size() - 1)
+		vsync = cfg.get_value("video", "vsync", vsync)
+		fps_cap = int(cfg.get_value("video", "fps_cap", fps_cap))
+		if fps_cap not in FPS_CAPS:
+			fps_cap = 0
 		key_overrides = {}
 		if cfg.has_section("keys"):
 			for action in cfg.get_section_keys("keys"):
@@ -385,6 +406,9 @@ func save_settings() -> void:
 	cfg.set_value("video", "graphics", graphics)
 	cfg.set_value("access", "subtitles", subtitles)
 	cfg.set_value("access", "toggle_aim", toggle_aim)
+	cfg.set_value("video", "window_mode", window_mode)
+	cfg.set_value("video", "vsync", vsync)
+	cfg.set_value("video", "fps_cap", fps_cap)
 	if cfg.has_section("keys"):
 		cfg.erase_section("keys")
 	for action in key_overrides:
@@ -397,7 +421,20 @@ func apply_settings() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
+	_apply_display()
 	settings_changed.emit()
+
+
+## Window mode, v-sync and the frame cap. The window only changes when the setting does, so a
+## slider elsewhere in the menu doesn't make it flicker. Nothing to do without a window.
+func _apply_display() -> void:
+	Engine.max_fps = fps_cap
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	if window_mode != _shown_window:
+		_shown_window = window_mode
+		DisplayServer.window_set_mode(WINDOW_MODES[window_mode])
 
 
 func reset() -> void:

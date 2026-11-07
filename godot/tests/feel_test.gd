@@ -24,6 +24,7 @@ func _run() -> void:
 	await _accessibility()
 	await _key_bindings()
 	await _pad_focus()
+	_display()
 	_graphics()
 	finished = true
 
@@ -362,6 +363,31 @@ func _pad_focus() -> void:
 	Game.stims = was[1]
 	Game.using_pad = false
 	await _frames(1)
+
+
+## Display settings: window mode, v-sync and the frame cap are in the menu, saved, and the cap
+## reaches the engine.
+func _display() -> void:
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	_check("the pause menu has display, frame cap and v-sync", menu.find_child("WindowMode", true, false) != null and menu.find_child("FpsCap", true, false) != null and menu.find_child("VSync", true, false) != null)
+	var was := [Game.window_mode, Game.vsync, Game.fps_cap]
+	Game.window_mode = 2
+	Game.vsync = false
+	Game.fps_cap = 144
+	Game.apply_settings()
+	_check("the frame cap reaches the engine", Engine.max_fps == 144)
+	Game.save_settings()
+	Game.window_mode = 0
+	Game.vsync = true
+	Game.fps_cap = 0
+	Game.load_settings()
+	_check("display settings are saved", Game.window_mode == 2 and not Game.vsync and Game.fps_cap == 144)
+	Game.window_mode = was[0]
+	Game.vsync = was[1]
+	Game.fps_cap = was[2]
+	Game.apply_settings()
+	Game.save_settings()
+	_check("lifting the cap frees the engine", Engine.max_fps == Game.fps_cap)
 
 
 func _has_key(action: String, key: int) -> bool:

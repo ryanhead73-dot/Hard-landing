@@ -41,6 +41,8 @@ func _ready() -> void:
 func _run() -> void:
 	var vsync := DisplayServer.window_get_vsync_mode()
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	var cap := Engine.max_fps
+	Engine.max_fps = 0
 	# Nothing in the run may touch the player's save.
 	var save_path := Game.save_path
 	Game.save_path = "user://benchmark_scratch.json"
@@ -64,6 +66,7 @@ func _run() -> void:
 		segments.append(await _segment(seg["name"], seg["seconds"] * time_scale))
 	report = _report(segments)
 	DisplayServer.window_set_vsync_mode(vsync)
+	Engine.max_fps = cap
 	Game.save_path = save_path
 	_save(report)
 	print(_text(report))

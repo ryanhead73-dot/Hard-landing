@@ -29,7 +29,7 @@ func _ready() -> void:
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(centre)
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(640, 0)
+	_panel.custom_minimum_size = Vector2(1100, 0)
 	centre.add_child(_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
@@ -41,12 +41,21 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	# Settings as a two-column grid: name on the left, control on the right.
-	_grid = GridContainer.new()
-	_grid.columns = 2
-	_grid.add_theme_constant_override("h_separation", 28)
-	_grid.add_theme_constant_override("v_separation", 10)
-	box.add_child(_grid)
+	# Settings in two side-by-side grids (controls and audio, then game and display), each with
+	# the name on the left and the control on the right, so the menu fits a 900-pixel-high window.
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 56)
+	box.add_child(columns)
+	var grids: Array[GridContainer] = []
+	for i in 2:
+		var g := GridContainer.new()
+		g.columns = 2
+		g.add_theme_constant_override("h_separation", 24)
+		g.add_theme_constant_override("v_separation", 10)
+		g.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		columns.add_child(g)
+		grids.append(g)
+	_grid = grids[0]
 	_section("CONTROLS")
 	_sensitivity = _slider(_grid, "Mouse sensitivity", 0.0005, 0.006, 0.0001, Game.mouse_sensitivity)
 	_invert = CheckBox.new()
@@ -88,6 +97,7 @@ func _ready() -> void:
 		Game.apply_settings())
 	_row_label("Subtitles")
 	_grid.add_child(subs)
+	_grid = grids[1]
 	_section("GAME")
 	_difficulty = OptionButton.new()
 	for d in Game.DIFFICULTY_NAMES:
@@ -100,6 +110,7 @@ func _ready() -> void:
 	_grid.add_child(_difficulty)
 	var shake := _slider(_grid, "Screen shake", 0.0, 1.0, 0.05, Game.screen_shake)
 	shake.value_changed.connect(func(v: float): Game.screen_shake = v)
+	_section("DISPLAY")
 	var gfx := OptionButton.new()
 	for preset in Game.GRAPHICS_NAMES:
 		gfx.add_item(preset)
@@ -110,6 +121,38 @@ func _ready() -> void:
 		Game.graphics_changed.emit())
 	_row_label("Graphics")
 	_grid.add_child(gfx)
+	var display := OptionButton.new()
+	display.name = "WindowMode"
+	for t in Game.WINDOW_NAMES:
+		display.add_item(t)
+	display.selected = Game.window_mode
+	display.item_selected.connect(func(i: int):
+		Game.window_mode = i
+		Game.apply_settings())
+	_row_label("Display")
+	_grid.add_child(display)
+	var cap := OptionButton.new()
+	cap.name = "FpsCap"
+	for c in Game.FPS_CAPS:
+		cap.add_item("None" if c == 0 else "%d fps" % c)
+	cap.selected = Game.FPS_CAPS.find(Game.fps_cap)
+	cap.item_selected.connect(func(i: int):
+		Game.fps_cap = Game.FPS_CAPS[i]
+		Game.apply_settings())
+	_row_label("Frame cap")
+	_grid.add_child(cap)
+	var vsync := CheckBox.new()
+	vsync.name = "VSync"
+	vsync.text = "V-sync"
+	vsync.button_pressed = Game.vsync
+	vsync.toggled.connect(func(on: bool):
+		Game.vsync = on
+		Game.apply_settings())
+	_row_label("")
+	_grid.add_child(vsync)
+	Game.settings_changed.connect(func():
+		display.selected = Game.window_mode
+		vsync.set_pressed_no_signal(Game.vsync))
 	var fps := CheckBox.new()
 	fps.text = "Show frame rate (F3)"
 	fps.button_pressed = Game.show_fps
@@ -186,7 +229,7 @@ func _section(text: String) -> void:
 func _row_label(text: String) -> void:
 	var label := Label.new()
 	label.text = text
-	label.custom_minimum_size = Vector2(190, 0)
+	label.custom_minimum_size = Vector2(180, 0)
 	_grid.add_child(label)
 
 
@@ -234,14 +277,14 @@ func _on_volume(value: float) -> void:
 func _slider(parent: Node, label_text: String, lo: float, hi: float, step: float, value: float) -> HSlider:
 	var label := Label.new()
 	label.text = label_text
-	label.custom_minimum_size = Vector2(190, 0)
+	label.custom_minimum_size = Vector2(180, 0)
 	parent.add_child(label)
 	var slider := HSlider.new()
 	slider.min_value = lo
 	slider.max_value = hi
 	slider.step = step
 	slider.value = value
-	slider.custom_minimum_size = Vector2(380, 28)
+	slider.custom_minimum_size = Vector2(290, 28)
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	parent.add_child(slider)
 	return slider

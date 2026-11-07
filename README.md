@@ -77,7 +77,7 @@ Every session is recorded for playtest review: objectives and how long each took
 | Key | Action |
 | --- | --- |
 | WASD / mouse | Move / look (click to capture the mouse) |
-| Esc | Pause menu: mouse sensitivity, invert Y, hold or toggle aim, key bindings (click a key, press the new one; a key in use swaps), volume, music and effects volume, subtitles (off, on, large, largest), difficulty, screen shake, graphics preset (Low / Medium / High; Medium targets a GTX 1660-class card at 1080p60), frame-rate readout; save and quit to title |
+| Esc | Pause menu: mouse sensitivity, invert Y, hold or toggle aim, key bindings (click a key, press the new one; a key in use swaps), volume, music and effects volume, subtitles (off, on, large, largest), difficulty, screen shake, graphics preset (Low / Medium / High; Medium targets a GTX 1660-class card at 1080p60), display (windowed, fullscreen or exclusive fullscreen; Alt+Enter toggles), frame cap, v-sync, frame-rate readout; save and quit to title |
 | F3 | Frame-rate readout |
 | F8 | Flag this moment for the playtest notes |
 | Right mouse / left mouse / R | Aim / fire / reload |
