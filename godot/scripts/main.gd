@@ -121,6 +121,8 @@ var ambience: Ambience
 var missions: MissionRunner
 ## Every quest's state (QuestDB / QuestLog), rebuilt from the game after a load.
 var quests: QuestLog
+## Travel between the Kettle and the other regions (RegionDB / RegionManager).
+var regions: RegionManager
 var onboarding: Onboarding
 ## Records the session for playtest review (only when this is the scene being played).
 var playtest: PlaytestLog
@@ -274,6 +276,10 @@ func _ready() -> void:
 	quests.name = "Quests"
 	quests.main = self
 	add_child(quests)
+	regions = RegionManager.new()
+	regions.name = "Regions"
+	add_child(regions)
+	regions.setup(self)
 	_update_active_site()
 	_set_dusk(false)
 	_start_playtest.call_deferred(not Game.pending_load.is_empty())
@@ -343,13 +349,14 @@ func _process(_delta: float) -> void:
 	_pack_check -= _delta
 	if _pack_check <= 0.0:
 		_pack_check = 0.5
-		_wake_packs()
-		if spawn_packs:
-			wildlife.update(0.5)
+		if regions.in_kettle():
+			_wake_packs()
+			if spawn_packs:
+				wildlife.update(0.5)
 	if dev_panel:
 		hud.set_dev(true, _dev_text())
 	if player.global_position.y < -20.0:
-		player.revive(SPAWN)
+		player.revive(regions.respawn_point())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -542,13 +549,14 @@ func load_state(data: Dictionary) -> void:
 	Game.objective_changed.emit(Game.objective_text())
 	hud.show_message("Back aboard Kestrel. %s." % Game.objective_text())
 	_settle_spawn()
+	regions.restore()
 
 
 ## The repaired parts move Kestrel's colliders, and the physics server only catches up on the
 ## next step; until then the player would be shoved out of where the old shapes were.
 func _settle_spawn() -> void:
 	await get_tree().physics_frame
-	if is_instance_valid(player) and not player.dead:
+	if is_instance_valid(player) and not player.dead and regions.in_kettle():
 		player.global_position = SPAWN
 		player.velocity = Vector3.ZERO
 
@@ -568,6 +576,9 @@ func _find_interaction() -> Dictionary:
 	if player.dead or Game.launched:
 		return {}
 	var pos := player.global_position
+	var gate := regions.interaction(pos)
+	if not gate.is_empty() or not regions.in_kettle():
+		return gate
 	var current := Game.current_repair()
 	# The mission's own devices come first: near the component, the clamp you're cutting wins.
 	var device := missions.interaction(pos)
@@ -874,6 +885,8 @@ func _show_ending() -> void:
 
 
 func _waypoint():
+	if not regions.in_kettle():
+		return regions.waypoint()
 	match Game.phase():
 		"find":
 			var stage_point = missions.waypoint()
@@ -945,7 +958,7 @@ func _on_player_died() -> void:
 	for s in get_tree().get_nodes_in_group("enemies"):
 		s.calm()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
-	player.revive(SPAWN)
+	player.revive(regions.respawn_point())
 	hud.set_dead(false)
 
 

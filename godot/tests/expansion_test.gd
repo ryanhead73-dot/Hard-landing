@@ -1,7 +1,8 @@
 extends "res://tests/test_base.gd"
 ## Expansion foundations (X1): saves from older builds are upgraded rather than dropped, a newer
 ## build's save is refused, and the expansion state (region, act, flags, quests) survives a save
-## and load. Run:
+## and load; the quest data holds together and plays through; Juno can travel to the Shatterlands
+## threshold and back, with the Kettle paused while she's away, and a save made there loads there. Run:
 ##   godot --headless --path . res://tests/expansion_test.tscn
 
 const V1_FIXTURE := "res://tests/fixtures/save_v1.json"
@@ -19,6 +20,7 @@ func _run() -> void:
 	_round_trip()
 	_content()
 	await _quest_flow()
+	await _regions()
 	finished = true
 
 
@@ -106,7 +108,7 @@ func _round_trip() -> void:
 
 
 func _content() -> void:
-	var bad := QuestDB.validate(["kettle"], main.wildlife.caches.size())
+	var bad := QuestDB.validate(RegionDB.ids(), main.wildlife.caches.size())
 	_check("every quest's references resolve and nothing loops", bad.is_empty(), "; ".join(bad))
 	var repairs := QuestDB.all().filter(func(q): return q.has("repair"))
 	_check("each of the seven repairs is a main quest", repairs.size() == Campaign.REPAIRS.size() and repairs.all(func(q): return q["kind"] == "main"))
@@ -188,3 +190,123 @@ func _quest_flow() -> void:
 	_check("launching completes the escape", q.is_done("escape"))
 	Game.delete_save()
 	Game.reset()
+
+
+func _regions() -> void:
+	Game.reset()
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, false)
+	var rm: RegionManager = main.regions
+	# The data.
+	var origins: Array = [Vector3.ZERO]
+	for id in RegionDB.travel_regions():
+		var r := RegionDB.get_region(id)
+		_check("%s has a scene that builds" % id, ResourceLoader.exists(String(r["scene"])) and load(String(r["scene"])).new() is RegionScene)
+		_check("%s opens from a known region" % id, RegionDB.REGIONS.has(r["from"]) and String(r["unlock_flag"]) != "")
+		for o in origins:
+			_check("%s sits well clear of other regions" % id, (r["origin"] as Vector3).distance_to(o) > 1000.0)
+		origins.append(r["origin"])
+	_check("the Loom Expanse is named but not built yet", RegionDB.get_region("loom_expanse").get("planned", false) and not "loom_expanse" in RegionDB.travel_regions())
+
+	# The gate in the Kettle, shut.
+	var gate: Node3D = rm.gates.get("shatterlands")
+	_check("the Shatterlands gate stands in the Kettle", gate != null and gate.visible)
+	_check("the gate sits on the ground", absf(gate.global_position.y - main.site.height_at(gate.global_position.x, gate.global_position.z)) < 0.1)
+	_place(gate.to_global(Vector3(0.0, 0.5, 4.5)), gate.global_rotation.y)
+	await _frames(3)
+	_check("a shut gate says why", _label().contains("rockfall") and not main._interaction.has("action"), _label())
+	_check("rubble blocks a shut gate", (gate.get_node("Rubble") as Node3D).visible)
+
+	# Opened, then through it.
+	Game.set_flag("shatterlands_open")
+	await _frames(3)
+	_check("opening clears the rubble", not (gate.get_node("Rubble") as Node3D).visible)
+	_check("an open gate offers the way through", _label().contains("Shatterlands"), _label())
+	Game.scrap = 55
+	Game.give_weapon("scattergun")
+	var quests_before: Dictionary = Game.quests.duplicate(true)
+	var crash_site: Node3D = main.site
+	var bug: Enemy = main.spawn_enemy("scuttler", gate.to_global(Vector3(6.0, 0.5, 14.0)))
+	await _press("interact")
+	await _wait_travel(rm)
+	var bug_at: Vector3 = bug.global_position
+	_check("travel lands in the Shatterlands", rm.current == "shatterlands" and Game.region == "shatterlands" and rm.scene != null)
+	_check("Juno arrives at the region's entry", player.global_position.distance_to(rm.scene.entry_global()) < 2.0, str(player.global_position))
+	_check("the Kettle is hidden and paused", not crash_site.visible and crash_site.process_mode == Node.PROCESS_MODE_DISABLED and main.wildlife.process_mode == Node.PROCESS_MODE_DISABLED and not gate.visible)
+	await get_tree().create_timer(1.0).timeout
+	_check("Kettle creatures freeze while she's away", is_instance_valid(bug) and bug.global_position.distance_to(bug_at) < 0.01 and bug.process_mode == Node.PROCESS_MODE_DISABLED)
+	_check("the trip keeps scrap, weapons and quests", Game.scrap == 55 and Game.owns_weapon("scattergun") and Game.quests == quests_before)
+	_check("she stands on the region's ground", player.is_on_floor() and player.global_position.y > -0.5, str(player.global_position))
+	_check("the waypoint points into the region", main._waypoint() != null and (main._waypoint() as Vector3).distance_to(rm.scene.global_position) < 80.0)
+	_check("the region has its own look", absf(main._env.fog_density - rm.scene.look["fog_density"]) < 0.0001)
+	_check("the region keeps to its budget", _region_budget(rm.scene))
+
+	# Going down there comes back at the region's entry, not at Kestrel.
+	player.take_damage(9999.0)
+	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout
+	_check("dying there respawns at the region's entry", not player.dead and player.global_position.distance_to(rm.scene.entry_global()) < 2.0, str(player.global_position))
+
+	# A save made there loads there.
+	main.save_game()
+	var data := Game.read_save()
+	_check("the save records the region", data.get("region") == "shatterlands")
+	main.queue_free()
+	await _frames(3)
+	Game.reset()
+	Game.pending_load = data
+	main = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	main.spawn_packs = false
+	main.weather.enabled = false
+	main.missions.bypass = true
+	kestrel = main.kestrel
+	player = main.player
+	rm = main.regions
+	await _frames(20)
+	_check("loading a save made there returns to the region", rm.current == "shatterlands" and rm.scene != null and Game.region == "shatterlands")
+	_check("and puts Juno at its entry", player.global_position.distance_to(rm.scene.entry_global()) < 2.0, str(player.global_position))
+
+	# Home again.
+	var fog_home: float = main.regions._old_look.get("fog_density", -1.0)
+	_place(rm.scene.exit_global() + Vector3(0.0, 0.5, -1.0), 0.0)
+	await _frames(3)
+	_check("the way back is offered at the canyon", _label().contains("Kettle"), _label())
+	await _press("interact")
+	await _wait_travel(rm)
+	gate = rm.gates["shatterlands"]
+	_check("back in the Kettle", rm.current == "kettle" and Game.region == "kettle" and rm.scene == null)
+	_check("the Kettle wakes up again", main.site.visible and main.site.process_mode != Node.PROCESS_MODE_DISABLED and main.wildlife.process_mode != Node.PROCESS_MODE_DISABLED and gate.visible)
+	_check("Juno comes out at the gate", _flat_distance(player.global_position, gate.global_position) < 6.0, str(player.global_position))
+	_check("the Kettle's look comes back", absf(main._env.fog_density - fog_home) < 0.0001 or fog_home < 0.0)
+	_check("the region is unloaded", main.get_children().filter(func(c): return c is RegionScene).is_empty())
+	Game.delete_save()
+	Game.reset()
+
+
+func _wait_travel(rm: RegionManager) -> void:
+	await _frames(2)
+	var t := 0.0
+	while rm.travelling and t < 5.0:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	await _frames(10)
+
+
+## Draw-call proxies for the prototype: few meshes (the undergrowth is one multimesh), a handful
+## of unshadowed lights.
+func _region_budget(region: Node) -> bool:
+	var meshes := 0
+	var lights := 0
+	var shadowed := 0
+	var stack: Array = [region]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is MeshInstance3D or n is MultiMeshInstance3D:
+			meshes += 1
+		if n is Light3D:
+			lights += 1
+			if (n as Light3D).shadow_enabled:
+				shadowed += 1
+	print("  region budget: %d meshes, %d lights (%d shadowed)" % [meshes, lights, shadowed])
+	return meshes <= 120 and lights <= 6 and shadowed == 0
