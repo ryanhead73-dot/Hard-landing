@@ -6,7 +6,8 @@ extends RefCounted
 
 const REPAIRS: Array[Dictionary] = [
 	{
-		"id": "aux_power", "site": "RelayStation",
+		"id": "aux_power", "banner": ["AUXILIARY POWER RESTORED", "Lights, fabricator and HOB back online"],
+		"site": "RelayStation",
 		"component": "aux_cell", "component_name": "aux power cell",
 		"find": "Recover the aux power cell from the relay station",
 		"return": "Return to Kestrel and install the cell in the aux bay",
@@ -15,7 +16,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Auxiliary power restored. The fabricator is online, but it overheats on heavy builds. A coolant hauler went down in the hot springs: follow its strobe.",
 	},
 	{
-		"id": "cooling", "site": "HaulerWreck",
+		"id": "cooling", "banner": ["COOLING RESTORED", "The fabricator can run heavy builds"],
+		"site": "HaulerWreck",
 		"component": "manifold", "component_name": "coolant manifold",
 		"find": "Salvage a coolant manifold from the hauler wreck in the hot springs",
 		"return": "Return to Kestrel and fit the manifold at the workshop install bay",
@@ -24,7 +26,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Cooling restored. The fabricator can run heavy builds now. Next: the canopy. A survey skiff is perched up on the basalt spires: follow its yellow flare.",
 	},
 	{
-		"id": "canopy", "site": "SpireSkiff",
+		"id": "canopy", "banner": ["COCKPIT SEALED", "Scanner online: crates and wildlife show on your HUD"],
+		"site": "SpireSkiff",
 		"component": "glazing", "component_name": "canopy glazing panel",
 		"find": "Climb the basalt spires and take the glazing panel from the skiff Lark",
 		"return": "Return to Kestrel and seal the cockpit canopy",
@@ -33,7 +36,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Cockpit sealed. The scanner is back: salvage crates and wildlife show on your HUD. Next: landing gear. There's a mining crawler in the quarry: follow its violet work lamp.",
 	},
 	{
-		"id": "landing_gear", "site": "QuarryCrawler",
+		"id": "landing_gear", "banner": ["GEAR DOWN AND LOCKED", "Cargo ramp open: the armoury is yours"],
+		"site": "QuarryCrawler",
 		"component": "struts", "component_name": "hydraulic strut pack",
 		"find": "Pull a hydraulic strut pack from the mining crawler in the quarry",
 		"return": "Return to Kestrel and fit the struts under the starboard hull",
@@ -42,7 +46,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Gear down and locked. Kestrel is level and the cargo ramp opens onto the armoury. Next: the port wing. A rescue dropship lies in the moss field: follow its green distress light.",
 	},
 	{
-		"id": "wing", "site": "MossDropship",
+		"id": "wing", "banner": ["PORT WING REPAIRED", "Point-defence turret live"],
+		"site": "MossDropship",
 		"component": "wing_panel", "component_name": "wing-tip panel",
 		"find": "Cut the wing-tip panel off the dropship Ferro-9 in the moss field",
 		"return": "Return to Kestrel and fit the panel to the port wing",
@@ -51,7 +56,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Wing whole again. The point-defence turret on the wing root is live. Next: the port engine. A freighter's drive coil is out in the graveyard: follow the white beacon.",
 	},
 	{
-		"id": "engine", "site": "FreighterGraveyard",
+		"id": "engine", "banner": ["PORT ENGINE ONLINE", "Engine bleed powers the fabricator's top tier"],
+		"site": "FreighterGraveyard",
 		"component": "drive_coil", "component_name": "drive coil",
 		"find": "Recover a drive coil from the freighter Long Patience in the graveyard",
 		"return": "Return to Kestrel and seat the coil in the port nacelle",
@@ -60,7 +66,8 @@ const REPAIRS: Array[Dictionary] = [
 		"done": "Port engine turns over. Engine bleed feeds the fabricator's top tier. Last: navigation. Ilse Marrow left a nav core at the Loom spire, under the teal light.",
 	},
 	{
-		"id": "navigation", "site": "LoomSpire",
+		"id": "navigation", "banner": ["NAVIGATION ONLINE", "Take the pilot's seat when you're ready"],
+		"site": "LoomSpire",
 		"component": "nav_core", "component_name": "pulse-timing nav core",
 		"find": "Take Ilse Marrow's nav core from the foot of the Loom spire",
 		"return": "Return to Kestrel and slot the nav core into the cockpit console",

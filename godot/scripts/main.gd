@@ -19,6 +19,8 @@ const RESPAWN_DELAY := 2.5
 ## Install points are checked on the flat with a little height slack, since the ship sits tilted,
 ## but not so much that a point inside the hull answers from the ground outside.
 const INSTALL_HEIGHT_SLACK := 0.7
+## Seconds from fitting a part to its title card (the clunk and the change land first).
+const REPAIR_BANNER_DELAY := 0.9
 ## How far the scanner (canopy repair) picks up crates and wildlife.
 const SCAN_CRATES := 70.0
 const SCAN_ENEMIES := 45.0
@@ -650,7 +652,9 @@ func _install(id: String) -> void:
 		kestrel.power_up_finished.connect(_on_power_restored.bind(id), CONNECT_ONE_SHOT)
 	else:
 		Sfx.play("power_up")
-		voice.say(Story.INSTALLED.get(id, []))
+		Sfx.duck(-8.0, 2.2, "repair")
+		# Every repair gets its title card: what came back and what it gives you.
+		get_tree().create_timer(REPAIR_BANNER_DELAY).timeout.connect(_on_repair_landed.bind(id))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -660,9 +664,16 @@ func _install(id: String) -> void:
 
 ## The aux power-up has finished: name the moment, then let HOB speak.
 func _on_power_restored(id: String) -> void:
+	_on_repair_landed(id)
+
+
+## A repair has landed: its title card, a chime, then HOB or Juno on what it means.
+func _on_repair_landed(id: String) -> void:
 	if not is_instance_valid(player) or not Game.is_repaired(id):
 		return
-	hud.show_banner("AUXILIARY POWER RESTORED", "Lights, fabricator and HOB back online")
+	var banner: Array = Campaign.get_repair(id).get("banner", [])
+	if banner.size() == 2:
+		hud.show_banner(banner[0], banner[1])
 	Sfx.play("log_chime", null, -6.0, 0.0)
 	voice.say(Story.INSTALLED.get(id, []))
 

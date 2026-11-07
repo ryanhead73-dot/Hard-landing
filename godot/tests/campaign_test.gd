@@ -238,6 +238,9 @@ func _repair_loop(r: Dictionary) -> void:
 	_check("%s: install point accepts it" % id, _label().contains(r["install_label"]), _label())
 	await _press("interact")
 	_check("%s: installed" % id, kestrel.is_repaired(id) and Game.is_repaired(id) and Game.carrying == "")
+	await get_tree().create_timer((Kestrel.POWER_UP_TIME if id == "aux_power" else main.REPAIR_BANNER_DELAY) + 0.3).timeout
+	var banner: Array = r["banner"]
+	_check("%s: a title card names it" % id, main.hud.banner_text() == banner[0], main.hud.banner_text())
 
 
 func _check_benefit(id: String) -> void:
