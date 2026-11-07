@@ -241,6 +241,7 @@ func take_damage(amount: float, from: Vector3 = Vector3.ZERO) -> bool:
 ## Shakes the camera. Amounts add up to 1.
 func add_trauma(amount: float) -> void:
 	trauma = minf(trauma + amount, 1.0)
+	Game.rumble(amount * 0.5, amount * 1.2, 0.1 + amount * 0.3)
 
 
 func is_rolling() -> bool:
@@ -283,6 +284,7 @@ func big_kill() -> void:
 
 func _on_fired() -> void:
 	_kick += KICK.get(weapon.current, 0.04)
+	Game.rumble(clampf(KICK.get(weapon.current, 0.04) * 4.0, 0.15, 0.6), 0.0, 0.06)
 	var c: Array = CLIMB.get(weapon.current, [0.3, 0.1])
 	var up := deg_to_rad(float(c[0])) * (0.6 if aiming else 1.0)
 	_pitch.rotation.x = clampf(_pitch.rotation.x + up, deg_to_rad(-70.0), deg_to_rad(50.0))

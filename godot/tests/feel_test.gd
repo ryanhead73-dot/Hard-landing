@@ -359,6 +359,15 @@ func _pad_focus() -> void:
 	owner = vp.gui_get_focus_owner()
 	_check("focus comes back after the list rebuilds", owner != null and fab.is_ancestor_of(owner) and not owner.is_queued_for_deletion(), str(owner))
 	fab.close()
+	# Vibration: a knock rumbles the pad, and the setting turns it off.
+	var n := Game.rumbles
+	main.player.add_trauma(0.4)
+	_check("a hit rumbles the pad", Game.rumbles == n + 1 and Game.last_rumble.y > 0.3, str(Game.last_rumble))
+	Game.vibration = false
+	main.player.add_trauma(0.4)
+	_check("vibration can be turned off", Game.rumbles == n + 1)
+	Game.vibration = true
+	_check("the pause menu has a vibration switch", menu.find_child("Vibration", true, false) != null)
 	Game.scrap = was[0]
 	Game.stims = was[1]
 	Game.using_pad = false

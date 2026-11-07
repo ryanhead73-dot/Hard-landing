@@ -90,6 +90,9 @@ static func theme() -> Theme:
 	t.set_color("font_hover_color", "Button", AMBER)
 	t.set_color("font_focus_color", "Button", AMBER)
 	t.set_color("font_pressed_color", "Button", ORANGE)
+	# The engine's empty checkbox is dark grey on the dark panels; draw a visible outline instead.
+	t.set_icon("unchecked", "CheckBox", _box_icon(DIM))
+	t.set_icon("unchecked", "CheckButton", _box_icon(DIM))
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.05, 0.06, 0.07, 0.985)
 	panel.border_color = Color(ORANGE, 0.8)
@@ -99,6 +102,19 @@ static func theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", panel)
 	_theme = t
 	return t
+
+
+## An empty checkbox: a 16 px square outline, 2 px thick, centred in 20 px.
+static func _box_icon(color: Color) -> ImageTexture:
+	var img := Image.create(20, 20, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for i in range(2, 18):
+		for w in 2:
+			img.set_pixel(i, 2 + w, color)
+			img.set_pixel(i, 17 - w, color)
+			img.set_pixel(2 + w, i, color)
+			img.set_pixel(17 - w, i, color)
+	return ImageTexture.create_from_image(img)
 
 
 ## Gamepad focus. While a pad is in use and `root` is showing, keeps the focus on one of its

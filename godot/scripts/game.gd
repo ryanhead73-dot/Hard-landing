@@ -49,6 +49,11 @@ const SAVE_VERSION := 1
 
 var mouse_sensitivity := 0.0025
 var invert_y := false
+## Controller vibration (rumble) on shots, hits taken, blasts and big kills.
+var vibration := true
+## The last rumble asked for, [weak, strong, seconds], and how many there have been (for tests).
+var last_rumble := Vector3.ZERO
+var rumbles := 0
 ## True after the last input came from a gamepad; prompts and look follow it.
 var using_pad := false
 signal input_device_changed(pad: bool)
@@ -251,6 +256,17 @@ func keyboard_text(text: String) -> String:
 
 
 ## True for the B button press that backs out of a menu.
+## Rumbles every connected pad, if a pad is in use and vibration is on. Weak is the high-frequency
+## motor (rattles: shots), strong the low one (thumps: hits, blasts); both 0-1.
+func rumble(weak: float, strong: float, seconds: float) -> void:
+	if not vibration or not using_pad:
+		return
+	last_rumble = Vector3(clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), seconds)
+	rumbles += 1
+	for pad in Input.get_connected_joypads():
+		Input.start_joy_vibration(pad, last_rumble.x, last_rumble.y, seconds)
+
+
 func is_pad_back(event: InputEvent) -> bool:
 	return event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 
@@ -318,6 +334,7 @@ func load_settings() -> void:
 	if cfg.load(SETTINGS_PATH) == OK:
 		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
+		vibration = cfg.get_value("controls", "vibration", vibration)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
@@ -401,6 +418,7 @@ func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("controls", "invert_y", invert_y)
+	cfg.set_value("controls", "vibration", vibration)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("audio", "sfx_volume", sfx_volume)

@@ -70,6 +70,15 @@ func _ready() -> void:
 	_invert.button_pressed = Game.invert_y
 	_row_label("")
 	_grid.add_child(_invert)
+	var rumble := CheckBox.new()
+	rumble.name = "Vibration"
+	rumble.text = "Controller vibration"
+	rumble.button_pressed = Game.vibration
+	rumble.toggled.connect(func(on: bool):
+		Game.vibration = on
+		Game.apply_settings())
+	_row_label("")
+	_grid.add_child(rumble)
 	var aim_mode := OptionButton.new()
 	aim_mode.name = "AimMode"
 	aim_mode.add_item("Hold")
