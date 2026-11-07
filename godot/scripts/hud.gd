@@ -504,12 +504,20 @@ func ending_text() -> String:
 	return _ending_text.text
 
 
+## Subtitle name colours. The name is always printed, so the colour is a help, never the only cue.
+const SPEAKER_COLOURS := {
+	Story.HOB: "9fe8d8",
+	Story.JUNO: "ffd08a",
+	Story.REYES: "c9b8ff",
+}
+
+
 func set_voice(speaker: String, text: String) -> void:
 	_voice.visible = text != "" and Game.subtitles > 0
 	if text == "":
 		_voice.text = ""
 		return
-	var colour := "9fe8d8" if speaker == Story.HOB else "ffd08a"
+	var colour: String = SPEAKER_COLOURS.get(speaker, "e9e1cc")
 	_voice.text = "[center][b][color=#%s]%s[/color][/b]   %s[/center]" % [colour, speaker.to_upper(), text]
 
 
