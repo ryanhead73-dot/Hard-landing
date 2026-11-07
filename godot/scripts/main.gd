@@ -604,6 +604,10 @@ func _find_interaction() -> Dictionary:
 	var found := discoveries.interaction(pos)
 	if not found.is_empty():
 		return found
+	for id in sites:
+		var own: Dictionary = sites[id].interaction(pos)
+		if not own.is_empty():
+			return own
 	var current := Game.current_repair()
 	# The mission's own devices come first: near the component, the clamp you're cutting wins.
 	var device := missions.interaction(pos)

@@ -23,6 +23,7 @@ extends RefCounted
 ##   {"type": "logs", "ids"}            every one of those Story logs has been found.
 ##   {"type": "caches", "count"}        that many drift caches opened (-1: every cache).
 ##   {"type": "launched"}               Kestrel has left the Kettle.
+##   {"type": "any", "of": [...]}       at least one of those conditions holds.
 ##
 ## The seven repairs are built from Campaign.REPAIRS so the repair campaign stays the one source
 ## of truth for them: a repair quest is done exactly when Game.is_repaired() says so.
@@ -67,7 +68,7 @@ const EXTRA: Array[Dictionary] = [
 	{
 		"id": "listening_post", "title": "The listening post", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "A mast blinks amber high on the north-east slope. Someone left equipment running.",
-		"requires": [{"type": "flag", "id": "seen_listening_post"}],
+		"requires": [{"type": "any", "of": [{"type": "flag", "id": "seen_listening_post"}, {"type": "flag", "id": "post_located"}]}],
 		"steps": [{"text": "Climb to the listening post and wake its terminal", "done": {"type": "flag", "id": "post_awake"}, "at": "listening_post"}],
 		"rewards": {"scrap": 25, "flags": {"heard_the_hollow": true}},
 	},
@@ -204,6 +205,15 @@ static func _check_condition(c: Dictionary, ids: Dictionary, cache_count: int) -
 		"caches":
 			return "" if int(c.get("count", 0)) <= cache_count else "needs %d caches, the basin has %d" % [c["count"], cache_count]
 		"launched":
+			return ""
+		"any":
+			var of: Array = c.get("of", [])
+			if of.is_empty():
+				return "an 'any' condition with nothing in it"
+			for sub in of:
+				var why := _check_condition(sub, ids, cache_count)
+				if why != "":
+					return why
 			return ""
 	return "unknown condition type '%s'" % c.get("type", "")
 

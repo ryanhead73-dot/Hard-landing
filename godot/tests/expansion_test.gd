@@ -25,6 +25,7 @@ func _run() -> void:
 	await _listening_post()
 	await _drop_pod()
 	await _survey_depot()
+	await _relay()
 	finished = true
 
 
@@ -479,4 +480,27 @@ func _survey_depot() -> void:
 	await _press("interact")
 	await _frames(3)
 	_check("taking it gives WREN's log and finishes the discovery", depot.core_taken() and Game.has_log("depot_1") and main.quests.is_done("survey_depot") and Game.scrap == scrap + 15 + 20)
+	Game.reset()
+
+
+func _relay() -> void:
+	Game.reset()
+	for r in Kestrel.REPAIR_ORDER:
+		kestrel.set_repaired(r, false)
+	_clear_enemies()
+	main.quests.restore()
+	var relay: RelayStation = main.sites["aux_power"]
+	_place(relay.console_point() + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("the relay console is dark before the generator", _label().contains("dark") and not relay.powered(), _label())
+	Game.mission_stage["aux_power"] = 1
+	await _frames(3)
+	_check("with the generator back the console can be read", _label().contains("traffic log"), _label())
+	await _press("interact")
+	await _frames(3)
+	_check("reading it locates the listening post", relay.console_read() and main.quests.state_of("listening_post") == QuestLog.ACTIVE)
+	var marks: Array = main.quests.markers()
+	_check("the post is marked for the journal and map", marks.any(func(m): return m["id"] == "listening_post"), str(marks))
+	_check("the console only reads once", _label() == "" or not _label().contains("traffic log"), _label())
+	_clear_enemies()
 	Game.reset()

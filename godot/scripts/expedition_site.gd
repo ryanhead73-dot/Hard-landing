@@ -179,6 +179,11 @@ func mission_points() -> Array[Vector3]:
 	return out
 
 
+## A site's own prompt at `pos` beyond its component and crates ({label, action?}), or {}.
+func interaction(_pos: Vector3) -> Dictionary:
+	return {}
+
+
 ## Mission hooks. Override to show a stage's effect on the site (vents shut, lights on).
 ## `animate` is false when snapping to a loaded save.
 func on_stage_done(_stage: int, _animate: bool) -> void:

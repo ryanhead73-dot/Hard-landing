@@ -7,8 +7,13 @@ extends ExpeditionSite
 
 const CELL_POSITION := Vector3(0.0, 1.35, -7.6)
 const CRATE_SCRAP := 10
+## The station's console, on the desk at the back of the hut: once the generator is back, its
+## traffic log points at Ilse's listening post up the north-east slope.
+const CONSOLE_STAND := Vector3(-2.5, 0.0, -7.4)
+const CONSOLE_RANGE := 1.8
 
 var _station_lights: Array[OmniLight3D] = []
+var _screen_mat: StandardMaterial3D
 
 
 func _configure() -> void:
@@ -69,7 +74,8 @@ func _build_pad_and_building() -> void:
 	slab.rotation = Vector3(0.5, 0.2, 0.3)
 	_static_box(Vector3(0.6, 1.0, 3.0), Vector3(-4.4, 0.6, -6.0), _mat(Color("24282b"), 0.5))
 	_static_box(Vector3(2.4, 1.0, 0.6), Vector3(-2.5, 0.6, -8.5), _mat(Color("24282b"), 0.5))
-	_static_box(Vector3(1.6, 0.6, 0.05), Vector3(-2.5, 1.6, -8.75), _emissive(Color("3fd1b5"), 0.4))
+	_screen_mat = _emissive(Color("3fd1b5"), 0.4)
+	_static_box(Vector3(1.6, 0.6, 0.05), Vector3(-2.5, 1.6, -8.75), _screen_mat)
 
 
 func _build_cover() -> void:
@@ -91,6 +97,44 @@ func on_stage_done(stage: int, _animate: bool) -> void:
 		for p in [Vector3(-2.5, 3.4, -5.0), Vector3(2.5, 3.4, -7.0)]:
 			_station_lights.append(_light(p, Color("ffd9a0"), 1.4, 8.0))
 		_station_lights.append(_light(Vector3(6.0, 15.0, -8.0), Color("ff4030"), 1.0, 10.0))
+		if _screen_mat:
+			_screen_mat.emission_energy_multiplier = 2.2
+
+
+## The backup generator is running: the first stage of the aux power mission is done.
+func powered() -> bool:
+	if Game.is_repaired("aux_power"):
+		return true
+	return int(Game.mission_stage.get("aux_power", 0)) >= 1
+
+
+func console_read() -> bool:
+	return Game.flags.get("post_located", false) == true
+
+
+func console_point() -> Vector3:
+	return to_global(CONSOLE_STAND)
+
+
+func interaction(pos: Vector3) -> Dictionary:
+	if console_read() or pos.distance_to(console_point()) > CONSOLE_RANGE:
+		return {}
+	if not powered():
+		return {"label": "The station's console: dark, like everything else here"}
+	return {"label": "[E] Read the station's traffic log", "action": read_console}
+
+
+## Ilse's last traffic went to a listening post up the slope: the journal and map pick it up.
+func read_console() -> void:
+	if console_read() or not powered():
+		return
+	Game.set_flag("post_located")
+	Sfx.play("log_chime", console_point(), -6.0)
+	var n := get_parent()
+	while n and n.get("voice") == null:
+		n = n.get_parent()
+	if n:
+		n.voice.say(Story.RELAY_CONSOLE_LINES)
 
 
 ## The mast is part of the station model; its lattice collides as one slim box.

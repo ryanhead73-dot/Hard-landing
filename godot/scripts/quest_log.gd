@@ -206,6 +206,8 @@ func holds(c: Dictionary) -> bool:
 			return need > 0 and Game.caches_opened.size() >= need
 		"launched":
 			return Game.launched
+		"any":
+			return (c["of"] as Array).any(func(sub): return holds(sub))
 	return false
 
 
