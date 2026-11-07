@@ -74,7 +74,18 @@ func _chase_from(place: String, at: Vector3, starts: Array) -> void:
 	var missed: Array = []
 	for i in es.size():
 		if best.get(i, INF) >= REACHED and not queued.has(i):
-			missed.append("from (%.0f, %.0f) got to %.0f m" % [starts[i].x, starts[i].z, best.get(i, INF)])
+			var near := INF
+			for j in es.size():
+				if j != i and is_instance_valid(es[j]) and is_instance_valid(es[i]):
+					near = minf(near, _flat_dist(es[i].global_position, es[j].global_position))
+			var e: Enemy = es[i] if is_instance_valid(es[i]) else null
+			missed.append("from (%.0f, %.0f) got to %.0f m (now %.1f m, nearest pack-mate %.1f m, worked loose %d)" % [starts[i].x, starts[i].z, best.get(i, INF),
+				_flat_dist(e.global_position, at) if e else -1.0, near, e.unstuck_count if e else -1])
+			if e:
+				var q := PhysicsRayQueryParameters3D.create(e.global_position + Vector3.UP * 0.5, at + Vector3.UP * 0.5)
+				q.exclude = [e.get_rid()]
+				var hit := e.get_world_3d().direct_space_state.intersect_ray(q)
+				print("  missed creature at %s, Juno at %s, first thing between them: %s at %s" % [e.global_position, at, hit["collider"].get_path() if hit else "nothing", hit.get("position", "-")])
 	_check("%s: all %d creatures reach Juno" % [place, es.size()], missed.is_empty(), ", ".join(missed))
 
 
