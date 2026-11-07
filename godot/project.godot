@@ -7,6 +7,8 @@ config_version=5
 config/name="Hard Landing"
 config/description="Third-person sci-fi shooter: restore the crashed salvage ship Kestrel and get off the Kettle."
 config/version="0.9.0-rc1"
+config/icon="res://icon.png"
+config/windows_native_icon="res://icon.ico"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 

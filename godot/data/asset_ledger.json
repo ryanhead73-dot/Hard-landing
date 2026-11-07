@@ -29,6 +29,11 @@
    "author": "The Barlow Project Authors",
    "url": "https://github.com/jpt/barlow",
    "credit": "Barlow and Barlow Condensed typefaces"
+  },
+  "icon_script": {
+   "origin": "Drawn by tools/make_icon.py in this repository",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -408,6 +413,10 @@
   {
    "path": "fonts/*.ttf",
    "source": "barlow"
+  },
+  {
+   "path": "icon.*",
+   "source": "icon_script"
   }
  ]
 }
