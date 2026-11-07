@@ -49,6 +49,15 @@ const EXTRA: Array[Dictionary] = [
 		"steps": [{"text": "Take the pilot's seat and launch", "done": {"type": "launched"}}],
 	},
 	{
+		"id": "the_lost", "title": "The lost", "act": 2, "kind": "main", "region": "shatterlands",
+		"summary": "Reyes's people are holding out in Voss's old greenhouses, past the canyon, under the big fungus.",
+		"requires": [{"type": "flag", "id": "shatterlands_open"}],
+		"steps": [
+			{"text": "Find Voss's greenhouses in the Shatterlands", "done": {"type": "flag", "id": "reached_greenhouses"}},
+			{"text": "Hail the greenhouse gate", "done": {"type": "flag", "id": "met_reyes"}},
+		],
+	},
+	{
 		"id": "ilse_trail", "title": "Ilse Marrow's trail", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "The relay technician left notes everywhere she went. Find them all.",
 		"requires": [{"type": "logs", "ids": ["relay_1"]}],

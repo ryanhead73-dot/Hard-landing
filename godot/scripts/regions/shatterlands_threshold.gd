@@ -21,6 +21,8 @@ const FUNGI := [
 	[Vector3(-22.0, 0.0, 8.0), 18.0, 10.0], [Vector3(20.0, 0.0, 14.0), 14.0, 8.0],
 	[Vector3(-6.0, 0.0, -30.0), 24.0, 13.0], [Vector3(26.0, 0.0, -30.0), 16.0, 9.0],
 	[Vector3(-34.0, 6.0, -22.0), 20.0, 11.0], [Vector3(6.0, 0.0, 24.0), 11.0, 6.0],
+	# "The big fungus": the one Voss's greenhouses shelter under.
+	[Vector3(36.0, 0.0, -58.0), 34.0, 20.0],
 ]
 ## Stepped shelves: [centre, size]. The ramps between them are built from the same list.
 const SHELVES := [
@@ -30,6 +32,8 @@ const SHELVES := [
 ]
 const WRECK_POS := Vector3(16.0, 0.0, -10.0)
 
+## Voss's greenhouses, the Act 2 hub (greybox).
+var greenhouses: Greenhouses
 var _rng := RandomNumberGenerator.new()
 var _mats := {}
 
@@ -38,7 +42,8 @@ func _init() -> void:
 	entry = Vector3(0.0, 0.3, 40.0)
 	entry_yaw = 0.0
 	exit_point = Vector3(0.0, 0.0, 45.0)
-	goal = WRECK_POS + Vector3(0.0, 1.0, 6.0)
+	# The waypoint leads to the greenhouse gate.
+	goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
 	look = {
 		"fog_light_color": Color("2a2442"), "fog_density": 0.02,
 		"ambient_light_color": Color("6a5f9a"), "ambient_light_energy": 0.5,
@@ -60,8 +65,15 @@ func build() -> void:
 		var base: Vector3 = f[0]
 		_fungus(base, f[1], f[2])
 	_wreck()
+	greenhouses = Greenhouses.new()
+	greenhouses.name = "Greenhouses"
+	add_child(greenhouses)
 	_undergrowth()
 	_spores()
+
+
+func interaction(pos: Vector3) -> Dictionary:
+	return greenhouses.interaction(pos) if greenhouses else {}
 
 
 func _ground() -> void:

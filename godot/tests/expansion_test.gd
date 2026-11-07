@@ -241,11 +241,27 @@ func _regions() -> void:
 	_check("the Kettle is hidden and paused", not crash_site.visible and crash_site.process_mode == Node.PROCESS_MODE_DISABLED and main.wildlife.process_mode == Node.PROCESS_MODE_DISABLED and not gate.visible)
 	await get_tree().create_timer(1.0).timeout
 	_check("Kettle creatures freeze while she's away", is_instance_valid(bug) and bug.global_position.distance_to(bug_at) < 0.01 and bug.process_mode == Node.PROCESS_MODE_DISABLED)
-	_check("the trip keeps scrap, weapons and quests", Game.scrap == 55 and Game.owns_weapon("scattergun") and Game.quests == quests_before)
+	_check("the trip keeps scrap, weapons and quests", Game.scrap == 55 and Game.owns_weapon("scattergun") and Game.quests == quests_before, "%s vs %s" % [Game.quests.keys(), quests_before.keys()])
 	_check("she stands on the region's ground", player.is_on_floor() and player.global_position.y > -0.5, str(player.global_position))
 	_check("the waypoint points into the region", main._waypoint() != null and (main._waypoint() as Vector3).distance_to(rm.scene.global_position) < 80.0)
 	_check("the region has its own look", absf(main._env.fog_density - rm.scene.look["fog_density"]) < 0.0001)
 	_check("the region keeps to its budget", _region_budget(rm.scene))
+
+	# Voss's greenhouses: the Act 2 hub, reached and hailed.
+	_check("opening the canyon starts Act 2's first quest", main.quests.state_of("the_lost") == QuestLog.ACTIVE)
+	var gh: Greenhouses = (rm.scene as ShatterlandsThreshold).greenhouses
+	_check("the greenhouses stand in the pocket", gh != null and gh.is_inside_tree())
+	_check("the waypoint leads to their gate", _flat_distance(main._waypoint(), gh.gate_pos) < 3.0)
+	_place(gh.gate_pos + Vector3(0.0, 0.5, 6.0), 0.0)
+	await _frames(5)
+	_check("coming up on them counts as finding them", gh.reached() and main.quests.step_of("the_lost") == 1)
+	_place(gh.intercom_pos + Vector3(0.0, 0.5, 0.3), 0.0)
+	await _frames(3)
+	_check("the gate can be hailed", _label().contains("Hail the greenhouses"), _label())
+	await _press("interact")
+	await _frames(3)
+	_check("hailing it meets Reyes and finishes the quest", gh.hailed() and main.quests.is_done("the_lost"))
+	_check("the gate stays shut for now", _label().contains("stays shut"), _label())
 
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)

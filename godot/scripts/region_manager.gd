@@ -85,7 +85,7 @@ func interaction(pos: Vector3) -> Dictionary:
 	if scene:
 		if pos.distance_to(scene.exit_global()) < 3.0:
 			return {"label": "[E] " + scene.exit_label, "action": travel.bind("kettle")}
-		return {}
+		return scene.interaction(pos)
 	for id in gates:
 		var gate: Node3D = gates[id]
 		if pos.distance_to(gate.global_position) >= 6.0:

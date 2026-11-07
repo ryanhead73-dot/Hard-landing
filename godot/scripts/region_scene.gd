@@ -25,6 +25,11 @@ func build() -> void:
 	pass
 
 
+## A prompt the region offers at `pos` (world space), {label, action?}, or {}.
+func interaction(_pos: Vector3) -> Dictionary:
+	return {}
+
+
 func entry_global() -> Vector3:
 	return to_global(entry)
 

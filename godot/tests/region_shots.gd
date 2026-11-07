@@ -22,6 +22,14 @@ func _ready() -> void:
 		s.queue_free()
 	main.day_cycle = false
 	main.set_daylight(0.0)
+	# `-- <out_dir> greenhouses` renders only Voss's greenhouses.
+	if args.size() > 1 and args[1] == "greenhouses":
+		Game.set_flag("shatterlands_open")
+		await main.regions.travel("shatterlands", true)
+		await _greenhouses(out, main.regions.scene)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	# The journal, with a discovery under way.
 	Game.find_log("relay_1")
 	Game.find_log("relay_2")
@@ -59,8 +67,16 @@ func _ready() -> void:
 	await _shot(out, "shatter_arrival", r.to_global(r.entry), r.to_global(Vector3(-6.0, 8.0, -20.0)))
 	await _shot(out, "shatter_wreck", r.to_global(Vector3(4.0, 0.3, 14.0)), r.to_global(Vector3(16.0, 3.0, -10.0)))
 	await _shot(out, "shatter_shelves", r.to_global(Vector3(-24.0, 9.3, -38.0)), r.to_global(Vector3(10.0, 2.0, 10.0)))
+	await _greenhouses(out, r)
 	Game.delete_save()
 	get_tree().quit()
+
+
+## Voss's greenhouses: from the shelves' foot across the pocket, and at the gate.
+func _greenhouses(out: String, r: RegionScene) -> void:
+	var gh: Greenhouses = (r as ShatterlandsThreshold).greenhouses
+	await _shot(out, "greenhouses_far", r.to_global(Vector3(2.0, 0.3, -20.0)), gh.to_global(Vector3(0.0, 3.0, 0.0)))
+	await _shot(out, "greenhouses_gate", gh.gate_pos + Vector3(-3.0, 0.3, 9.0), gh.gate_pos + Vector3(0.0, 2.5, -6.0))
 
 
 func _shot(out: String, name: String, at: Vector3, look: Vector3) -> void:

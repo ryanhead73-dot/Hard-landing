@@ -6,6 +6,7 @@ extends RefCounted
 
 const JUNO := "Juno"
 const HOB := "HOB"
+const REYES := "Reyes"
 
 ## New game: Juno, alone, Kestrel dark.
 const OPENING: Array = [
@@ -64,6 +65,16 @@ const FINALE_START: Array = [
 const RELAY_CONSOLE_LINES := [
 	[JUNO, "Station log. Last outbound traffic: 'Post Seven, hold your carrier, I'm still listening.'"],
 	[JUNO, "Post Seven's up the south-east slope. Somebody kept a listening post running out here."],
+]
+## Coming up on Voss's greenhouses in the Shatterlands, and hailing the gate.
+const GREENHOUSE_ARRIVE := [
+	[JUNO, "Glasshouses. Lit. Somebody's growing things out here."],
+	[HOB, "Palisade's new. Whoever's inside expects company, and not the friendly kind."],
+]
+const GREENHOUSE_HAIL := [
+	[JUNO, "Greenhouses, this is Juno Vale, off the Kestrel. I've got Lieutenant Reyes's recorder."],
+	[REYES, "Then you've got my last words, Vale. Lucky for both of us they weren't."],
+	[REYES, "Stay where the lamp can see you. Eleven of us in here, and we've buried enough strangers."],
 ]
 ## Waking Ilse's listening post on the south-east slope.
 const POST_LINES := [
