@@ -461,6 +461,15 @@ func _save_load() -> void:
 	Game.delete_save()
 	await _press("interact")
 	_check("resting saves", Game.has_save())
+	# A damaged save falls back to the one before it.
+	main.save_game()
+	main.save_game()
+	var f := FileAccess.open(Game.save_path, FileAccess.WRITE)
+	f.store_string("{\"version\": ")
+	f.close()
+	_check("a damaged save falls back to the backup", not Game.read_save().is_empty())
+	Game.delete_save()
+	_check("deleting a save removes its backup too", not Game.has_save() and Game.read_save().is_empty())
 
 
 func _title() -> void:
@@ -492,6 +501,11 @@ func _title() -> void:
 	add_child(title)
 	await _frames(5)
 	_check("title: Continue is offered with a save", not title.continue_button.disabled)
+	title.new_button.pressed.emit()
+	await _frames(2)
+	_check("title: New game over a save asks first", title._confirm_left > 0.0 and title._warning.visible and get_tree().current_scene == self)
+	title._process(title.CONFIRM_TIME + 0.1)
+	_check("title: the question lapses", title.new_button.text == "New game" and not title._warning.visible)
 	title.queue_free()
 	Game.delete_save()
 	await _frames(2)

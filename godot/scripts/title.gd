@@ -9,6 +9,10 @@ var settings: PauseMenu
 var credits: CreditsPanel
 var _menu: CanvasLayer
 var _difficulty: OptionButton
+var _warning: Label
+## Seconds left to press New game again to confirm starting over on top of a save.
+var _confirm_left := 0.0
+const CONFIRM_TIME := 4.0
 var _camera: Camera3D
 var _t := 0.0
 
@@ -34,12 +38,28 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _confirm_left > 0.0:
+		_confirm_left -= delta
+		if _confirm_left <= 0.0:
+			new_button.text = "New game"
+			_warning.visible = false
 	if not settings.visible and not settings.bindings.visible and not credits.visible:
 		UiStyle.keep_pad_focus(_menu, continue_button if not continue_button.disabled else new_button)
 	# A slow drift around the wreck.
 	_t += delta * 0.04
 	_camera.position = Vector3(cos(_t) * 38.0, 9.0, sin(_t) * 38.0 + 6.0)
 	_camera.look_at(Vector3(0.0, 2.5, 0.0))
+
+
+## New game. With a save on disk, the first press asks (the button changes and a line says what
+## will happen); a second press within a few seconds starts over.
+func _new_game() -> void:
+	if continue_button.disabled or _confirm_left > 0.0:
+		start(false)
+		return
+	_confirm_left = CONFIRM_TIME
+	new_button.text = "Start over? Press again"
+	_warning.visible = true
 
 
 func start(load_save: bool) -> void:
@@ -103,7 +123,12 @@ func _build_menu() -> void:
 	box.add_child(Control.new())
 	continue_button = _button(box, "Continue", start.bind(true))
 	continue_button.disabled = Game.read_save().is_empty()
-	new_button = _button(box, "New game", start.bind(false))
+	new_button = _button(box, "New game", _new_game)
+	_warning = Label.new()
+	_warning.text = "Your saved campaign is replaced the first time you rest or install."
+	UiStyle.apply(_warning, "small", UiStyle.AMBER)
+	_warning.visible = false
+	box.add_child(_warning)
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = "Difficulty  "

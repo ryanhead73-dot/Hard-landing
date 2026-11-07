@@ -480,7 +480,7 @@ func enemy_health_scale() -> float:
 # --- Save and load -------------------------------------------------------------------------
 
 func has_save() -> bool:
-	return FileAccess.file_exists(save_path)
+	return FileAccess.file_exists(save_path) or FileAccess.file_exists(backup_path())
 
 
 ## The session half of a save. Main adds the world (sites, siege, weapon in hand).
@@ -545,29 +545,52 @@ func apply_session(data: Dictionary) -> void:
 	inventory_changed.emit()
 
 
+## Writes the save safely: the new file goes to a temp file first and only replaces the save once
+## it is complete, and the save it replaces is kept as a backup. A crash or power cut mid-write
+## leaves the last good save in place.
 func write_save(data: Dictionary) -> bool:
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	var tmp := save_path + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
-		push_warning("Game: cannot write %s" % save_path)
+		push_warning("Game: cannot write %s" % tmp)
 		return false
 	file.store_string(JSON.stringify(data, "\t"))
+	file.close()
+	if FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(backup_path())
+		DirAccess.rename_absolute(save_path, backup_path())
+	if DirAccess.rename_absolute(tmp, save_path) != OK:
+		push_warning("Game: cannot replace %s" % save_path)
+		return false
 	return true
 
 
-## Reads the save file, or returns {} if there is none or it doesn't parse.
+func backup_path() -> String:
+	return save_path + ".bak"
+
+
+## Reads the save, or the backup if the save is missing or damaged; {} if neither parses.
 func read_save() -> Dictionary:
-	if not has_save():
+	for path in [save_path, backup_path()]:
+		var data := _read_json(path)
+		if not data.is_empty():
+			return data
+	return {}
+
+
+func _read_json(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
 		return {}
-	var file := FileAccess.open(save_path, FileAccess.READ)
-	var data: Variant = JSON.parse_string(file.get_as_text()) if file else null
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != SAVE_VERSION:
 		return {}
 	return data
 
 
 func delete_save() -> void:
-	if has_save():
-		DirAccess.remove_absolute(save_path)
+	for path in [save_path, backup_path(), save_path + ".tmp"]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 
 
 func add_scrap(amount: int) -> void:
