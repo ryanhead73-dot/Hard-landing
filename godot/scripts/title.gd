@@ -5,6 +5,9 @@ extends Node3D
 var continue_button: Button
 var new_button: Button
 
+var settings: PauseMenu
+var credits: CreditsPanel
+var _menu: CanvasLayer
 var _difficulty: OptionButton
 var _camera: Camera3D
 var _t := 0.0
@@ -12,6 +15,10 @@ var _t := 0.0
 
 func _ready() -> void:
 	Game.reset()
+	# Keyboard bindings, so Settings > Key bindings and the controls line read right here too.
+	if Game.default_keys.is_empty():
+		Game.default_keys = (load("res://scripts/main.gd") as Script).get_script_constant_map()["KEYS"].duplicate(true)
+		Game.apply_keys()
 	_build_scene()
 	_build_menu()
 	Sfx.loop_flat("wind_loop", self, -14.0, "Ambience")
@@ -27,6 +34,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not settings.visible and not settings.bindings.visible and not credits.visible:
+		UiStyle.keep_pad_focus(_menu, continue_button if not continue_button.disabled else new_button)
 	# A slow drift around the wreck.
 	_t += delta * 0.04
 	_camera.position = Vector3(cos(_t) * 38.0, 9.0, sin(_t) * 38.0 + 6.0)
@@ -78,6 +87,7 @@ func _build_scene() -> void:
 
 func _build_menu() -> void:
 	var layer := CanvasLayer.new()
+	_menu = layer
 	add_child(layer)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
@@ -107,8 +117,16 @@ func _build_menu() -> void:
 		Game.save_settings())
 	row.add_child(_difficulty)
 	box.add_child(row)
+	settings = PauseMenu.new()
+	settings.from_title = true
+	add_child(settings)
+	settings.closed.connect(func(): _difficulty.selected = Game.difficulty)
+	credits = CreditsPanel.new()
+	add_child(credits)
+	_button(box, "Settings", settings.open).name = "Settings"
 	var bench := _button(box, "Benchmark", func(): get_tree().change_scene_to_file("res://scenes/benchmark.tscn"))
 	bench.tooltip_text = "A one-minute run through the slice that measures frame times and saves a report."
+	_button(box, "Credits", credits.open).name = "Credits"
 	_button(box, "Quit", func(): get_tree().quit())
 	# Anchor once the contents give it a size: left edge, centred vertically at any resolution.
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH

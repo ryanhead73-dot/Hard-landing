@@ -46,6 +46,10 @@ godot --headless --path godot --export-release "Windows" ../build/windows/HardLa
 
 A new game opens with Kestrel's crash (E, Space or Esc skips it).
 
+### Title screen
+
+Continue, New game and difficulty, then **Settings** (the same options as the pause menu, including key bindings), **Benchmark**, **Credits** (the team, the Barlow typeface and the Godot Engine, with the full licence texts they need to ship with) and Quit.
+
 ### Benchmark
 
 **Benchmark** on the title screen runs a fixed one-minute route with vsync off:

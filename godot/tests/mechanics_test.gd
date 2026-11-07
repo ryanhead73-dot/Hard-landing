@@ -469,6 +469,22 @@ func _title() -> void:
 	add_child(title)
 	await _frames(5)
 	_check("title: Continue is greyed out with no save", title.continue_button.disabled)
+	# Settings and credits open from the title without pausing it or offering quit-to-title.
+	(title.find_child("Settings", true, false) as Button).pressed.emit()
+	await _frames(2)
+	_check("title: Settings opens the settings menu, unpaused", title.settings.visible and not get_tree().paused and not title.settings._title_button.visible and title.settings._resume.text == "Back")
+	title.settings._resume.pressed.emit()
+	await _frames(2)
+	_check("title: Back closes it", not title.settings.visible)
+	(title.find_child("Credits", true, false) as Button).pressed.emit()
+	await _frames(2)
+	var credits: String = title.credits.text.get_parsed_text()
+	_check("title: credits name the typeface, the engine licence and the font licence", title.credits.visible and credits.contains("Barlow Project Authors") and credits.contains("Permission is hereby granted") and credits.contains("SIL OPEN FONT LICENSE"), credits.substr(0, 200))
+	var esc := InputEventAction.new()
+	esc.action = "ui_cancel"
+	esc.pressed = true
+	title.credits._unhandled_input(esc)
+	_check("title: Esc closes the credits", not title.credits.visible)
 	title.queue_free()
 	await _frames(2)
 	Game.write_save(main.save_state())

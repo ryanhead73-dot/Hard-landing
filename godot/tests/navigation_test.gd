@@ -4,8 +4,10 @@ extends Node
 ##   godot --headless --path . res://tests/navigation_test.tscn
 
 const CHASE_TIME := 14.0
-## Close enough to count as having reached her (scuttlers ring at 4.2 m and wait their turn).
-const REACHED := 6.5
+## Close enough to count as having reached her. Scuttlers ring at 4.2 m and wait their turn,
+## and with a dozen in one pack the outer ones can be held at about 7 m by the crowd; a creature
+## that was actually wedged ends up tens of metres out.
+const REACHED := 8.0
 
 var failures := 0
 var main: Node

@@ -20,13 +20,15 @@
    "origin": "Godot Engine 4.7 (engine, default font and editor-generated resources)",
    "licence": "MIT (Godot Engine); default font Open Sans / Noto under OFL 1.1 via the engine",
    "author": "Godot Engine contributors",
-   "url": "https://godotengine.org/license"
+   "url": "https://godotengine.org/license",
+   "credit": "Godot Engine 4.7"
   },
   "barlow": {
    "origin": "Barlow and Barlow Condensed by Jeremy Tribby, via https://github.com/google/fonts/tree/main/ofl/barlow (downloaded 2026-11-06)",
    "licence": "SIL Open Font License 1.1 (fonts/OFL.txt ships beside the fonts)",
    "author": "The Barlow Project Authors",
-   "url": "https://github.com/jpt/barlow"
+   "url": "https://github.com/jpt/barlow",
+   "credit": "Barlow and Barlow Condensed typefaces"
   }
  },
  "tiers": {

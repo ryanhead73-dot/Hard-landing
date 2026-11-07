@@ -16,6 +16,10 @@ var _controls: Label
 var _grid: GridContainer
 var bindings: KeyBindMenu
 var _resume: Button
+var _title_button: Button
+## Opened from the title screen as Settings: no pause, no quit to title, the mouse stays free.
+var from_title := false
+signal closed
 
 
 func _ready() -> void:
@@ -36,6 +40,7 @@ func _ready() -> void:
 	_panel.add_child(box)
 
 	var title := Label.new()
+	title.name = "Heading"
 	title.text = "PAUSED"
 	UiStyle.apply(title, "banner")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -174,6 +179,7 @@ func _ready() -> void:
 	resume.pressed.connect(close)
 	buttons.add_child(resume)
 	var title_button := Button.new()
+	_title_button = title_button
 	title_button.text = "Save and quit to title"
 	title_button.pressed.connect(func():
 		close()
@@ -237,6 +243,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Another panel (fabricator, inventory) owns the pause while it's open.
 	if get_tree().paused and not visible:
 		return
+	# On the title screen the menu opens from its Settings button, never from Esc.
+	if from_title and not visible:
+		return
 	if event.is_action_pressed("ui_cancel") or (visible and Game.is_pad_back(event)):
 		if visible:
 			close()
@@ -247,16 +256,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open() -> void:
 	_controls.text = "Controls: " + (Hud.PAD_HELP_TEXT if Game.using_pad else Hud.help_text())
+	_resume.text = "Back" if from_title else "Resume"
+	_title_button.visible = not from_title
+	(_panel.find_child("Heading", true, false) as Label).text = "SETTINGS" if from_title else "PAUSED"
+	_difficulty.selected = Game.difficulty
 	visible = true
-	get_tree().paused = true
+	if not from_title:
+		get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
 func close() -> void:
 	visible = false
-	get_tree().paused = false
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if not from_title:
+		get_tree().paused = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	Game.save_settings()
+	closed.emit()
 
 
 func _on_sensitivity(value: float) -> void:
