@@ -53,4 +53,8 @@ func _quest(x: Dictionary, q: QuestLog) -> void:
 	var count := q.progress(x["id"])
 	if count.y > 0:
 		line += "  %d / %d" % [count.x, count.y]
+	var at = q.marker(x["id"])
+	if at is Vector3 and main.player:
+		var from: Vector3 = main.player.global_position
+		line += "  ·  %d m %s" % [int(Vector2(at.x - from.x, at.z - from.z).length()), MissionRunner.compass_word(from, at)]
 	_row("◆ " + line, UiStyle.CREAM, 15)

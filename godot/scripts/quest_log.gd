@@ -72,6 +72,30 @@ func objective(id: String) -> String:
 	return String(steps[i]["text"]) if state_of(id) == ACTIVE and i < steps.size() else ""
 
 
+## Where an active quest's current step happens (world space), or null when it has no place.
+func marker(id: String):
+	var steps: Array = QuestDB.get_quest(id).get("steps", [])
+	var i := step_of(id)
+	if state_of(id) != ACTIVE or i >= steps.size():
+		return null
+	var at = steps[i].get("at")
+	if at is Vector3:
+		return at
+	if at is String and main and main.get("discoveries") and main.discoveries.built.has(at):
+		return (main.discoveries.built[at] as Node3D).global_position
+	return null
+
+
+## Every active quest with a place, as [{id, title, pos}] (for the map and journal).
+func markers() -> Array:
+	var out := []
+	for q in active():
+		var at = marker(q["id"])
+		if at is Vector3:
+			out.append({"id": q["id"], "title": q["title"], "pos": at})
+	return out
+
+
 ## How far an active quest's current step has got, as (have, need), for steps that collect
 ## things (logs, caches); (0, 0) for the rest.
 func progress(id: String) -> Vector2i:

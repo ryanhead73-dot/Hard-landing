@@ -11,7 +11,9 @@ extends RefCounted
 ##   region    where it happens (a RegionDB id).
 ##   summary   one line for the journal.
 ##   requires  conditions that must all hold before it starts (see below). Empty: from the start.
-##   steps     worked in order; each is {"text": objective line, "done": condition}.
+##   steps     worked in order; each is {"text": objective line, "done": condition, "at"?}.
+##             `at` marks where the step happens on the map and in the journal: a Vector3, or
+##             the id of a discovery (main.discoveries) to point at.
 ##   rewards   optional: {"scrap": n, "flags": {id: value}} given once, on completion.
 ##
 ## Conditions (one dictionary each):
@@ -66,7 +68,7 @@ const EXTRA: Array[Dictionary] = [
 		"id": "listening_post", "title": "The listening post", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "A mast blinks amber high on the north-east slope. Someone left equipment running.",
 		"requires": [{"type": "flag", "id": "seen_listening_post"}],
-		"steps": [{"text": "Climb to the listening post and wake its terminal", "done": {"type": "flag", "id": "post_awake"}}],
+		"steps": [{"text": "Climb to the listening post and wake its terminal", "done": {"type": "flag", "id": "post_awake"}, "at": "listening_post"}],
 		"rewards": {"scrap": 25, "flags": {"heard_the_hollow": true}},
 	},
 	{
@@ -74,8 +76,8 @@ const EXTRA: Array[Dictionary] = [
 		"summary": "The listening post picked up a distress beacon on the west flats: one of Reyes's drop pods.",
 		"requires": [{"type": "flag", "id": "post_awake"}],
 		"steps": [
-			{"text": "Find the drop pod on the west flats", "done": {"type": "flag", "id": "pod_found"}},
-			{"text": "Pull the pod's flight recorder and hold the ground while it downloads", "done": {"type": "flag", "id": "pod_downloaded"}},
+			{"text": "Find the drop pod on the west flats", "done": {"type": "flag", "id": "pod_found"}, "at": "drop_pod"},
+			{"text": "Pull the pod's flight recorder and hold the ground while it downloads", "done": {"type": "flag", "id": "pod_downloaded"}, "at": "drop_pod"},
 		],
 		"rewards": {"scrap": 30, "flags": {"knows_greenhouses": true}},
 	},
@@ -136,7 +138,7 @@ static func in_act(act: int) -> Array[Dictionary]:
 
 ## Problems with the data, as readable lines; empty when every reference resolves, every quest
 ## can be reached and no requirement loops. The content test fails on any line.
-static func validate(region_ids: Array, cache_count: int) -> PackedStringArray:
+static func validate(region_ids: Array, cache_count: int, discovery_ids: Array = []) -> PackedStringArray:
 	var bad: PackedStringArray = []
 	var ids := {}
 	for q in all():
@@ -161,6 +163,9 @@ static func validate(region_ids: Array, cache_count: int) -> PackedStringArray:
 		for s in q.get("steps", []):
 			if String(s.get("text", "")) == "":
 				bad.append("%s has a step with no objective text" % id)
+			var at = s.get("at")
+			if at is String and not at in discovery_ids:
+				bad.append("%s points at unknown discovery '%s'" % [id, at])
 			conds.append(s.get("done", {}))
 		for c in conds:
 			var problem := _check_condition(c, ids, cache_count)

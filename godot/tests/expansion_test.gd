@@ -111,7 +111,7 @@ func _round_trip() -> void:
 
 
 func _content() -> void:
-	var bad := QuestDB.validate(RegionDB.ids(), main.wildlife.caches.size())
+	var bad := QuestDB.validate(RegionDB.ids(), main.wildlife.caches.size(), main.discoveries.ids())
 	_check("every quest's references resolve and nothing loops", bad.is_empty(), "; ".join(bad))
 	var repairs := QuestDB.all().filter(func(q): return q.has("repair"))
 	_check("each of the seven repairs is a main quest", repairs.size() == Campaign.REPAIRS.size() and repairs.all(func(q): return q["kind"] == "main"))
@@ -403,6 +403,17 @@ func _drop_pod() -> void:
 	await _frames(5)
 	_check("waking the post starts the side mission and the pod reaching", main.quests.state_of("last_drop") == QuestLog.ACTIVE and Game.flags.get("pod_found") == true and main.quests.step_of("last_drop") == 1)
 	_check("the recorder can be pulled", _label().contains("flight recorder"), _label())
+	var qm: Array = main.quests.markers().filter(func(m): return m["id"] == "last_drop")
+	_check("the side mission is marked where it happens", qm.size() == 1 and (qm[0]["pos"] as Vector3).distance_to(pod.global_position) < 0.1)
+	_check("the map shows it", main.map_panel.marks().any(func(m): return m["kind"] == "quest" and m["label"] == "The last supply drop"))
+	_place(Vector3(0.0, 0.5, 15.0), 0.0)
+	await _frames(2)
+	main.journal.open()
+	await _frames(2)
+	_check("the journal says how far and which way", _panel_text(main.journal).contains("m north-west"), _panel_text(main.journal))
+	main.journal.close()
+	_place(pod.recorder_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(5)
 	await _press("interact")
 	_check("pulling it starts the download", pod.downloading())
 	await get_tree().create_timer(5.0).timeout

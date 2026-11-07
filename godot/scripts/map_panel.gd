@@ -97,6 +97,9 @@ func marks() -> Array:
 		for pool in w.lurker_pools:
 			if pool[2]:
 				out.append({"kind": "lurker", "pos": pool[0]})
+	if main.get("quests"):
+		for qm in main.quests.markers():
+			out.append({"kind": "quest", "pos": qm["pos"], "label": qm["title"]})
 	var goal = main.call("_waypoint")
 	if goal is Vector3:
 		out.append({"kind": "goal", "pos": goal})
@@ -140,6 +143,10 @@ class MapView:
 					var lc := Color("d0574a")
 					draw_line(at + Vector2(-5, -5), at + Vector2(5, 5), lc, 2.0)
 					draw_line(at + Vector2(5, -5), at + Vector2(-5, 5), lc, 2.0)
+				"quest":
+					var qc := Color("9fe8d8")
+					draw_polyline(PackedVector2Array([at + Vector2(0, -8), at + Vector2(8, 0), at + Vector2(0, 8), at + Vector2(-8, 0), at + Vector2(0, -8)]), qc, 2.0)
+					draw_string(font, at + Vector2(11, 4), m["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, qc)
 				"goal":
 					draw_arc(at, 12.0, 0.0, TAU, 24, Color("ffb347"), 2.0)
 				"player":
