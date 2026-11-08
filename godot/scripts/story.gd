@@ -8,6 +8,75 @@ const JUNO := "Juno"
 const HOB := "HOB"
 const REYES := "Reyes"
 
+## The opening, aboard a Kestrel that still works (the approach) and then the wreck.
+const APPROACH_WAKE: Array = [
+	[HOB, "Proximity chime, Juno. Low priority. We're coming up on HD-4471 b."],
+	[HOB, "You're three minutes early. I'm recording that for posterity."],
+]
+const APPROACH_NUDGE: Array = [
+	[HOB, "The copilot's seat is free, if you'd like to watch me park."],
+]
+const APPROACH_CUP: Array = [[JUNO, "Got you. Not today, cup."]]
+const APPROACH_CONTRACT: Array = [
+	[JUNO, "Strip one relay station, Kettle basin, salvage rights paid in full. Nobody's been down there in years."],
+	[JUNO, "Easy money. That's what worries me."],
+]
+const APPROACH_RELAY: Array = [
+	[JUNO, "Relay looks intact. That's a good day's work, if it stays that way."],
+]
+const APPROACH_KEEPSAKE: Array = [
+	[JUNO, "Mira carved this fish the week she quit the yards. Said every ship needs something that can't break."],
+	[HOB, "It is a fish, Juno. It has broken twice. I glued it."],
+]
+const APPROACH_SEATED: Array = [
+	[JUNO, "Not much of a welcome mat."],
+	[HOB, "Kestrel has a name. The mat is optional."],
+	[HOB, "There's a wreck beacon on the surface, if you want something to look at while I work."],
+]
+const APPROACH_TRACE: Array = [
+	[JUNO, "That beacon's moving against the wind."],
+	[HOB, "It's weather. Probably. I'm logging it as weather."],
+]
+const APPROACH_DRIFT: Array = [
+	[JUNO, "HOB, you're pulling us down."],
+	[HOB, "I am not."],
+]
+const APPROACH_FALL: Array = [
+	[HOB, "Juno, something is moving the direction of down."],
+]
+
+## The wreck, and the walk to the relay (see Opening).
+const WAKE: Array = [
+	[JUNO, "...HOB? That's not funny."],
+	[JUNO, "Suit's punctured. One problem. Fix one problem."],
+]
+const GET_UP: Array = [[JUNO, "There's a med-seal in the aux bay kit. Amber light. Go."]]
+const SEALED: Array = [[JUNO, "Breathe in. Seal. Breathe out."], [JUNO, "Okay. Okay. Side door."]]
+const HOB_DARK: Array = [[JUNO, "HOB? ...Nothing. Not even the boot chime."]]
+const HATCH_JAMMED: Array = [[JUNO, "Jammed solid. The hull's twisted round it. Later."]]
+const THRESHOLD: Array = [[JUNO, "Fresh air. Sort of. Let's see what we hit."]]
+const SCANS := {
+	"scan_fracture": [[JUNO, "Keel's cracked through the starboard plating. She's not flying on that."]],
+	"scan_pod": [[JUNO, "Our cargo pod, torn off on the way in. Empty. Of course it's empty."]],
+	"scan_scar": [[JUNO, "That crater was here before us."], [JUNO, "Whatever brought us down, it has practice."]],
+}
+const FIND_POWER: Array = [
+	[JUNO, "Kestrel needs power before she needs anything else. The relay's across the basin."],
+	[JUNO, "Someone left reflector beads on a trail. I'll take it."],
+]
+const SPOOL: Array = [[JUNO, "Fibre, wound tight. And the rock: those aren't scratches. They're lines. Something dragged a wire through stone."]]
+const POD_OPEN: Array = [[JUNO, "A survey pod's field kit. Receiver, a cell, one bent rail. You don't have to be pretty. You have to work."]]
+const ASSEMBLE_1: Array = [[JUNO, "If I find the idiot who packed a receiver without a stock..."]]
+const ASSEMBLE_2: Array = [[JUNO, "There. A salvage rifle, more or less. Test it on something that won't mind."]]
+const TEST_SHOT: Array = [[JUNO, "Pulls a little left. I'll live with it."]]
+const CARCASS: Array = [[JUNO, "A salvage drone. Orange coolant all over it, and bite marks."], [JUNO, "Those teeth would go straight through the suit."]]
+const WATCHER: Array = [[JUNO, "...You saw me."], [JUNO, "Easy. I'm not here for you."]]
+const WATCHER_GONE: Array = [[JUNO, "Gone. Something lives on this path. The relay's just ahead."]]
+const YARD_SURGE: Array = [[JUNO, "Fence cable snapped, and there's one cornered in the yard. Easy..."]]
+const YARD_WARNING: Array = [[JUNO, "I said easy!"]]
+const YARD_AFTER: Array = [[JUNO, "Sorry. You gave me no room."], [JUNO, "It's got a battery contact in its teeth. The relay's breaker will want that."]]
+const CELL_TAKEN: Array = [[JUNO, "There you are."], [JUNO, "Hang on, HOB. I found you a heartbeat."]]
+
 ## New game: Juno, alone, Kestrel dark.
 const OPENING: Array = [
 	[JUNO, "Kestrel? ...Nothing. Every board's red and the ship mind's dark."],

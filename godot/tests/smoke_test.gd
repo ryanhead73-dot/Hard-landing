@@ -132,7 +132,7 @@ func _run() -> void:
 	_check("cell prompt at the station", _label().contains("power cell"), _label())
 	await _press("interact")
 	_check("cell is carried", Game.carrying == "aux_cell" and not main.station.has_component())
-	_check("ambush spawns on the way home", _enemy_count() >= 3)
+	_check("on Normal the walk home is quiet (one stalker on Hard only)", _enemy_count() == 0, "enemies=%d" % _enemy_count())
 	_clear_enemies()
 
 	_check("one crate can be searched", main.station.crate_count() == 4)

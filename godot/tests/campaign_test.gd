@@ -27,11 +27,12 @@ func _run() -> void:
 	_check("install points don't answer through the hull", not _label().contains("Canopy") and not _label().contains("bay"), _label())
 	_check("only the canopy site's beacon is active", main.sites.keys().all(func(id): return main.sites[id].active == (id == "canopy")))
 
-	# Scanner is off until the canopy is sealed.
+	# Before the canopy only the suit scanner works: wildlife close by, no salvage.
 	player.revive(Vector3(45.0, 0.5, 45.0))
 	var probe: Node3D = main.spawn_scuttler(Vector3(45.0, 0.5, 30.0))
 	await _frames(5)
-	_check("no scanner before the canopy", main.scanner_marks().is_empty())
+	var marks: Array = main.scanner_marks()
+	_check("before the canopy the suit scanner sees wildlife, not salvage", marks.any(func(m): return m["kind"] == "enemy") and not marks.any(func(m): return m["kind"] == "crate"))
 	probe.queue_free()
 	_clear_enemies()
 

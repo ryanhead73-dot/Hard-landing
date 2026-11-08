@@ -17,6 +17,7 @@ extends RefCounted
 ##   gate_in        for a region beyond the Kettle's ring: which way is back into the nearer
 ##                  region from its gate_pos (Juno comes back facing that way).
 ##   planned        named in the design but not built yet (no gate is placed).
+##   sequence       a scripted scene with no gate (the opening's approach).
 
 const REGIONS := {
 	"kettle": {
@@ -40,6 +41,12 @@ const REGIONS := {
 		"locked_text": "A scrap barricade across a split in the rim. Reyes's people put it there",
 		"enter_text": "Go north into the Gillwood",
 	},
+	# The opening's approach, aboard a Kestrel still in orbit: no gate, reached only by Opening.
+	"approach": {
+		"name": "Approach to HD-4471 b", "act": 1, "sequence": true,
+		"scene": "res://scripts/regions/approach.gd",
+		"origin": Vector3(-8000.0, 0.0, 0.0),
+	},
 	"loom_expanse": {
 		"name": "The Loom Expanse", "act": 3, "planned": true,
 	},
@@ -60,4 +67,4 @@ static func display_name(id: String) -> String:
 
 ## Built regions with a gate (not the Kettle, not planned ones).
 static func travel_regions() -> Array:
-	return ids().filter(func(id): return not REGIONS[id].get("resident", false) and not REGIONS[id].get("planned", false))
+	return ids().filter(func(id): return not REGIONS[id].get("resident", false) and not REGIONS[id].get("planned", false) and not REGIONS[id].get("sequence", false))

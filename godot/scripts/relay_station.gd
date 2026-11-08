@@ -20,10 +20,8 @@ func _configure() -> void:
 	component_id = "aux_cell"
 	component_pos = CELL_POSITION
 	component_stand = Vector3(0.0, 0.0, -6.3)
-	spawn_pts = [
-		Vector3(-6.0, 0.3, 4.0), Vector3(6.0, 0.3, 5.0), Vector3(0.0, 0.3, 10.0),
-		Vector3(-9.0, 0.3, -9.0), Vector3(9.0, 0.3, -10.0),
-	]
+	# No resident pack: the yard has one territorial scuttler (see Opening), nothing more.
+	spawn_pts = []
 	crate_pts = [Vector3(-3.8, 0.1, -3.2), Vector3(-8.0, 0.0, -1.2), Vector3(8.5, 0.0, 6.5), Vector3(3.5, 0.0, -10.4)]
 	crate_scrap = CRATE_SCRAP
 	beacon_pos = Vector3(6.0, 16.3, -8.0)
@@ -141,42 +139,38 @@ func read_console() -> void:
 func _build_mast() -> void:
 	_collider(Vector3(0.9, 16.0, 0.9), Vector3(6.0, 8.0, -8.0))
 
-## The relay's mission: restart the backup generator, then hold the station while the charging
-## cradle lets go of the cell.
+## The relay's mission: wire the battery contact (from the yard's scuttler) into the dead
+## breaker, route current through the two live switchboxes (the third runs back to the old
+## wreckage, and the live ones carry Kestrel's triple-click interference), then release the cell.
 func _mission() -> Array:
 	var J := Story.JUNO
 	return [
 		{
-			"type": "activate", "text": "Restart the relay's backup generator: throw the breakers",
+			"type": "activate", "text": "Wire the battery contact into the relay's dead breaker",
+			"needs_flag": "relay_contact", "locked_label": "Dead breaker: a battery contact's missing",
 			"devices": [
-				{"pos": Vector3(-12.0, 0.1, 0.5), "kind": "breaker", "label": "Throw the breaker", "yaw": PI * 0.5},
-				{"pos": Vector3(11.5, 0.1, 3.5), "kind": "breaker", "label": "Throw the breaker", "yaw": -PI * 0.5},
-				{"pos": Vector3(-4.5, 0.1, -10.8), "kind": "breaker", "label": "Throw the breaker", "yaw": PI},
+				{"pos": Vector3(-12.0, 0.1, 0.5), "kind": "breaker", "label": "Wire in the battery contact", "yaw": PI * 0.5},
 			],
-			"say": [[J, "Station's as dead as Kestrel. The backup generator's tripped."], [J, "Three breakers on the outside walls. Then the cradle should give up the cell."]],
+			"say": [[J, "Station's as dead as Kestrel. The breaker's missing its battery contact."]],
 		},
 		{
-			"type": "defend", "text": "Release the power cell from its charging cradle",
-			"running_text": "Hold the station while the cradle releases the cell",
-			"device": {"pos": Vector3(2.4, 0.1, -8.0), "kind": "cradle", "label": "Start the cradle release", "yaw": PI},
-			"bar": "CRADLE RELEASE", "seconds": 35.0, "radius": 11.0, "wave_every": 10.0, "lift": 0.0,
-			# The first wave crosses the flats in front; the second comes round the back of the hut,
-			# past the side door; the third follows a big one in, a first taste of an elite.
-			"waves": [
-				["scuttler", "scuttler", "scuttler"],
-				{
-					"kinds": ["scuttler", "scuttler", "scuttler", "scuttler"],
-					"spawns": [Vector3(9.5, 0.3, -6.0), Vector3(2.0, 0.3, -14.0), Vector3(-8.0, 0.3, -13.5)],
-					"say": [[J, "Round the back! They're coming past the hut."]],
-				},
-				{
-					"kinds": ["scuttler", "scuttler", "scuttler"], "elite": "PACK MOTHER",
-					"spawns": [Vector3(0.0, 0.3, 13.0), Vector3(-5.0, 0.3, 12.0), Vector3(5.0, 0.3, 12.0)],
-					"say": [[J, "That one's huge. Go for the glow on its back."]],
-				},
+			"type": "activate", "text": "Route current to the cradle: listen for the two live switchboxes",
+			"decoys": [0],
+			"devices": [
+				{"pos": Vector3(11.5, 0.1, 3.5), "kind": "breaker", "label": "Close the switchbox", "reading": "lamp steady, a flat hum", "yaw": -PI * 0.5},
+				{"pos": Vector3(-4.5, 0.1, -10.8), "kind": "breaker", "label": "Close the switchbox", "reading": "lamp flickers, click-click-click", "yaw": PI},
+				{"pos": Vector3(8.0, 0.1, -10.8), "kind": "breaker", "label": "Close the switchbox", "reading": "lamp flickers, click-click-click", "yaw": PI},
 			],
-			"say": [[J, "Lights. Good. The cradle wants half a minute to let go of the cell."]],
-			"start_say": [[J, "And that whine's going to carry for kilometres. Here they come."]],
-			"done_say": [[J, "Cradle's open. Now to haul this thing home."]],
+			"wrong_text": "Sparks. That line runs out to the old wreckage, not the cradle.",
+			"wrong_say": [[J, "Not that one. The live lines click in threes, like the noise before we fell."]],
+			"say": [[J, "Lights. Three switchboxes, and only two run to the cradle."], [J, "That triple click on the way down... the live lines have it too. Listen."]],
+		},
+		{
+			"type": "activate", "text": "Release the power cell from its charging cradle",
+			"devices": [
+				{"pos": Vector3(2.4, 0.1, -8.0), "kind": "cradle", "label": "Release the cell from the cradle", "hold": 2.0, "yaw": PI},
+			],
+			"say": [[J, "Current's at the cradle. Now let go of it, gently."]],
+			"done_say": [[J, "Cradle's open. It's small enough for the shoulder pouch."]],
 		},
 	]

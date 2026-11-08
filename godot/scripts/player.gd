@@ -2,6 +2,7 @@ class_name Player
 extends CharacterBody3D
 ## Third-person player: movement, over-the-shoulder aim, salvage rifle and health.
 
+signal stim_used
 signal health_changed(health: float, max_health: float)
 signal damaged(amount: float)
 signal died
@@ -54,6 +55,16 @@ const CLIMB := {"rifle": [0.22, 0.1], "scattergun": [1.6, 0.4], "arc_lance": [1.
 const CLIMB_RECOVER := 0.8
 
 var crouching := false
+## Strapped into a seat (the opening's approach): looks round, but no moving, jumping or shooting.
+var seated := false
+## The suit won't knit itself while it's punctured (the opening, until the med-seal goes on).
+var regen_blocked := false
+## Holding a working gun. The opening starts her without one until she builds the rifle.
+var armed := true:
+	set(value):
+		armed = value
+		if weapon:
+			weapon.visible = value
 var aiming := false
 ## Toggle-aim mode: whether a press has latched aim on.
 var _aim_latched := false
@@ -158,6 +169,7 @@ func _ready() -> void:
 	_pitch.add_child(_flashlight)
 
 	weapon = Weapon.new()
+	weapon.visible = armed
 	weapon.name = "Rifle"
 	weapon.camera = _camera
 	weapon.shooter = self
@@ -303,6 +315,7 @@ func use_stim() -> bool:
 	health_changed.emit(health, max_health())
 	Sfx.play("stim", null, -4.0, 0.0)
 	anim.play("stim")
+	stim_used.emit()
 	return true
 
 
@@ -344,7 +357,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * sens, deg_to_rad(-70.0), deg_to_rad(50.0))
 	elif event.is_action_pressed("flashlight"):
 		_flashlight.visible = not _flashlight.visible
-	elif event.is_action_pressed("reload") and not dead:
+	elif event.is_action_pressed("reload") and not dead and armed:
 		weapon.start_reload()
 	elif event.is_action_pressed("weapon_next") and not dead:
 		weapon.cycle(1)
@@ -375,10 +388,10 @@ func _poll_actions() -> void:
 		use_stim()
 	if Input.is_action_just_pressed("throw"):
 		throw_charge()
-	if Input.is_action_just_pressed("dodge"):
+	if Input.is_action_just_pressed("dodge") and not seated:
 		start_roll()
 	for i in Weapon.ORDER.size():
-		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
+		if armed and Input.is_action_just_pressed("weapon_%d" % (i + 1)):
 			weapon.equip(Weapon.ORDER[i])
 
 
@@ -394,7 +407,7 @@ func _process(delta: float) -> void:
 	_update_boom(delta)
 	_since_damage += delta
 	var servo := Game.has_upgrade("regen_servo")
-	if not dead and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
+	if not dead and not regen_blocked and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
 		health = minf(health + regen_rate * (1.5 if servo else 1.0) * delta, max_health())
 		health_changed.emit(health, max_health())
 
@@ -447,6 +460,11 @@ func _physics_process(delta: float) -> void:
 	if is_rolling():
 		_roll(delta)
 		return
+	if seated:
+		velocity = Vector3(0.0, minf(velocity.y, 0.0), 0.0)
+		aiming = false
+		move_and_slide()
+		return
 	_since_floor = 0.0 if is_on_floor() else _since_floor + delta
 	_jump_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_jump_buffer - delta, 0.0)
 	if _jump_buffer > 0.0 and _since_floor <= COYOTE_TIME and velocity.y <= 0.5 and not crouching:
@@ -461,11 +479,13 @@ func _physics_process(delta: float) -> void:
 	else:
 		_aim_latched = false
 		aiming = Input.is_action_pressed("aim")
+	if not armed:
+		aiming = false
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
 	if _hold_fire and not Input.is_action_pressed("fire"):
 		_hold_fire = false
 	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Game.using_pad or DisplayServer.get_name() == "headless"
-	var firing := can_fire and not _hold_fire and Input.is_action_pressed("fire")
+	var firing := armed and can_fire and not _hold_fire and Input.is_action_pressed("fire")
 	if firing and weapon.try_fire(aiming):
 		_combat_face = 0.6
 
@@ -477,12 +497,12 @@ func _physics_process(delta: float) -> void:
 	_sprinting = false
 	if crouching:
 		speed = crouch_speed
-	elif Input.is_action_pressed("sprint") and not aiming and Game.carrying == "":
+	elif Input.is_action_pressed("sprint") and not aiming and (Game.carrying == "" or Campaign.PACKS_LIGHT.has(Game.carrying)):
 		speed = sprint_speed
 		_sprinting = dir.length() > 0.3
 	if aiming:
 		speed = minf(speed, walk_speed * 0.7)
-	if Game.carrying != "":
+	if Game.carrying != "" and not Campaign.PACKS_LIGHT.has(Game.carrying):
 		speed *= carry_speed_factor
 	# Quick to get going, quicker to stop, and only a little steering in the air.
 	var want := Vector2(dir.x, dir.z) * speed
@@ -508,7 +528,7 @@ func _roll(delta: float) -> void:
 	roll_t += delta
 	var t := clampf(roll_t / ROLL_TIME, 0.0, 1.0)
 	var speed := ROLL_SPEED * lerpf(1.0, 0.45, t * t)
-	if Game.carrying != "":
+	if Game.carrying != "" and not Campaign.PACKS_LIGHT.has(Game.carrying):
 		speed *= carry_speed_factor
 	velocity.x = _roll_dir.x * speed
 	velocity.z = _roll_dir.z * speed

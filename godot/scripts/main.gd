@@ -24,6 +24,8 @@ const REPAIR_BANNER_DELAY := 0.9
 ## How far the scanner (canopy repair) picks up crates and wildlife.
 const SCAN_CRATES := 70.0
 const SCAN_ENEMIES := 45.0
+## The suit scanner's reach, before the cockpit's is back.
+const SCAN_SUIT := 25.0
 ## Reserve rounds in a crate bundle and in an enemy's ammo drop, per weapon.
 const AMMO_BUNDLE := {"scattergun": 12, "arc_lance": 4}
 const AMMO_DROP := {"scattergun": 6, "arc_lance": 2}
@@ -128,6 +130,7 @@ var missions: MissionRunner
 var quests: QuestLog
 ## Travel between the Kettle and the other regions (RegionDB / RegionManager).
 var regions: RegionManager
+var opening: Opening
 ## Optional places off the repair routes (Discoveries).
 var discoveries: Discoveries
 ## The Kettle's big shapes: the Split round the canyon gate and the Chimney geyser.
@@ -161,6 +164,9 @@ var _env: Environment
 var _sky: ShaderMaterial
 var _sun: DirectionalLight3D
 var _interaction: Dictionary = {}
+## Seconds the current hold prompt has been held (prompts with a "hold" key).
+var _hold_t := 0.0
+var _hold_label := ""
 var _ship_hum: Node
 var _pack_check := 0.0
 var _daylight_check := 0.0
@@ -274,8 +280,10 @@ func _ready() -> void:
 	kestrel.repair_changed.connect(_on_repair_changed)
 	for id in Kestrel.REPAIR_ORDER:
 		Game.set_repaired(id, kestrel.is_repaired(id))
-	for p in ROAMER_POINTS:
-		spawn_scuttler(p)
+	# A new game's opening keeps the way to the relay quiet; the roamers come out after it.
+	var flags: Dictionary = Game.pending_load.get("flags", {})
+	if not Game.intro_pending and int(flags.get("opening", Opening.Beat.DONE)) >= Opening.Beat.DONE:
+		spawn_roamers()
 	wildlife = Wildlife.new()
 	wildlife.name = "Wildlife"
 	add_child(wildlife)
@@ -292,6 +300,11 @@ func _ready() -> void:
 	regions.name = "Regions"
 	add_child(regions)
 	regions.setup(self)
+	opening = Opening.new()
+	opening.name = "Opening"
+	add_child(opening)
+	opening.setup(self)
+	player.stim_used.connect(opening.on_stim)
 	discoveries = Discoveries.new()
 	discoveries.name = "Discoveries"
 	add_child(discoveries)
@@ -307,11 +320,13 @@ func _ready() -> void:
 		Game.pending_load = {}
 	elif Game.intro_pending:
 		Game.intro_pending = false
-		play_intro()
+		opening.start()
 	else:
 		_face_first_goal()
 		voice.say(Story.OPENING)
 	quests.restore()
+	if opening.active() and regions.in_kettle():
+		opening.resume()
 
 
 func _start_playtest(continued: bool, force := false) -> void:
@@ -355,7 +370,12 @@ func _process(_delta: float) -> void:
 		return
 	_interaction = _find_interaction()
 	hud.set_prompt(_interaction.get("label", ""))
-	if _interaction.has("action") and Input.is_action_just_pressed("interact") and not player.dead:
+	if _interaction.has("hold"):
+		_tick_hold(_delta)
+	elif _hold_t > 0.0:
+		_hold_t = 0.0
+		hud.set_task(-1.0)
+	if _interaction.has("action") and not _interaction.has("hold") and Input.is_action_just_pressed("interact") and not player.dead:
 		(_interaction["action"] as Callable).call()
 	elif Input.is_action_just_pressed("inventory") and not player.dead and not Game.launched:
 		inventory.open()
@@ -370,7 +390,7 @@ func _process(_delta: float) -> void:
 	_pack_check -= _delta
 	if _pack_check <= 0.0:
 		_pack_check = 0.5
-		if regions.in_kettle():
+		if regions.in_kettle() and not opening.active():
 			_wake_packs()
 			if spawn_packs:
 				wildlife.update(0.5)
@@ -378,6 +398,27 @@ func _process(_delta: float) -> void:
 		hud.set_dev(true, _dev_text())
 	if player.global_position.y < -20.0:
 		player.revive(regions.respawn_point())
+
+
+## A prompt held down for its "hold" seconds: the task bar fills, letting go starts it over.
+func _tick_hold(delta: float) -> void:
+	var label: String = _interaction["label"]
+	if label != _hold_label:
+		_hold_label = label
+		_hold_t = 0.0
+	if not Input.is_action_pressed("interact") or player.dead:
+		if _hold_t > 0.0:
+			_hold_t = 0.0
+			hud.set_task(-1.0)
+		return
+	_hold_t += delta
+	var need := float(_interaction["hold"])
+	hud.set_task(clampf(_hold_t / need, 0.0, 1.0), label.replace("[Hold E] ", "").to_upper())
+	if _hold_t >= need:
+		_hold_t = 0.0
+		_hold_label = ""
+		hud.set_task(-1.0)
+		(_interaction["action"] as Callable).call()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -458,6 +499,11 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
+func spawn_roamers() -> void:
+	for p in ROAMER_POINTS:
+		spawn_scuttler(p)
+
+
 ## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer", "drifter", "veilwing" or "warden". A name makes it an elite.
 ## `parent`, when given, owns it instead of main (a region scene, so it goes when the region does).
 func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = null) -> Enemy:
@@ -503,18 +549,24 @@ func spawn_enemy_node(e: Enemy, at: Vector3, parent: Node = null) -> Enemy:
 ## What the cockpit scanner shows once the canopy is sealed: [{pos, kind}].
 func scanner_marks() -> Array:
 	var marks := []
-	if not Game.is_repaired("canopy") or player == null:
+	var cockpit := Game.is_repaired("canopy")
+	# The suit's own scanner (HOB back on aux power, or the opening's battery) sees wildlife
+	# close by; the cockpit's, once the canopy is sealed, sees salvage and further.
+	var suit: bool = Game.is_repaired("aux_power") or Game.flags.get("scanner_battery", false)
+	if not (cockpit or suit) or player == null:
 		return marks
 	var pos := player.global_position
-	for id in sites:
-		var site: ExpeditionSite = sites[id]
-		for i in site.crate_count():
-			if not site.crate_searched(i) and site.crate_point(i).distance_to(pos) < SCAN_CRATES:
-				marks.append({"pos": site.crate_point(i), "kind": "crate"})
-	if wildlife:
-		marks.append_array(wildlife.cache_marks(pos, SCAN_CRATES))
+	if cockpit:
+		for id in sites:
+			var site: ExpeditionSite = sites[id]
+			for i in site.crate_count():
+				if not site.crate_searched(i) and site.crate_point(i).distance_to(pos) < SCAN_CRATES:
+					marks.append({"pos": site.crate_point(i), "kind": "crate"})
+		if wildlife:
+			marks.append_array(wildlife.cache_marks(pos, SCAN_CRATES))
+	var reach := SCAN_ENEMIES if cockpit else SCAN_SUIT
 	for e in get_tree().get_nodes_in_group("enemies"):
-		if e.global_position.distance_to(pos) < SCAN_ENEMIES:
+		if e.global_position.distance_to(pos) < reach:
 			marks.append({"pos": e.global_position, "kind": "enemy"})
 	return marks
 
@@ -551,7 +603,7 @@ func _notification(what: int) -> void:
 
 
 func save_game() -> bool:
-	if Game.launched:
+	if Game.launched or regions.current == "approach":
 		return false
 	return Game.write_save(save_state())
 
@@ -612,6 +664,9 @@ func _find_interaction() -> Dictionary:
 	var gate := regions.interaction(pos)
 	if not gate.is_empty() or not regions.in_kettle():
 		return gate
+	var scripted := opening.interaction(pos)
+	if not scripted.is_empty():
+		return scripted
 	var found := discoveries.interaction(pos)
 	if not found.is_empty():
 		return found
@@ -694,10 +749,12 @@ func _take_component(id: String) -> void:
 		var w := spawn_enemy("warden", (site as LoomSpire).warden_point()) as Warden
 		w.alert(false)
 		hud.show_boss(w)
-	if id == "aux_power":
+	opening.on_component_taken(id)
+	# Hard only: something stalks the walk home from the relay.
+	if id == "aux_power" and Game.difficulty >= 2:
 		var home := kestrel.global_position
 		var from := site.global_position
-		for t in [0.35, 0.55, 0.75]:
+		for t in [0.55]:
 			var p: Vector3 = from.lerp(home, t)
 			var side := (home - from).cross(Vector3.UP).normalized() * (9.0 if t != 0.55 else -9.0)
 			spawn_scuttler(p + side + Vector3.UP * 0.5).alert(false)
@@ -886,10 +943,13 @@ func end_intro() -> void:
 		_cine_focus = null
 	player.visible = true
 	player.set_physics_process(true)
-	player.revive(SPAWN, false)
-	_face_first_goal()
 	player.camera().current = true
 	hud.exit_cinematic()
+	if opening.active():
+		opening.wake()
+		return
+	player.revive(SPAWN, false)
+	_face_first_goal()
 	voice.say(Story.OPENING)
 
 
@@ -927,6 +987,8 @@ func _show_ending() -> void:
 func _waypoint():
 	if not regions.in_kettle():
 		return regions.waypoint()
+	if opening.active():
+		return opening.waypoint()
 	match Game.phase():
 		"find":
 			var stage_point = missions.waypoint()
@@ -998,7 +1060,8 @@ func _on_player_died() -> void:
 	for s in get_tree().get_nodes_in_group("enemies"):
 		s.calm()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
-	player.revive(regions.respawn_point())
+	var back = opening.respawn()
+	player.revive(back if back is Vector3 else regions.respawn_point())
 	hud.set_dead(false)
 
 

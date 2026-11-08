@@ -13,6 +13,7 @@ func _ready() -> void:
 	Game.window_mode = 0
 	Game.apply_settings()
 	Game.save_path = "user://region_shots_save.json"
+	Game.intro_pending = args.size() > 1 and args[1] == "opening"
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
@@ -25,6 +26,11 @@ func _ready() -> void:
 	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket;
 	# `nest`, only the wreck's nested pack; `darkhouse`, only Teo's favour; `gillwood`, the
 	# north split and the Gillwood beyond it.
+	if args.size() > 1 and args[1] == "opening":
+		await _opening(out)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] == "gillwood":
 		Game.set_flag("shatterlands_open")
 		Game.set_flag("reyes_talked")
@@ -185,6 +191,55 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	gw.free_strut()
 	await get_tree().create_timer(1.5).timeout
 	await _shot(out, "gillwood_salvaged", wreck + Vector3(-9.0, 0.3, 6.0), wreck + Vector3(2.0, 1.0, 2.0))
+
+
+## The opening: aboard in orbit, the drift, the wreck, then the trail to the relay.
+func _opening(out: String) -> void:
+	var op: Opening = main.opening
+	var a: Approach = main.regions.scene
+	main.set_daylight(0.0)
+	await _shot(out, "open_bunk", a._at(Vector3(10.6, 0.1, 13.0)), a._at(Vector3(4.0, 1.6, 13.0)))
+	await _shot(out, "open_workshop", a._at(Vector3(12.5, 0.1, 12.0)), a._at(Vector3(18.0, 1.0, 10.0)))
+	a.sit()
+	await _frames(5)
+	main.player.aim_at(a._at(Vector3(-30.0, -6.0, 13.0)))
+	await _still(out, "open_seat")
+	for i in 4:
+		a.trace()
+	a.override()
+	await get_tree().create_timer(2.5).timeout
+	main.player.aim_at(a._at(Vector3(-30.0, -4.0, 13.0)))
+	await _still(out, "open_drift")
+	op._on_fell(2)
+	await _frames(10)
+	main.end_intro()
+	await _frames(10)
+	main.player.aim_at(op._ship(Opening.MEDSEAL))
+	await _still(out, "open_wake")
+	main.player.seated = false
+	main.player.crouching = false
+	op._wake_lock = false
+	Game.set_flag("opening", Opening.Beat.TRAIL)
+	await _shot(out, "open_door", op._ship(Vector3(12.9, -1.0, 23.0)), op._ship(Vector3(12.9, 1.0, 17.0)))
+	await _shot(out, "open_scar", op._ground(Opening.SCAR_AT + Vector2(-4.0, 6.0), 0.5), op._ground(Opening.SCAR_AT, 0.0))
+	await _shot(out, "open_trail", op._ground(Vector2(-6.0, 9.0), 0.5), op._ground(Opening.LEDGE_AT, 1.5))
+	Game.set_flag("bridge_down")
+	await get_tree().create_timer(1.6).timeout
+	await _shot(out, "open_bridge", op._ground(Opening.LEDGE_AT + Vector2(6.0, 3.5), 0.5), op._ground(Opening.LEDGE_AT + Vector2(0.0, 3.5), 2.0))
+	Game.set_flag("pod_open")
+	await get_tree().create_timer(1.0).timeout
+	await _shot(out, "open_pod", op._ground(Opening.SURVEY_AT + Vector2(2.5, 6.0), 0.5), op._ground(Opening.SURVEY_AT, 1.0))
+	await _shot(out, "open_gully", op._ground(Opening.GULLY_AT + Vector2(5.0, 4.0), 0.5), op._ground(Opening.GULLY_AT, 0.5))
+	var yard: Vector3 = main.sites["aux_power"].global_position
+	await _shot(out, "open_yard", op._ground(Vector2(-46.0, 49.5), 0.5), yard + Vector3(0.0, 2.0, 0.0))
+
+
+## A frame without moving Juno (she's seated, or posed already).
+func _still(out: String, name: String) -> void:
+	await _frames(30)
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/%s.png" % [out, name])
+	print("shot ", name)
 
 
 func _shot(out: String, name: String, at: Vector3, look: Vector3) -> void:

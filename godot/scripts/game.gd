@@ -141,6 +141,8 @@ var mission_stage: Dictionary = {}
 var mission_done: Array = []
 ## The current mission stage's objective line (set by MissionRunner), or "".
 var mission_objective := ""
+## The opening's own objective line (see Opening); wins over the campaign's while it is set.
+var opening_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
 var intro_pending := false
 
@@ -902,6 +904,8 @@ func launch() -> void:
 
 
 func objective_text() -> String:
+	if opening_objective != "":
+		return opening_objective
 	match phase():
 		"find":
 			if mission_objective != "":

@@ -111,7 +111,7 @@ func _process(delta: float) -> void:
 		_drive_tree(hv)
 	var w := player.weapon
 	w.position = _weapon_rest + Vector3(0.0, 0.0, 0.06 * _recoil)
-	w.visible = not (action in TWO_HANDED) and _down < 0.5
+	w.visible = player.armed and not (action in TWO_HANDED) and _down < 0.5
 
 
 func _state_name(hv: float, grounded: bool) -> String:

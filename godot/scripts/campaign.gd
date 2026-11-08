@@ -10,7 +10,7 @@ const REPAIRS: Array[Dictionary] = [
 		"site": "RelayStation",
 		"component": "aux_cell", "component_name": "aux power cell",
 		"find": "Recover the aux power cell from the relay station",
-		"return": "Return to Kestrel and install the cell in the aux bay",
+		"return": "Bring the aux cell home and install it in the aux bay",
 		"install_label": "Install the aux power cell",
 		"bay_label": "Aux power bay: needs a replacement power cell",
 		"done": "Auxiliary power restored. The fabricator is online, but it overheats on heavy builds. A coolant hauler went down in the hot springs: follow its strobe.",
@@ -87,6 +87,9 @@ const PACKS := {
 	"drive_coil": [Vector3(0.7, 0.7, 0.45), Color("ff7a3a"), 2.0],
 	"nav_core": [Vector3(0.4, 0.4, 0.4), Color("3fd1b5"), 3.0],
 }
+
+## Components small enough to carry at a run (a shoulder pouch, not a two-handed lift).
+const PACKS_LIGHT := ["aux_cell"]
 
 
 ## "aux power cell" -> "Aux power cell".

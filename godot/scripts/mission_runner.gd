@@ -20,6 +20,9 @@ extends Node
 ## An activate stage with an `order` must be worked in that order (each device's `reading` shows
 ## in its prompt as the clue); the wrong one undoes the stage (`wrong_text`, `wrong_say`,
 ## `wrong_damage` to Juno, and the site's `on_wrong`).
+## Any stage can name a `needs_flag`: until that Game flag is set its devices only show
+## `locked_label`. An activate stage's `decoys` are devices that are never right: working one
+## undoes the stage as a wrong order does (no `order` needed), and the rest finish it.
 ## After the last stage comes the implicit "take" stage. Stage index and the devices done in the
 ## current stage live in Game (mission_stage, mission_done) so they save with the session.
 
@@ -209,6 +212,8 @@ func interaction(pos: Vector3) -> Dictionary:
 		var d: MissionDevice = list[i]
 		if i in Game.mission_done or _flat(d.global_position - pos) > REACH or absf(d.global_position.y - pos.y) > 1.6:
 			continue
+		if s.has("needs_flag") and not Game.flags.get(s["needs_flag"], false):
+			return {"label": s.get("locked_label", "Not yet")}
 		var spec: Dictionary = specs[i]
 		var label: String = spec.get("label", "Work the device")
 		if spec.has("reading"):
@@ -601,7 +606,7 @@ func _complete_device(index: int) -> void:
 	if index in Game.mission_done:
 		return
 	var s0 := stage(id)
-	if s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index:
+	if index in s0.get("decoys", []) or (s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index):
 		_wrong_order(id, s0, index)
 		return
 	Game.mission_done.append(index)
@@ -614,7 +619,7 @@ func _complete_device(index: int) -> void:
 		return
 	Sfx.play("repair_clunk", d.global_position, -4.0)
 	(main.sites[id] as ExpeditionSite).on_device_done(si, index, true)
-	if Game.mission_done.size() >= devices[id][si].size():
+	if Game.mission_done.size() >= devices[id][si].size() - s.get("decoys", []).size():
 		_advance(id)
 	else:
 		_update_objective()
