@@ -4,10 +4,13 @@ extends Node3D
 ## eleven survivors hold out "under the big fungus". Three long arched glasshouses, two of them
 ## still lit, inside a palisade of scrap hull plate with one gate. Human things here are amber
 ## and ivory (the pack's rule: amber means people); the fungus outside is violet and teal.
-## For now Juno can reach the gate and hail it; the inside opens with the Act 2 work.
+## Juno hails the gate; Reyes won't open it until she's cleared the scuttler nest under the
+## Marigold's tail (it took two of hers). Then the gate slides open, Reyes waits just inside, and
+## the middle glasshouse can be walked into: grow beds under amber lamps.
 ##
 ## Built in the threshold pocket's local space; `Greenhouses.AT` is the compound's centre.
-## State in Game.flags: reached_greenhouses (within REACH of the gate), met_reyes (hailed).
+## State in Game.flags: reached_greenhouses (within REACH of the gate), met_reyes (hailed),
+## nest_cleared (set by the pocket), greenhouse_open (the gate), reyes_talked.
 
 const AT := Vector3(15.0, 0.0, -52.0)
 ## Palisade half-extents (x, z) round AT; the gate is in the south wall (+Z, toward the canyon).
@@ -20,9 +23,25 @@ const OXIDE := Color("bf6835")
 const AMBER := Color("e8a44e")
 const SLATE := Color("3c4448")
 const GLASS := Color(0.55, 0.85, 0.7, 0.35)
+const LEAF := Color("5f8f4e")
+## The glasshouses: length and radius, and how high they stand on their footings.
+const HOUSE_LENGTH := 13.0
+const HOUSE_RADIUS := 3.4
+const FOOTING := 1.0
+## Which one Juno can walk into (the middle one, straight up from the gate).
+const WALK_IN := 1
+const TALK_RANGE := 2.4
+const GATE_SLIDE := 3.6
+## Where Reyes stands, inside the gate under its lamp (local).
+const REYES_AT := Vector3(2.6, 0.0, 7.6)
 
 var gate_pos := Vector3.ZERO
 var intercom_pos := Vector3.ZERO
+var reyes: Node3D
+## The walk-in glasshouse's door and the middle of its floor (world space).
+var house_door := Vector3.ZERO
+var house_inside := Vector3.ZERO
+var _gate_body: AnimatableBody3D
 var _mats := {}
 
 
@@ -30,8 +49,10 @@ func _ready() -> void:
 	position = AT
 	_palisade()
 	for i in 3:
-		_glasshouse(Vector3(-8.0 + i * 8.0, 0.0, -2.0), i < 2)
+		_glasshouse(Vector3(-8.0 + i * 8.0, 0.0, -2.0), i < 2, i == WALK_IN)
 	_gate()
+	_reyes()
+	_sync_gate(false)
 
 
 func reached() -> bool:
@@ -42,6 +63,14 @@ func hailed() -> bool:
 	return Game.flags.get("met_reyes", false) == true
 
 
+func is_open() -> bool:
+	return Game.flags.get("greenhouse_open", false) == true
+
+
+func nest_cleared() -> bool:
+	return Game.flags.get("nest_cleared", false) == true
+
+
 func _process(_delta: float) -> void:
 	var main := _main()
 	if main == null or main.player.dead:
@@ -49,13 +78,22 @@ func _process(_delta: float) -> void:
 	if not reached() and main.player.global_position.distance_to(gate_pos) < REACH:
 		Game.set_flag("reached_greenhouses")
 		main.voice.say(Story.GREENHOUSE_ARRIVE)
+	# Back at the gate with the nest gone: Reyes opens up without being asked twice.
+	if hailed() and nest_cleared() and not is_open() and main.player.global_position.distance_to(gate_pos) < 8.0:
+		open_gate()
+	if reyes and is_open():
+		var to: Vector3 = main.player.global_position - reyes.global_position
+		if to.length() < 9.0:
+			reyes.rotation.y = lerp_angle(reyes.rotation.y, atan2(to.x, to.z), 0.08)
 
 
 func interaction(pos: Vector3) -> Dictionary:
-	if pos.distance_to(intercom_pos) > HAIL_RANGE:
+	if reyes and reyes.visible and pos.distance_to(reyes.global_position) < TALK_RANGE:
+		return {"label": "[E] Talk to Reyes", "action": talk}
+	if pos.distance_to(intercom_pos) > HAIL_RANGE or is_open():
 		return {}
 	if hailed():
-		return {"label": "The gate stays shut. Reyes: \"Not until we're sure of you. Soon.\""}
+		return {"label": "The gate stays shut. Reyes: \"Clear that nest first, Vale.\""}
 	return {"label": "[E] Hail the greenhouses", "action": hail}
 
 
@@ -69,6 +107,45 @@ func hail() -> void:
 	var main := _main()
 	if main:
 		main.voice.say(Story.GREENHOUSE_HAIL)
+		main.voice.say(Story.GREENHOUSE_HAIL_CLEARED if nest_cleared() else Story.GREENHOUSE_ASK)
+	if nest_cleared():
+		open_gate()
+
+
+func open_gate() -> void:
+	if is_open():
+		return
+	Game.set_flag("greenhouse_open")
+	var main := _main()
+	if main:
+		main.voice.say(Story.GREENHOUSE_OPEN)
+	Sfx.play("hull_groan", gate_pos, -4.0)
+	_sync_gate(true)
+
+
+func talk() -> void:
+	var main := _main()
+	if main == null:
+		return
+	if Game.flags.get("reyes_talked", false):
+		main.voice.say(Story.REYES_AGAIN)
+		return
+	Game.set_flag("reyes_talked")
+	main.voice.say(Story.REYES_TALK)
+
+
+## Gate and Reyes follow the flag: shut with nobody inside, or slid aside with Reyes waiting.
+func _sync_gate(animate: bool) -> void:
+	var open := is_open()
+	if reyes:
+		reyes.visible = open
+	if _gate_body == null:
+		return
+	var to := Vector3(-GATE_SLIDE if open else 0.0, 1.6, HALF.y - 0.4 if open else HALF.y)
+	if animate and is_inside_tree():
+		create_tween().tween_property(_gate_body, "position", to, 1.6).set_trans(Tween.TRANS_SINE)
+	else:
+		_gate_body.position = to
 
 
 func _main() -> Node:
@@ -121,13 +198,14 @@ func _palisade() -> void:
 
 
 ## A long arched house: a half-cylinder of greenish glass over ivory ribs, oxide end frames.
-## Lit ones glow amber from inside (grow lamps).
-func _glasshouse(at: Vector3, lit: bool) -> void:
-	var length := 13.0
-	var radius := 3.4
+## Lit ones glow amber from inside (grow lamps). The walk-in one is open at the south end, walled
+## inside rather than boxed over, with steps up to its floor, grow beds and a string of lamps.
+func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> void:
+	var length := HOUSE_LENGTH
+	var radius := HOUSE_RADIUS
 	# Raised on a low footing so the lit arches show over the palisade.
 	at.y += 1.3
-	_solid(at + Vector3(0.0, -1.3 + 0.5, 0.0), Vector3(radius * 2.0 + 0.4, 1.0, length + 0.4), _mat(SLATE, 0.8))
+	_solid(at + Vector3(0.0, -1.3 + FOOTING * 0.5, 0.0), Vector3(radius * 2.0 + 0.4, FOOTING, length + 0.4), _mat(SLATE, 0.8))
 	var shell := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = radius
@@ -135,15 +213,19 @@ func _glasshouse(at: Vector3, lit: bool) -> void:
 	cyl.height = length
 	cyl.radial_segments = 16
 	cyl.rings = 1
+	# Rotated to lie along Z, the cylinder's top cap is the south end: the walk-in one's doorway.
+	cyl.cap_top = not walk_in
 	shell.mesh = cyl
 	var glass := StandardMaterial3D.new()
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	glass.albedo_color = GLASS
 	glass.roughness = 0.15
+	if walk_in:
+		glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if lit:
 		glass.emission_enabled = true
 		glass.emission = AMBER
-		glass.emission_energy_multiplier = 1.1
+		glass.emission_energy_multiplier = 0.7 if walk_in else 1.1
 	shell.material_override = glass
 	shell.rotation.x = PI * 0.5
 	shell.position = at
@@ -165,11 +247,79 @@ func _glasshouse(at: Vector3, lit: bool) -> void:
 	rmi.multimesh = ribs
 	rmi.material_override = _mat(IVORY, 0.6)
 	add_child(rmi)
-	# One box collider over the arch, so Juno walks round, not through.
-	_solid(at + Vector3(0.0, radius * 0.5, 0.0), Vector3(radius * 2.0, radius, length), null)
-	# A door frame on the south end, with steps down from the footing.
-	_solid(at + Vector3(0.0, 1.1, length * 0.5 + 0.05), Vector3(1.6, 2.2, 0.12), _mat(OXIDE, 0.6))
-	_solid(at + Vector3(0.0, -0.95, length * 0.5 + 0.7), Vector3(1.8, 0.7, 1.0), _mat(SLATE, 0.8))
+	var floor_y := at.y - 1.3 + FOOTING
+	# A plank ramp up the footing at the south end.
+	_ramp(Vector3(at.x, 0.0, at.z + length * 0.5 + 0.2), 3.0, FOOTING, 1.8)
+	if not walk_in:
+		# One box collider over the arch, so Juno walks round, not through.
+		_solid(at + Vector3(0.0, radius * 0.5, 0.0), Vector3(radius * 2.0, radius, length), null)
+		_solid(at + Vector3(0.0, 1.1, length * 0.5 + 0.05), Vector3(1.6, 2.2, 0.12), _mat(OXIDE, 0.6))
+		return
+	# The walk-in house: side walls and the back, an open door frame, beds, lamps, a cot.
+	var wall_x := radius - 0.35
+	for side in [-1.0, 1.0]:
+		_solid(Vector3(at.x + side * wall_x, floor_y + 1.4, at.z), Vector3(0.2, 2.8, length), null)
+		_solid(Vector3(at.x + side * 1.05, floor_y + 1.15, at.z + length * 0.5 + 0.05), Vector3(0.2, 2.3, 0.2), _mat(OXIDE, 0.6))
+		# A grow bed along each side, planted.
+		_solid(Vector3(at.x + side * 2.1, floor_y + 0.3, at.z - 0.5), Vector3(1.3, 0.6, length - 3.0), _mat(Color("5a4636"), 0.95))
+		_plants(Vector3(at.x + side * 2.1, floor_y + 0.6, at.z - 0.5), length - 3.4)
+	_solid(Vector3(at.x, floor_y + 2.35, at.z + length * 0.5 + 0.05), Vector3(2.3, 0.2, 0.2), _mat(OXIDE, 0.6))
+	_solid(Vector3(at.x, floor_y + 1.4, at.z - length * 0.5 + 0.1), Vector3(radius * 2.0, 2.8, 0.2), null)
+	# A cot at the back: somebody sleeps with the plants.
+	_solid(Vector3(at.x, floor_y + 0.25, at.z - length * 0.5 + 1.6), Vector3(1.0, 0.5, 2.0), _mat(Color("6c6a66"), 0.9))
+	# Grow lamps strung along the ridge, and the light they give.
+	var lamp_mat := StandardMaterial3D.new()
+	lamp_mat.albedo_color = AMBER.darkened(0.3)
+	lamp_mat.emission_enabled = true
+	lamp_mat.emission = AMBER
+	lamp_mat.emission_energy_multiplier = 3.5
+	for k in 4:
+		var lamp := MeshInstance3D.new()
+		var lm := BoxMesh.new()
+		lm.size = Vector3(0.9, 0.08, 0.3)
+		lamp.mesh = lm
+		lamp.material_override = lamp_mat
+		lamp.position = Vector3(at.x, floor_y + 2.9, at.z - length * 0.5 + 2.0 + k * 3.0)
+		add_child(lamp)
+	var light := OmniLight3D.new()
+	light.light_color = AMBER
+	light.light_energy = 1.6
+	light.omni_range = 8.0
+	light.shadow_enabled = false
+	light.position = Vector3(at.x, floor_y + 2.6, at.z)
+	add_child(light)
+	house_door = to_global(Vector3(at.x, 0.0, at.z + length * 0.5 + 2.0))
+	house_inside = to_global(Vector3(at.x, floor_y, at.z))
+
+
+## Rows of leafy crowns on a bed: one MultiMesh of squashed spheres, a little irregular.
+func _plants(centre: Vector3, length: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(centre.x * 10.0) + 7
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var leaf := SphereMesh.new()
+	leaf.radius = 0.28
+	leaf.height = 0.4
+	leaf.radial_segments = 8
+	leaf.rings = 4
+	mm.mesh = leaf
+	var n := int(length / 0.6)
+	mm.instance_count = n * 2
+	for i in n * 2:
+		var z := -length * 0.5 + (i / 2) * 0.6 + rng.randf_range(-0.1, 0.1)
+		var x := (-0.3 if i % 2 == 0 else 0.3) + rng.randf_range(-0.08, 0.08)
+		var sc := rng.randf_range(0.7, 1.25)
+		mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sc, sc * rng.randf_range(0.8, 1.4), sc)), centre + Vector3(x, 0.15 * sc, z)))
+		mm.set_instance_color(i, LEAF.lerp(Color("8fae5a"), rng.randf()))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.roughness = 0.75
+	mmi.material_override = m
+	add_child(mmi)
 
 
 ## Gate: two posts, a slab door, an amber work lamp and the intercom box beside it.
@@ -177,7 +327,22 @@ func _gate() -> void:
 	var z := HALF.y
 	for x in [-GATE_WIDTH * 0.5 - 0.3, GATE_WIDTH * 0.5 + 0.3]:
 		_solid(Vector3(x, 2.0, z), Vector3(0.6, 4.0, 0.6), _mat(SLATE, 0.6))
-	_solid(Vector3(0.0, 1.6, z), Vector3(GATE_WIDTH, 3.2, 0.3), _mat(OXIDE, 0.55))
+	_gate_body = AnimatableBody3D.new()
+	_gate_body.collision_layer = Game.LAYER_WORLD
+	_gate_body.sync_to_physics = false
+	var shape := CollisionShape3D.new()
+	var gb := BoxShape3D.new()
+	gb.size = Vector3(GATE_WIDTH, 3.2, 0.3)
+	shape.shape = gb
+	_gate_body.add_child(shape)
+	var slab := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = gb.size
+	slab.mesh = sm
+	slab.material_override = _mat(OXIDE, 0.55)
+	_gate_body.add_child(slab)
+	_gate_body.position = Vector3(0.0, 1.6, z)
+	add_child(_gate_body)
 	var lamp := MeshInstance3D.new()
 	var lm := BoxMesh.new()
 	lm.size = Vector3(0.6, 0.25, 0.3)
@@ -206,6 +371,59 @@ func _gate() -> void:
 	add_child(box)
 	gate_pos = to_global(Vector3(0.0, 0.0, z + 1.5))
 	intercom_pos = to_global(Vector3(-GATE_WIDTH * 0.5 - 0.3, 0.0, z + 1.4))
+
+
+## Lt. Sana Reyes: Juno's own suit model in Ferro-9's colours (slate with an amber stripe), standing
+## easy inside the gate. Hidden until the gate opens.
+func _reyes() -> void:
+	reyes = Node3D.new()
+	reyes.name = "Reyes"
+	reyes.position = REYES_AT
+	add_child(reyes)
+	var rig := Rig.spawn("juno_rigged", reyes)
+	for mi in Rig.meshes(rig):
+		var mesh := mi.mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var src := mi.get_active_material(i) as StandardMaterial3D
+			if src == null:
+				continue
+			var m := src.duplicate() as StandardMaterial3D
+			# Ivory suit panels go Ferro slate; oxide trim goes amber; dark parts stay.
+			var c := m.albedo_color
+			if c.get_luminance() > 0.55:
+				m.albedo_color = Color("6f7d84")
+			elif c.r > c.b * 1.6 and c.r > 0.35:
+				m.albedo_color = AMBER.darkened(0.15)
+			mi.set_surface_override_material(i, m)
+	var clips := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if clips and clips.has_animation("idle"):
+		clips.get_animation("idle").loop_mode = Animation.LOOP_LINEAR
+		clips.play("idle")
+
+
+## A ramp rising north to `rise` over `run` metres, its top edge at `edge` (local, ground level).
+func _ramp(edge: Vector3, run: float, rise: float, width: float) -> void:
+	var angle := atan2(rise, run)
+	var length := sqrt(run * run + rise * rise)
+	var normal := Vector3(0.0, cos(angle), sin(angle))
+	var body := StaticBody3D.new()
+	body.collision_layer = Game.LAYER_WORLD
+	var shape := CollisionShape3D.new()
+	var b := BoxShape3D.new()
+	b.size = Vector3(width, 0.3, length)
+	shape.shape = b
+	body.add_child(shape)
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = b.size
+	mi.mesh = mesh
+	mi.material_override = _mat(Color("6c6a66"), 0.85)
+	body.add_child(mi)
+	body.rotation.x = angle
+	body.position = edge + Vector3(0.0, rise * 0.5, run * 0.5) - normal * 0.15
+	add_child(body)
 
 
 ## A collision box, dressed with a mesh when `mat` is given.

@@ -286,8 +286,8 @@ func _regions() -> void:
 	_check("the gate can be hailed", _label().contains("Hail the greenhouses"), _label())
 	await _press("interact")
 	await _frames(3)
-	_check("hailing it meets Reyes and finishes the quest", gh.hailed() and main.quests.is_done("the_lost"))
-	_check("the gate stays shut for now", _label().contains("stays shut"), _label())
+	_check("hailing it meets Reyes, who wants the nest cleared", gh.hailed() and main.quests.step_of("the_lost") == 2 and not gh.is_open())
+	_check("the gate stays shut till then", _label().contains("Clear that nest"), _label())
 
 	# The Marigold: walk up the fallen plate and along the spine to the locker.
 	var sh := rm.scene as ShatterlandsThreshold
@@ -317,6 +317,53 @@ func _regions() -> void:
 	await _press("interact")
 	await _frames(3)
 	_check("it holds Voss's log and two charges", sh.locker_open() and Game.has_log("voss_1") and Game.charges == mini(charges + 2, Game.max_charges()) and main.quests.is_done("marigold"))
+
+	# Reyes's price: the nest under the Marigold's tail. Cleared, it stays cleared.
+	var pocket: Array[Enemy] = sh.spawn_residents(main)
+	await _frames(3)
+	var nest_bugs := pocket.filter(func(e): return e.is_in_group("resident_nest"))
+	_check("the nest is the pack under the tail", nest_bugs.size() == 4 and nest_bugs.all(func(e): return e is Scuttler))
+	for e in nest_bugs:
+		e.take_damage(999.0, e.global_position, Vector3.FORWARD)
+	await _frames(3)
+	_check("killing the nest clears it and moves the quest on", sh.nest_cleared() and main.quests.step_of("the_lost") == 3)
+	for e in pocket:
+		if is_instance_valid(e):
+			e.queue_free()
+	await _frames(2)
+	var again: Array[Enemy] = sh.spawn_residents(main)
+	_check("a cleared nest doesn't come back", again.size() == sh.residents.size() - 4 and not again.any(func(e): return e.is_in_group("resident_nest")), "%d spawned" % again.size())
+	for e in again:
+		e.queue_free()
+	await _frames(2)
+	# Back at the gate, it opens, Reyes waits inside, and the middle glasshouse can be walked into.
+	_place(gh.gate_pos + Vector3(0.0, 0.5, 5.0), PI)
+	await _frames(5)
+	_check("back at the gate, Reyes opens up and the quest is done", gh.is_open() and main.quests.is_done("the_lost"))
+	await get_tree().create_timer(2.0).timeout
+	_check("Reyes waits inside the gate", gh.reyes.visible and gh.reyes.global_position.distance_to(gh.gate_pos) < 6.0)
+	route = [gh.gate_pos + Vector3(0.0, 0.0, -3.0), gh.house_door, gh.house_inside]
+	leg = 0
+	t = 0.0
+	Input.action_press("move_forward")
+	while t < 20.0 and leg < route.size():
+		var d: Vector3 = route[leg] - player.global_position
+		d.y = 0.0
+		if d.length() < 0.9:
+			leg += 1
+			continue
+		player.face(atan2(-d.x, -d.z))
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+	Input.action_release("move_forward")
+	await _frames(5)
+	_check("Juno walks through the gate, up the ramp and into the glasshouse", leg == route.size() and player.global_position.y > gh.house_inside.y - 0.2, "leg %d at %s after %.1f s" % [leg, player.global_position - gh.house_inside, t])
+	_place(gh.reyes.global_position + Vector3(0.0, 0.5, 1.4), 0.0)
+	await _frames(3)
+	_check("Reyes can be talked to", _label().contains("Talk to Reyes"), _label())
+	await _press("interact")
+	await _frames(3)
+	_check("and talking to her is remembered", Game.flags.get("reyes_talked", false) == true)
 
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)
@@ -386,7 +433,9 @@ func _region_budget(region: Node) -> bool:
 			if (n as Light3D).shadow_enabled:
 				shadowed += 1
 	print("  region budget: %d meshes, %d lights (%d shadowed)" % [meshes, lights, shadowed])
-	return meshes <= 120 and lights <= 6 and shadowed == 0
+	# Unshadowed omni lights are cheap in the clustered renderer; 8 keeps any one mesh under the
+	# Compatibility renderer's per-object limit too.
+	return meshes <= 120 and lights <= 8 and shadowed == 0
 
 
 func _panel_text(panel: UiPanel) -> String:

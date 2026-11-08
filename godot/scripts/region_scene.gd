@@ -15,9 +15,10 @@ var goal = null
 ## Environment settings while here: property name -> value on the main Environment, plus
 ## "sun_energy" / "sun_color" / "sun_rotation" for the sun. Restored on leaving.
 var look := {}
-## Creatures living here, spawned each time Juno arrives: [kind, local position,
-## optional {property: value}]. They belong
-## to the region, so they go when it's unloaded.
+## Creatures living here, spawned each time Juno arrives: [kind, local position, optional
+## {property: value}]. Two keys there are for the region, not the creature: "_tag" puts it in the
+## group "resident_<tag>", and "_unless" skips it once that flag is set (a cleared nest stays
+## cleared). They belong to the region, so they go when it's unloaded.
 var residents: Array = []
 
 
@@ -32,11 +33,15 @@ func build() -> void:
 func spawn_residents(main: Node) -> Array[Enemy]:
 	var out: Array[Enemy] = []
 	for r in residents:
+		var props: Dictionary = r[2] if r.size() > 2 else {}
+		if props.has("_unless") and Game.flags.get(props["_unless"], false):
+			continue
 		var e: Enemy = main.spawn_enemy(String(r[0]), to_global(r[1]), "", self)
-		# Optional tuning per resident, e.g. {"wander_radius": 1.5}.
-		if r.size() > 2:
-			for k in r[2]:
-				e.set(k, r[2][k])
+		for k in props:
+			if String(k) == "_tag":
+				e.add_to_group("resident_" + String(props[k]))
+			elif not String(k).begins_with("_"):
+				e.set(k, props[k])
 		out.append(e)
 	return out
 

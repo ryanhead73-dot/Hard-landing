@@ -115,6 +115,13 @@ func _greenhouses(out: String, r: RegionScene) -> void:
 	var gh: Greenhouses = (r as ShatterlandsThreshold).greenhouses
 	await _shot(out, "greenhouses_far", r.to_global(Vector3(2.0, 0.3, -20.0)), gh.to_global(Vector3(0.0, 3.0, 0.0)))
 	await _shot(out, "greenhouses_gate", gh.gate_pos + Vector3(-3.0, 0.3, 9.0), gh.gate_pos + Vector3(0.0, 2.5, -6.0))
+	# With the nest cleared: the gate open, Reyes inside it, and the walk-in glasshouse.
+	Game.set_flag("met_reyes")
+	Game.set_flag("nest_cleared")
+	Game.set_flag("greenhouse_open")
+	gh._sync_gate(false)
+	await _shot(out, "greenhouses_open", gh.gate_pos + Vector3(-2.5, 0.3, -6.5), gh.reyes.global_position + Vector3(0.0, 1.4, 0.0))
+	await _shot(out, "greenhouses_inside", gh.house_inside + Vector3(0.0, 0.3, 5.0), gh.house_inside + Vector3(0.0, 1.2, -6.0))
 
 
 func _shot(out: String, name: String, at: Vector3, look: Vector3) -> void:

@@ -55,7 +55,8 @@ func _init() -> void:
 	#   a pack nested under the wreck's lamp-lit tail with one moored over them, to be shot;
 	#   a pair hung close under the big cap, so one popped sets off the other;
 	#   a spitter up on the middle shelf, covering the climb.
-	var nest := {"wander_radius": 1.5}
+	# The nest is what Reyes asks Juno to clear; once it is, it stays gone.
+	var nest := {"wander_radius": 1.5, "_tag": "nest", "_unless": "nest_cleared"}
 	var moored := {"wander_radius": 0.8}
 	residents = [
 		["drifter", Vector3(3.0, 3.0, 16.0)],
@@ -95,6 +96,30 @@ func build() -> void:
 	add_child(greenhouses)
 	_undergrowth()
 	_spores()
+
+
+func spawn_residents(main: Node) -> Array[Enemy]:
+	var out := super(main)
+	for e in out:
+		if e.is_in_group("resident_nest"):
+			e.died.connect(_on_nest_death)
+	return out
+
+
+func nest_cleared() -> bool:
+	return Game.flags.get("nest_cleared", false) == true
+
+
+func _on_nest_death(_e: Enemy) -> void:
+	if nest_cleared():
+		return
+	for e in get_tree().get_nodes_in_group("resident_nest"):
+		if is_instance_valid(e) and not (e as Enemy).dead and e.is_inside_tree():
+			return
+	Game.set_flag("nest_cleared")
+	var main := greenhouses._main() if greenhouses else null
+	if main:
+		main.voice.say(Story.NEST_CLEARED)
 
 
 func interaction(pos: Vector3) -> Dictionary:

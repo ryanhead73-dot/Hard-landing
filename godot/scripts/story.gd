@@ -76,6 +76,32 @@ const GREENHOUSE_HAIL := [
 	[REYES, "Then you've got my last words, Vale. Lucky for both of us they weren't."],
 	[REYES, "Stay where the lamp can see you. Eleven of us in here, and we've buried enough strangers."],
 ]
+## Reyes's price for the gate: the nest under the Marigold's tail.
+const GREENHOUSE_ASK := [
+	[REYES, "You want in, earn it. There's a nest under that hauler's tail, by the lamp. It took Pell and Dorrie on a water run."],
+	[REYES, "Clear it and come back to the gate."],
+]
+## Hailed with the nest already gone.
+const GREENHOUSE_HAIL_CLEARED := [
+	[REYES, "And that was you at the hauler. We heard it from here. Hold on, I'm opening up."],
+]
+const NEST_CLEARED := [
+	[HOB, "That's the last of the nest. Reyes will have heard it from the gate."],
+]
+const GREENHOUSE_OPEN := [
+	[REYES, "All right, Vale. Come in. Wipe your boots, the spores get into everything."],
+]
+## Inside the gate, the first time.
+const REYES_TALK := [
+	[REYES, "Ferro-9 came down for the Long Patience's people and we ended up needing rescuing ourselves. Same as everyone here."],
+	[REYES, "Voss built this place sixty years ago. Her caps keep the pulse off us, mostly."],
+	[JUNO, "Mostly?"],
+	[REYES, "Some nights it gets through. Then we sit very still and wait for morning."],
+	[REYES, "You've got a ship with a frame. We've got hands and a greenhouse full of salvage. Let's talk about getting both of us off this rock."],
+]
+const REYES_AGAIN := [
+	[REYES, "Look around, Vale. Middle house is ours to eat from. Mind the beds."],
+]
 ## Waking Ilse's listening post on the south-east slope.
 const POST_LINES := [
 	[HOB, "That's one of Ilse Marrow's listening posts. Still logging, after all this time."],

@@ -55,6 +55,8 @@ const EXTRA: Array[Dictionary] = [
 		"steps": [
 			{"text": "Find Voss's greenhouses in the Shatterlands", "done": {"type": "flag", "id": "reached_greenhouses"}},
 			{"text": "Hail the greenhouse gate", "done": {"type": "flag", "id": "met_reyes"}},
+			{"text": "Clear the nest under the wrecked hauler's tail", "done": {"type": "flag", "id": "nest_cleared"}},
+			{"text": "Go back to the greenhouse gate", "done": {"type": "flag", "id": "greenhouse_open"}},
 		],
 	},
 	{
