@@ -23,12 +23,15 @@ func _ready() -> void:
 	main.day_cycle = false
 	main.set_daylight(0.0)
 	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket;
-	# `nest`, only the wreck's nested pack.
-	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands", "nest"]:
+	# `nest`, only the wreck's nested pack; `darkhouse`, only Teo's favour.
+	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands", "nest", "darkhouse"]:
 		Game.set_flag("shatterlands_open")
 		await main.regions.travel("shatterlands", true)
-		if args[1] == "nest":
-			await _nest(out, main.regions.scene)
+		if args[1] in ["nest", "darkhouse"]:
+			if args[1] == "nest":
+				await _nest(out, main.regions.scene)
+			else:
+				await _dark_house(out, main.regions.scene)
 			Game.delete_save()
 			get_tree().quit()
 			return
@@ -124,6 +127,24 @@ func _greenhouses(out: String, r: RegionScene) -> void:
 	await _shot(out, "greenhouses_camp", gh.to_global(Greenhouses.HEATER + Vector3(5.0, 0.3, -4.0)), gh.to_global(Greenhouses.HEATER + Vector3(0.0, 1.0, 0.5)))
 	await _shot(out, "greenhouses_lookout", gh.to_global(Greenhouses.LOOKOUT + Vector3(5.0, -1.3, 3.5)), gh.to_global(Greenhouses.LOOKOUT + Vector3(0.0, 1.0, 0.0)))
 	await _shot(out, "greenhouses_inside", gh.house_inside + Vector3(0.0, 0.3, 5.0), gh.house_inside + Vector3(0.0, 1.2, -6.0))
+	await _dark_house(out, r)
+
+
+## Teo's favour: the ramps up the shelves, Voss's cache at the top, and the east glasshouse
+## before and after its lamp cell goes in.
+func _dark_house(out: String, r: RegionScene) -> void:
+	var sh := r as ShatterlandsThreshold
+	var gh := sh.greenhouses
+	Game.set_flag("greenhouse_open")
+	gh._sync_gate(false)
+	await _shot(out, "shatter_ramps", r.to_global(Vector3(-7.0, 0.3, 0.5)), r.to_global(Vector3(-17.0, 1.5, -6.0)))
+	await _shot(out, "shatter_cache", sh.cache_pos + Vector3(2.0, 0.3, 3.0), r.to_global(ShatterlandsThreshold.CELL_CACHE + Vector3(0.0, 0.6, 0.0)))
+	var from := gh.to_global(Vector3(4.5, 0.3, 8.8))
+	var east := gh.to_global(Vector3(8.0, 2.5, -3.0))
+	await _shot(out, "greenhouses_east_dark", from, east)
+	Game.set_flag("lamp_cell_fitted")
+	gh._sync_east(false)
+	await _shot(out, "greenhouses_east_lit", from, east)
 
 
 func _shot(out: String, name: String, at: Vector3, look: Vector3) -> void:

@@ -11,6 +11,8 @@ extends Node3D
 ## Built in the threshold pocket's local space; `Greenhouses.AT` is the compound's centre.
 ## State in Game.flags: reached_greenhouses (within REACH of the gate), met_reyes (hailed),
 ## nest_cleared (set by the pocket), greenhouse_open (the gate), reyes_talked.
+## Teo's favour, the dark house: lamp_cell_asked (Teo's ask), lamp_cell_found (taken from Voss's
+## cache, in the pocket), lamp_cell_fitted (the east house lights again).
 
 const AT := Vector3(15.0, 0.0, -52.0)
 ## Palisade half-extents (x, z) round AT; the gate is in the south wall (+Z, toward the canyon).
@@ -28,8 +30,10 @@ const LEAF := Color("5f8f4e")
 const HOUSE_LENGTH := 13.0
 const HOUSE_RADIUS := 3.4
 const FOOTING := 1.0
-## Which one Juno can walk into (the middle one, straight up from the gate).
+## Which one Juno can walk into (the middle one, straight up from the gate), and the east one,
+## dark until Juno brings Teo a lamp cell.
 const WALK_IN := 1
+const EAST := 2
 const TALK_RANGE := 2.4
 const GATE_SLIDE := 3.6
 ## Crew colours, [suit, trim]: Ferro-9's rescue crew, and Ilse's survey expedition.
@@ -56,6 +60,7 @@ var survivors: Array[Node3D] = []
 var house_door := Vector3.ZERO
 var house_inside := Vector3.ZERO
 var _gate_body: AnimatableBody3D
+var _east_glass: StandardMaterial3D
 var _mats := {}
 
 
@@ -63,11 +68,14 @@ func _ready() -> void:
 	position = AT
 	_palisade()
 	for i in 3:
-		_glasshouse(Vector3(-8.0 + i * 8.0, 0.0, -2.0), i < 2, i == WALK_IN)
+		var glass := _glasshouse(Vector3(-8.0 + i * 8.0, 0.0, -2.0), i != EAST, i == WALK_IN)
+		if i == EAST:
+			_east_glass = glass
 	_gate()
 	_reyes()
 	_camp()
 	_sync_gate(false)
+	_sync_east(false)
 
 
 func reached() -> bool:
@@ -84,6 +92,15 @@ func is_open() -> bool:
 
 func nest_cleared() -> bool:
 	return Game.flags.get("nest_cleared", false) == true
+
+
+func east_lit() -> bool:
+	return Game.flags.get("lamp_cell_fitted", false) == true
+
+
+## Teo has asked for a cell and Juno hasn't got one yet (the pocket offers the cache then).
+static func cell_wanted() -> bool:
+	return Game.flags.get("lamp_cell_asked", false) == true and Game.flags.get("lamp_cell_found", false) != true
 
 
 func _process(_delta: float) -> void:
@@ -107,6 +124,8 @@ func interaction(pos: Vector3) -> Dictionary:
 		return {"label": "[E] Talk to Reyes", "action": talk}
 	for p in survivors:
 		if pos.distance_to(p.global_position) < TALK_RANGE:
+			if p.name == "Teo" and Game.flags.get("lamp_cell_found", false) and not east_lit():
+				return {"label": "[E] Give Teo the lamp cell", "action": fit_cell}
 			return {"label": "[E] Talk to %s" % p.name, "action": func(): _bark(p.name)}
 	if pos.distance_to(intercom_pos) > HAIL_RANGE or is_open():
 		return {}
@@ -154,8 +173,44 @@ func talk() -> void:
 
 func _bark(who: String) -> void:
 	var main := _main()
+	if main == null:
+		return
+	# Teo's favour: until the east house is lit, that's all Teo talks about.
+	if who == "Teo" and not east_lit():
+		if not Game.flags.get("lamp_cell_asked", false):
+			Game.set_flag("lamp_cell_asked")
+			main.voice.say(Story.TEO_ASK)
+		else:
+			main.voice.say(Story.TEO_WAITING)
+		return
+	main.voice.say(Story.SURVIVORS.get(who, []))
+
+
+## Juno hands Teo the cell from Voss's cache; the east house lights up and Teo pays in charges.
+func fit_cell() -> void:
+	if east_lit():
+		return
+	Game.set_flag("lamp_cell_fitted")
+	Game.add_charges(2)
+	var main := _main()
 	if main:
-		main.voice.say(Story.SURVIVORS.get(who, []))
+		main.voice.say(Story.TEO_THANKS)
+	Sfx.play("power_up", to_global(Vector3(8.0, 1.5, -2.0)), -2.0)
+	_sync_east(true)
+
+
+## The east glasshouse glows amber like the others once its cell is in; dark glass until then.
+func _sync_east(animate: bool) -> void:
+	if _east_glass == null:
+		return
+	var lit := east_lit()
+	_east_glass.emission_enabled = lit
+	_east_glass.emission = AMBER
+	if lit and animate and is_inside_tree():
+		_east_glass.emission_energy_multiplier = 0.0
+		create_tween().tween_property(_east_glass, "emission_energy_multiplier", 1.1, 2.5).set_trans(Tween.TRANS_SINE)
+	else:
+		_east_glass.emission_energy_multiplier = 1.1
 
 
 ## Gate and Reyes follow the flag: shut with nobody inside, or slid aside with Reyes waiting.
@@ -224,7 +279,7 @@ func _palisade() -> void:
 ## A long arched house: a half-cylinder of greenish glass over ivory ribs, oxide end frames.
 ## Lit ones glow amber from inside (grow lamps). The walk-in one is open at the south end, walled
 ## inside rather than boxed over, with steps up to its floor, grow beds and a string of lamps.
-func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> void:
+func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> StandardMaterial3D:
 	var length := HOUSE_LENGTH
 	var radius := HOUSE_RADIUS
 	# Raised on a low footing so the lit arches show over the palisade.
@@ -278,7 +333,7 @@ func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> void:
 		# One box collider over the arch, so Juno walks round, not through.
 		_solid(at + Vector3(0.0, radius * 0.5, 0.0), Vector3(radius * 2.0, radius, length), null)
 		_solid(at + Vector3(0.0, 1.1, length * 0.5 + 0.05), Vector3(1.6, 2.2, 0.12), _mat(OXIDE, 0.6))
-		return
+		return glass
 	# The walk-in house: side walls and the back, an open door frame, beds, lamps, a cot.
 	var wall_x := radius - 0.35
 	for side in [-1.0, 1.0]:
@@ -314,6 +369,7 @@ func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> void:
 	add_child(light)
 	house_door = to_global(Vector3(at.x, 0.0, at.z + length * 0.5 + 2.0))
 	house_inside = to_global(Vector3(at.x, floor_y, at.z))
+	return glass
 
 
 ## Rows of leafy crowns on a bed: one MultiMesh of squashed spheres, a little irregular.

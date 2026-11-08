@@ -60,6 +60,16 @@ const EXTRA: Array[Dictionary] = [
 		],
 	},
 	{
+		"id": "dark_house", "title": "The dark house", "act": 2, "kind": "side", "region": "shatterlands",
+		"summary": "The east glasshouse went dark in the last pulse. Teo says Voss kept spare lamp cells up on the high shelf.",
+		"requires": [{"type": "flag", "id": "lamp_cell_asked"}],
+		"steps": [
+			{"text": "Fetch a lamp cell from Voss's cache on the high shelf", "done": {"type": "flag", "id": "lamp_cell_found"}},
+			{"text": "Bring the cell back to Teo", "done": {"type": "flag", "id": "lamp_cell_fitted"}},
+		],
+		"rewards": {"scrap": 25},
+	},
+	{
 		"id": "marigold", "title": "The Marigold", "act": 2, "kind": "discovery", "region": "shatterlands",
 		"summary": "A hauler lies nose-down in the growth, its back still dry. Someone stowed something up there.",
 		"requires": [{"type": "flag", "id": "shatterlands_open"}],

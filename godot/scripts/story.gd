@@ -109,6 +109,24 @@ const SURVIVORS := {
 const REYES_AGAIN := [
 	[REYES, "Look around, Vale. Middle house is ours to eat from. Mind the beds."],
 ]
+## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
+const TEO_ASK := [
+	["Teo", "You're the pilot? Good, you can wire. The east house went dark in the last pulse. Its cell cooked."],
+	["Teo", "Voss kept spare lamp cells up on the high shelf, west side, out of the scuttlers' reach. There's a spitter up there now."],
+	[JUNO, "And you'd like me to go and get one."],
+	["Teo", "I'd like the beans to live. You'd like to eat. Same thing."],
+]
+const TEO_WAITING := [
+	["Teo", "High shelf, up the steps on the west side. Oxide box, Voss's mark on the lid."],
+]
+const CELL_FOUND := [
+	[HOB, "Voss-pattern lamp cell. Eighty percent charge after sixty years. She built things to last."],
+]
+const TEO_THANKS := [
+	["Teo", "Oh, that's a good cell. Hold the lid... there."],
+	["Teo", "Look at that. Tell Okafor the east house is back."],
+	["Teo", "Here, we pulled these off Ferro-9 and nobody in here can use them."],
+]
 ## Waking Ilse's listening post on the south-east slope.
 const POST_LINES := [
 	[HOB, "That's one of Ilse Marrow's listening posts. Still logging, after all this time."],

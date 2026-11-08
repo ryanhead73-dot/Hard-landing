@@ -35,6 +35,8 @@ const SHELVES := [
 const WRECK_POS := Vector3(16.0, 0.0, -10.0)
 ## Where the scuttlers nest: off the wreck's tail, under its lamp.
 const NEST := Vector3(24.0, 0.0, 5.0)
+## Voss's cache of spare grow-lamp cells, at the back of the high shelf (Teo's favour).
+const CELL_CACHE := Vector3(-22.0, 9.0, -43.0)
 
 ## Voss's greenhouses, the Act 2 hub (greybox).
 var greenhouses: Greenhouses
@@ -43,6 +45,9 @@ var _spots: Array[Transform3D] = []
 ## Where Juno stands to open the wrecked hauler's dorsal locker (world space).
 var locker_pos := Vector3.INF
 var _locker_tell: MeshInstance3D
+## Where Juno stands to take a cell from Voss's cache (world space).
+var cache_pos := Vector3.INF
+var _cache_tell: MeshInstance3D
 var _mats := {}
 
 
@@ -83,8 +88,9 @@ func build() -> void:
 	# The shelves are the tops of basalt columns, the joints showing.
 	for s in SHELVES:
 		_box(s[0], s[1], _basalt(6.0), true)
-	_ramp(Vector3(-15.0, 0.0, -2.0), Vector3(-19.0, 3.0, -8.0), 5.0)
-	_ramp(Vector3(-30.0, 3.0, -12.0), Vector3(-30.0, 6.0, -16.0), 5.0)
+	# Each ramp tops out at its shelf's edge (Juno has no step-up, so a lip there stops her).
+	_ramp(Vector3(-12.0, 0.0, -6.0), Vector3(-18.0, 3.0, -6.0), 5.0)
+	_ramp(Vector3(-30.0, 3.0, -10.0), Vector3(-30.0, 6.0, -15.0), 5.0)
 	_ramp(Vector3(-24.0, 6.0, -26.0), Vector3(-17.0, 9.0, -34.0), 5.0)
 	_spots.clear()
 	for f in FUNGI:
@@ -92,6 +98,7 @@ func build() -> void:
 		_fungus(base, f[1], f[2])
 	_build_spots()
 	_wreck()
+	_cell_cache()
 	greenhouses = Greenhouses.new()
 	greenhouses.name = "Greenhouses"
 	add_child(greenhouses)
@@ -126,6 +133,11 @@ func _on_nest_death(_e: Enemy) -> void:
 func interaction(pos: Vector3) -> Dictionary:
 	if not locker_open() and pos.distance_to(locker_pos) < 2.2:
 		return {"label": "[E] Open the hauler's dorsal locker", "action": open_locker}
+	if pos.distance_to(cache_pos) < 2.2:
+		if Greenhouses.cell_wanted():
+			return {"label": "[E] Take a lamp cell from Voss's cache", "action": take_cell}
+		if not Game.flags.get("lamp_cell_found", false):
+			return {"label": "A sealed cache with Voss's mark on the lid"}
 	return greenhouses.interaction(pos) if greenhouses else {}
 
 
@@ -346,6 +358,36 @@ func open_locker() -> void:
 	if _locker_tell:
 		_locker_tell.visible = false
 	Sfx.play("scrap_pickup", locker_pos, 0.0)
+
+
+## Voss's cache at the back of the high shelf: an oxide box with an amber tell-tale, where she kept
+## spare grow-lamp cells out of the scuttlers' reach. The spitter on the middle shelf covers the way
+## up. It opens only once Teo has asked for a cell (Greenhouses: the dark house).
+func _cell_cache() -> void:
+	_box(CELL_CACHE + Vector3(0.0, 0.4, 0.0), Vector3(1.3, 0.8, 0.9), _mat(OXIDE, 0.55), true)
+	_box(CELL_CACHE + Vector3(0.0, 0.85, 0.0), Vector3(1.4, 0.1, 1.0), _mat(Color("6c6a66"), 0.5), false)
+	var tell := MeshInstance3D.new()
+	var tm := BoxMesh.new()
+	tm.size = Vector3(0.25, 0.12, 0.25)
+	tell.mesh = tm
+	tell.material_override = _glow(Color("e8a44e"), 3.0)
+	tell.position = CELL_CACHE + Vector3(0.45, 0.96, 0.0)
+	add_child(tell)
+	_cache_tell = tell
+	_cache_tell.visible = not Game.flags.get("lamp_cell_found", false)
+	cache_pos = to_global(CELL_CACHE + Vector3(0.0, 0.0, 1.3))
+
+
+func take_cell() -> void:
+	if not Greenhouses.cell_wanted():
+		return
+	Game.set_flag("lamp_cell_found")
+	if _cache_tell:
+		_cache_tell.visible = false
+	Sfx.play("scrap_pickup", cache_pos, 0.0)
+	var main := greenhouses._main() if greenhouses else null
+	if main:
+		main.voice.say(Story.CELL_FOUND)
 
 
 ## Small glowing caps scattered across the floor, instanced in one draw call.

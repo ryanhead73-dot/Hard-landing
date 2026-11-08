@@ -379,6 +379,54 @@ func _regions() -> void:
 	var haddad: Node3D = gh.survivors.filter(func(p): return p.name == "Haddad")[0]
 	_check("the lookout stands high enough to see over the wall", haddad.global_position.y - gh.global_position.y > 1.4)
 
+	# Teo's favour, the dark house: Teo asks, Voss's cache on the high shelf gives a cell, the east
+	# house lights up again.
+	var teo: Node3D = gh.survivors.filter(func(p): return p.name == "Teo")[0]
+	_place(sh.cache_pos + Vector3(0.0, 0.5, 0.0), PI)
+	await _frames(3)
+	_check("Voss's cache stays shut until someone wants a cell", _label().contains("Voss's mark") and not _label().contains("[E]"), _label())
+	_place(teo.global_position + Vector3(0.0, 0.5, 0.0) - teo.global_transform.basis.z * 1.0, 0.0)
+	await _frames(3)
+	await _press("interact")
+	await _frames(3)
+	_check("Teo asks for a lamp cell, and the favour starts", Game.flags.get("lamp_cell_asked") == true and main.quests.state_of("dark_house") == QuestLog.ACTIVE)
+	_check("the east house is dark until then", not gh._east_glass.emission_enabled)
+	# The climb: up the three shelves' ramps from the pocket floor to the cache.
+	_place(sh.to_global(Vector3(-9.0, 0.5, -6.0)), 0.0)
+	route = []
+	for p in [Vector3(-12.0, 0.0, -6.0), Vector3(-19.0, 0.0, -6.0), Vector3(-29.0, 0.0, -9.0), Vector3(-30.0, 0.0, -10.0), Vector3(-30.0, 0.0, -16.0), Vector3(-24.0, 0.0, -26.0), Vector3(-17.0, 0.0, -34.0), Vector3(-20.0, 0.0, -39.0)]:
+		route.append(sh.to_global(p))
+	route.append(sh.cache_pos)
+	await _frames(5)
+	leg = 0
+	t = 0.0
+	Input.action_press("move_forward")
+	while t < 30.0 and leg < route.size():
+		var d: Vector3 = route[leg] - player.global_position
+		d.y = 0.0
+		if d.length() < 0.9:
+			leg += 1
+			continue
+		player.face(atan2(-d.x, -d.z))
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+	Input.action_release("move_forward")
+	await _frames(5)
+	_check("Juno can climb the shelves to the cache", leg == route.size() and player.global_position.y - sh.global_position.y > 8.5, "leg %d at %s after %.1f s" % [leg, player.global_position - sh.global_position, t])
+	_check("and take a cell", _label().contains("Take a lamp cell"), _label())
+	await _press("interact")
+	await _frames(3)
+	_check("taking it moves the favour on", Game.flags.get("lamp_cell_found") == true and main.quests.step_of("dark_house") == 1 and not sh._cache_tell.visible)
+	_place(teo.global_position + Vector3(0.0, 0.5, 0.0) - teo.global_transform.basis.z * 1.0, 0.0)
+	await _frames(3)
+	_check("Teo takes the cell", _label().contains("Give Teo the lamp cell"), _label())
+	var scrap_before := Game.scrap
+	var charges_before := Game.charges
+	await _press("interact")
+	await _frames(3)
+	_check("the east house lights up, and the favour pays", gh.east_lit() and gh._east_glass.emission_enabled and main.quests.is_done("dark_house") and Game.scrap == scrap_before + 25 and Game.charges == mini(charges_before + 2, Game.max_charges()), "scrap %d -> %d" % [scrap_before, Game.scrap])
+	_check("after that Teo has other things to say", _label().contains("Talk to Teo"), _label())
+
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)
 	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout
