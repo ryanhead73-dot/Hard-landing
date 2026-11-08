@@ -12,6 +12,8 @@ enum State { IDLE, CHASE, WINDUP, RECOVER, STAGGER, DEAD }
 @export var recover_time := 0.7
 ## A hit this hard (or any weak-spot hit) during the wind-up knocks it off its bite.
 @export var stagger_damage := 15.0
+## How far from home it wanders while idle; a pack sharing a nest keeps close.
+@export var wander_radius := 6.0
 const STAGGER_TIME := 0.4
 ## How far a hit shoves it (m/s), and a weak-spot hit.
 const KNOCKBACK := 2.6
@@ -128,7 +130,7 @@ func _idle() -> Vector3:
 	if _flat(global_position).distance_to(_flat(_wander)) < 0.8:
 		if _timer <= 0.0:
 			var a := randf() * TAU
-			_wander = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(1.0, 6.0)
+			_wander = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(minf(1.0, wander_radius), wander_radius)
 			_timer = randf_range(1.5, 4.0)
 		return Vector3.ZERO
 	var dir := _flat(_wander - global_position).normalized()

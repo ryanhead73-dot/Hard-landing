@@ -253,6 +253,22 @@ func _regions() -> void:
 	await _frames(3)
 	_check("the Shatterlands has its own wildlife", residents.size() == rm.scene.residents.size() and residents.all(func(e): return is_instance_valid(e) and e.get_parent() == rm.scene))
 	_check("which stands on the region's ground", residents.all(func(e): return e.global_position.distance_to(rm.scene.global_position) < 90.0 and e.global_position.y > rm.scene.global_position.y - 0.5), str(residents.map(func(e): return e.global_position)))
+	# The layout pays the drifter off: one hangs over the nested pack, and a pair hang close.
+	var drifters := residents.filter(func(e): return e is Drifter)
+	var bugs := residents.filter(func(e): return e is Scuttler)
+	var best := 0
+	for d in drifters:
+		best = maxi(best, bugs.filter(func(b): return (d as Drifter).in_cloud(b.global_position, d.global_position)).size())
+	_check("a drifter hangs over the pack, its cloud reaching most of it", best >= 3, "%d of %d" % [best, bugs.size()])
+	var paired := drifters.any(func(a): return drifters.any(func(b): return a != b and (a as Drifter).in_cloud(b.global_position, a.global_position)))
+	_check("and a pair hang close enough to set each other off", paired)
+	var lone: Drifter = drifters.reduce(func(m, d): return d if d.global_position.distance_to(rm.scene.entry_global()) < m.global_position.distance_to(rm.scene.entry_global()) else m)
+	var lone_gap: float = residents.filter(func(e): return e != lone).map(func(e): return e.global_position.distance_to(lone.global_position)).min()
+	_check("the first drifter Juno meets is alone, to learn on", lone.global_position.distance_to(rm.scene.entry_global()) < 30.0 and lone_gap > 12.0, "%.0f m from the way in, %.0f m from the rest" % [lone.global_position.distance_to(rm.scene.entry_global()), lone_gap])
+	# Still nested after they've had time to wander.
+	await get_tree().create_timer(6.0).timeout
+	var nested := bugs.filter(func(b): return b.global_position.distance_to(rm.scene.to_global(ShatterlandsThreshold.NEST)) < 4.0).size()
+	_check("the pack keeps to its nest", nested == bugs.size(), "%d of %d" % [nested, bugs.size()])
 	for e in residents:
 		e.queue_free()
 	await _frames(2)

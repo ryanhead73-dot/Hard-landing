@@ -15,7 +15,8 @@ var goal = null
 ## Environment settings while here: property name -> value on the main Environment, plus
 ## "sun_energy" / "sun_color" / "sun_rotation" for the sun. Restored on leaving.
 var look := {}
-## Creatures living here, spawned each time Juno arrives: [kind, local position]. They belong
+## Creatures living here, spawned each time Juno arrives: [kind, local position,
+## optional {property: value}]. They belong
 ## to the region, so they go when it's unloaded.
 var residents: Array = []
 
@@ -31,7 +32,12 @@ func build() -> void:
 func spawn_residents(main: Node) -> Array[Enemy]:
 	var out: Array[Enemy] = []
 	for r in residents:
-		out.append(main.spawn_enemy(String(r[0]), to_global(r[1]), "", self))
+		var e: Enemy = main.spawn_enemy(String(r[0]), to_global(r[1]), "", self)
+		# Optional tuning per resident, e.g. {"wander_radius": 1.5}.
+		if r.size() > 2:
+			for k in r[2]:
+				e.set(k, r[2][k])
+		out.append(e)
 	return out
 
 

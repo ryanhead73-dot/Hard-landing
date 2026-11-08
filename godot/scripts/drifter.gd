@@ -14,11 +14,16 @@ enum State { DRIFT, CHASE, SWELL, DEAD }
 @export var splash_damage := 30.0
 @export var burst_radius := 3.6
 @export var swell_time := 1.1
+## How far from home it wanders while idle. A drifter moored over a nest keeps close.
+@export var wander_radius := 7.0
 
 ## Starts swelling this close to its target.
 const SWELL_RANGE := 3.0
 ## A burst Juno shot early still catches her, but less.
 const SHOT_BURST_SCALE := 0.4
+## The cloud sinks: below the burst, height counts for this much, so one popped over a pack
+## reaches the creatures under it.
+const CLOUD_SINK := 0.5
 const VIOLET := Color("b49cff")
 const CORE := Color("3fd1b5")
 
@@ -38,7 +43,8 @@ var _core_mat: StandardMaterial3D
 func _init() -> void:
 	max_health = 24.0
 	speed = 2.6
-	sight_range = 22.0
+	# Slow, dim senses: it notices Juno late, so one hanging over a pack stays there to be shot.
+	sight_range = 14.0
 	alert_radius = 10.0
 	drops = Vector2i(0, 1)
 	death_puff = 0.5
@@ -57,7 +63,8 @@ func _setup() -> void:
 	add_child(shape)
 	_build()
 	_bob = randf() * TAU
-	_pick_wander()
+	_wander = home
+	_timer = randf_range(0.5, 3.0)
 
 
 func _build() -> void:
@@ -175,7 +182,7 @@ func _toward(point: Vector3, spd: float) -> Vector3:
 
 func _pick_wander() -> void:
 	var a := randf() * TAU
-	_wander = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(2.0, 7.0)
+	_wander = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(minf(2.0, wander_radius * 0.5), wander_radius)
 	_timer = randf_range(4.0, 7.0)
 
 
@@ -210,6 +217,14 @@ func _burst(juno_scale: float) -> void:
 	if state != State.DEAD:
 		health = 0.0
 		_die()
+
+
+## Whether `point` is inside a burst at `at`: a sphere that sags below the bladder.
+func in_cloud(point: Vector3, at: Vector3) -> bool:
+	var d := point - at
+	if d.y < 0.0:
+		d.y *= CLOUD_SINK
+	return d.length() <= burst_radius
 
 
 func _die() -> void:

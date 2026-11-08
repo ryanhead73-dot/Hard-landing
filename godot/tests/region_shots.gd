@@ -22,10 +22,16 @@ func _ready() -> void:
 		s.queue_free()
 	main.day_cycle = false
 	main.set_daylight(0.0)
-	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket.
-	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands"]:
+	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket;
+	# `nest`, only the wreck's nested pack.
+	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands", "nest"]:
 		Game.set_flag("shatterlands_open")
 		await main.regions.travel("shatterlands", true)
+		if args[1] == "nest":
+			await _nest(out, main.regions.scene)
+			Game.delete_save()
+			get_tree().quit()
+			return
 		if args[1] == "shatterlands":
 			await _pocket(out, main.regions.scene)
 		await _greenhouses(out, main.regions.scene)
@@ -85,6 +91,23 @@ func _pocket(out: String, r: RegionScene) -> void:
 	var hull: Node3D = sh.get_node("Marigold")
 	await _shot(out, "shatter_marigold_climb", sh.to_global(hull.transform * Vector3(-15.0, 0.0, -16.0)) * Vector3(1, 0, 1) + Vector3(0.0, sh.global_position.y + 0.3, 0.0), sh.to_global(hull.transform * Vector3(-3.0, 4.0, -4.0)))
 	await _shot(out, "shatter_marigold_top", sh.locker_pos + Vector3(0.0, 0.3, 0.0), sh.greenhouses.to_global(Vector3(0.0, 3.0, 0.0)))
+
+	await _nest(out, r)
+
+
+## The pocket's wildlife where it lives, held still: the pack under the wreck's tail lamp with a
+## drifter moored over it, as Juno first sees it from the way in.
+func _nest(out: String, r: RegionScene) -> void:
+	var residents: Array[Enemy] = r.spawn_residents(main)
+	await _frames(20)
+	for e in residents:
+		e.set_physics_process(false)
+	var nest := r.to_global(ShatterlandsThreshold.NEST)
+	await _shot(out, "shatter_nest", r.to_global(Vector3(11.0, 0.3, 9.0)), nest + Vector3(0.0, 1.4, 0.0))
+	await _shot(out, "shatter_nest_close", r.to_global(Vector3(19.0, 0.3, 11.0)), nest + Vector3(0.0, 1.2, 0.0))
+	for e in residents:
+		e.queue_free()
+	await _frames(2)
 
 
 ## Voss's greenhouses: from the shelves' foot across the pocket, and at the gate.

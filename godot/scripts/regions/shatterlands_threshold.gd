@@ -33,6 +33,8 @@ const SHELVES := [
 	[Vector3(-14.0, 4.5, -40.0), Vector3(26.0, 9.0, 12.0)],
 ]
 const WRECK_POS := Vector3(16.0, 0.0, -10.0)
+## Where the scuttlers nest: off the wreck's tail, under its lamp.
+const NEST := Vector3(24.0, 0.0, 5.0)
 
 ## Voss's greenhouses, the Act 2 hub (greybox).
 var greenhouses: Greenhouses
@@ -48,16 +50,22 @@ func _init() -> void:
 	entry = Vector3(0.0, 0.3, 40.0)
 	entry_yaw = 0.0
 	exit_point = Vector3(0.0, 0.0, 45.0)
-	# The waypoint leads to the greenhouse gate.
-	# A pack round the wreck, a spitter up on the middle shelf, drifters under the caps.
+	# Laid out to teach the drifter, then pay it off:
+	#   one alone by the way in, which comes to Juno and bursts, so she learns what it does;
+	#   a pack nested under the wreck's lamp-lit tail with one moored over them, to be shot;
+	#   a pair hung close under the big cap, so one popped sets off the other;
+	#   a spitter up on the middle shelf, covering the climb.
+	var nest := {"wander_radius": 1.5}
+	var moored := {"wander_radius": 0.8}
 	residents = [
-		["scuttler", Vector3(9.0, 0.5, -3.0)], ["scuttler", Vector3(21.0, 0.5, -1.0)],
-		["scuttler", Vector3(23.0, 0.5, -17.0)], ["scuttler", Vector3(7.0, 0.5, -22.0)],
+		["drifter", Vector3(3.0, 3.0, 16.0)],
+		["scuttler", NEST + Vector3(-1.5, 0.5, -1.0), nest], ["scuttler", NEST + Vector3(1.4, 0.5, -0.8), nest],
+		["scuttler", NEST + Vector3(-0.6, 0.5, 1.6), nest], ["scuttler", NEST + Vector3(1.6, 0.5, 1.4), nest],
+		["drifter", NEST + Vector3(0.0, 3.0, 0.0), moored],
+		["drifter", Vector3(-6.0, 3.0, -26.0), moored], ["drifter", Vector3(-3.6, 3.0, -28.0), moored],
 		["spitter", Vector3(-30.0, 6.5, -24.0)],
-		# Drifters hang under the big caps.
-		["drifter", Vector3(-6.0, 3.0, -26.0)], ["drifter", Vector3(-2.0, 3.0, -34.0)],
-		["drifter", Vector3(-20.0, 3.0, 6.0)],
 	]
+	# The waypoint leads to the greenhouse gate.
 	goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
 	look = {
 		"fog_light_color": Color("3a3160"), "fog_density": 0.017,
@@ -263,9 +271,10 @@ func _wreck() -> void:
 		_box(Vector3(3.6, 4.0, 14.0 + i * 1.6), Vector3(0.4, 4.0, 0.4), _mat(Color("6c6a66"), 0.5), false, hull)
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color("e8a44e")
-	lamp.light_energy = 1.2
-	lamp.omni_range = 7.0
-	lamp.position = Vector3(0.0, 3.0, 13.0)
+	# Hung off the tail, so it lights the nest under it.
+	lamp.light_energy = 1.8
+	lamp.omni_range = 9.0
+	lamp.position = Vector3(0.0, 3.4, 15.0)
 	hull.add_child(lamp)
 	_wreck_climb(hull)
 
