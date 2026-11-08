@@ -26,6 +26,8 @@ const AMBER := Color("e8a44e")
 const SLATE := Color("3c4448")
 const GLASS := Color(0.55, 0.85, 0.7, 0.35)
 const LEAF := Color("5f8f4e")
+## Where Jake's texture sets live (PbrSet folder).
+const TEXTURES := "shatterlands"
 ## The glasshouses: length and radius, and how high they stand on their footings.
 const HOUSE_LENGTH := 13.0
 const HOUSE_RADIUS := 3.4
@@ -270,8 +272,14 @@ func _palisade() -> void:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	var m := StandardMaterial3D.new()
+	if PbrSet.exists(TEXTURES, "greenhouse_palisade_scrap_hull"):
+		# Jake's patched scrap plate, each plate tinted a little differently so the repeat breaks up.
+		m = PbrSet.material(TEXTURES, "greenhouse_palisade_scrap_hull", 4.0).duplicate()
+		for i in plates.size():
+			mm.set_instance_color(i, [Color.WHITE, Color(0.82, 0.82, 0.8), Color(1.0, 0.88, 0.8), Color(0.78, 0.84, 0.88)][i % 4])
+	else:
+		m.roughness = 0.8
 	m.vertex_color_use_as_albedo = true
-	m.roughness = 0.8
 	mmi.material_override = m
 	add_child(mmi)
 
@@ -295,10 +303,7 @@ func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> StandardMaterial3D
 	# Rotated to lie along Z, the cylinder's top cap is the south end: the walk-in one's doorway.
 	cyl.cap_top = not walk_in
 	shell.mesh = cyl
-	var glass := StandardMaterial3D.new()
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.albedo_color = GLASS
-	glass.roughness = 0.15
+	var glass := _glass(walk_in)
 	if walk_in:
 		glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if lit:
@@ -324,7 +329,7 @@ func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> StandardMaterial3D
 		ribs.set_instance_transform(i, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), at + Vector3(0.0, 0.0, z)))
 	var rmi := MultiMeshInstance3D.new()
 	rmi.multimesh = ribs
-	rmi.material_override = _mat(IVORY, 0.6)
+	rmi.material_override = _tex("glasshouse_frame_metal", 2.0, _mat(IVORY, 0.6))
 	add_child(rmi)
 	var floor_y := at.y - 1.3 + FOOTING
 	# A plank ramp up the footing at the south end.
@@ -340,7 +345,7 @@ func _glasshouse(at: Vector3, lit: bool, walk_in := false) -> StandardMaterial3D
 		_solid(Vector3(at.x + side * wall_x, floor_y + 1.4, at.z), Vector3(0.2, 2.8, length), null)
 		_solid(Vector3(at.x + side * 1.05, floor_y + 1.15, at.z + length * 0.5 + 0.05), Vector3(0.2, 2.3, 0.2), _mat(OXIDE, 0.6))
 		# A grow bed along each side, planted.
-		_solid(Vector3(at.x + side * 2.1, floor_y + 0.3, at.z - 0.5), Vector3(1.3, 0.6, length - 3.0), _mat(Color("5a4636"), 0.95))
+		_solid(Vector3(at.x + side * 2.1, floor_y + 0.3, at.z - 0.5), Vector3(1.3, 0.6, length - 3.0), _tex("greenhouse_grow_bed_soil", 1.5, _mat(Color("5a4636"), 0.95)))
 		_plants(Vector3(at.x + side * 2.1, floor_y + 0.6, at.z - 0.5), length - 3.4)
 	_solid(Vector3(at.x, floor_y + 2.35, at.z + length * 0.5 + 0.05), Vector3(2.3, 0.2, 0.2), _mat(OXIDE, 0.6))
 	_solid(Vector3(at.x, floor_y + 1.4, at.z - length * 0.5 + 0.1), Vector3(radius * 2.0, 2.8, 0.2), null)
@@ -582,6 +587,30 @@ func _solid(pos: Vector3, size: Vector3, mat: Material) -> void:
 		body.add_child(mi)
 	body.position = pos
 	add_child(body)
+
+
+## Jake's greenhouse PBR sets (assets/textures/shatterlands/), or the flat colour if a set is missing.
+func _tex(set_name: String, metres: float, fallback: Material) -> Material:
+	return PbrSet.material(TEXTURES, set_name, metres) if PbrSet.exists(TEXTURES, set_name) else fallback
+
+
+## Each glasshouse gets its own glass (the east one's glow changes): Jake's clean glass on the
+## walk-in house, his grimy glass on the other two.
+func _glass(clean: bool) -> StandardMaterial3D:
+	var set_name := "greenhouse_glass_clean" if clean else "greenhouse_glass_dirty"
+	var glass: StandardMaterial3D
+	if PbrSet.exists(TEXTURES, set_name):
+		# Its normal and roughness only: the grime in the albedo's alpha broke the houses' amber glow
+		# into blotches, so the tint stays flat and the grime shows as dull, streaky patches instead.
+		glass = PbrSet.material(TEXTURES, set_name, 3.0).duplicate()
+		glass.albedo_texture = null
+		glass.albedo_color = GLASS
+	else:
+		glass = StandardMaterial3D.new()
+		glass.albedo_color = GLASS
+		glass.roughness = 0.15
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return glass
 
 
 func _mat(color: Color, roughness := 0.8) -> StandardMaterial3D:

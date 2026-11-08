@@ -428,6 +428,26 @@
    "source": "jake_pbr"
   },
   {
+   "path": "assets/textures/shatterlands/greenhouse_palisade_scrap_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_grow_bed_soil/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/glasshouse_frame_metal/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_glass_clean/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_glass_dirty/*.png",
+   "source": "jake_pbr"
+  },
+  {
    "path": "assets/kestrel/*.glb",
    "source": "blender_scripts"
   },
