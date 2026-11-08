@@ -80,8 +80,9 @@ func build() -> void:
 	_rng.seed = SEED
 	_ground()
 	_canyon_mouth()
+	# The shelves are rock under the same spore grit as the floor, a shade darker.
 	for s in SHELVES:
-		_box(s[0], s[1], _mat(BASALT), true)
+		_box(s[0], s[1], _tex("shatterlands_ground", 3.0, true, Color(0.72, 0.7, 0.78), _mat(BASALT)), true)
 	_ramp(Vector3(-15.0, 0.0, -2.0), Vector3(-19.0, 3.0, -8.0), 5.0)
 	_ramp(Vector3(-30.0, 3.0, -12.0), Vector3(-30.0, 6.0, -16.0), 5.0)
 	_ramp(Vector3(-24.0, 6.0, -26.0), Vector3(-17.0, 9.0, -34.0), 5.0)
@@ -133,7 +134,7 @@ func _ground() -> void:
 	mesh.size = Vector2(140.0, 140.0)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
-	mi.material_override = _mat(GROUND, 0.85)
+	mi.material_override = _tex("shatterlands_ground", 2.5, true, Color.WHITE, _mat(GROUND, 0.85))
 	add_child(mi)
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -178,7 +179,7 @@ func _fungus(base: Vector3, height: float, radius: float) -> void:
 	stem.radial_segments = 10
 	var stem_mi := MeshInstance3D.new()
 	stem_mi.mesh = stem
-	stem_mi.material_override = _mat(STEM, 0.7)
+	stem_mi.material_override = _tex("fungus_stem", 2.5, true, Color.WHITE, _mat(STEM, 0.7))
 	stem_mi.position = base + Vector3(0.0, height * 0.5, 0.0)
 	add_child(stem_mi)
 	var body := StaticBody3D.new()
@@ -209,7 +210,7 @@ func _fungus(base: Vector3, height: float, radius: float) -> void:
 	bulb.rings = 5
 	var bulb_mi := MeshInstance3D.new()
 	bulb_mi.mesh = bulb
-	bulb_mi.material_override = _mat(STEM.darkened(0.25), 0.8)
+	bulb_mi.material_override = _tex("fungus_stem", 2.0, true, Color(0.75, 0.72, 0.8), _mat(STEM.darkened(0.25), 0.8))
 	bulb_mi.position = base + Vector3(0.0, radius * 0.08, 0.0)
 	add_child(bulb_mi)
 	var skirt := TorusMesh.new()
@@ -248,7 +249,8 @@ func _fungus(base: Vector3, height: float, radius: float) -> void:
 	gills.radial_segments = 20
 	var gill_mi := MeshInstance3D.new()
 	gill_mi.mesh = gills
-	gill_mi.material_override = _glow(GILLS, 1.4)
+	# Lilac gills whose ridges glow teal (the set's emission mask).
+	gill_mi.material_override = _tex("fungus_cap_underside", 3.0, true, Color.WHITE, _glow(GILLS, 1.4), GILLS, 3.0)
 	gill_mi.position = base + Vector3(0.0, height - radius * 0.2, 0.0)
 	add_child(gill_mi)
 	if radius >= 10.0:
@@ -287,7 +289,8 @@ func _wreck() -> void:
 	hull.position = WRECK_POS
 	hull.rotation = Vector3(deg_to_rad(-9.0), deg_to_rad(28.0), deg_to_rad(6.0))
 	add_child(hull)
-	_box(Vector3(0.0, 2.6, 0.0), Vector3(7.0, 5.0, 26.0), _mat(HULL, 0.55), true, hull)
+	# Plated in Jake's hull set, mapped in the hull's own space so the seams follow the wreck.
+	_box(Vector3(0.0, 2.6, 0.0), Vector3(7.0, 5.0, 26.0), _tex("hauler_hull", 6.0, false, Color.WHITE, _mat(HULL, 0.55)), true, hull)
 	for z in [-9.0, 0.0, 9.0]:
 		_box(Vector3(0.0, 2.6, z), Vector3(7.2, 5.2, 1.0), _mat(OXIDE, 0.6), false, hull)
 	_box(Vector3(0.0, 1.0, -14.5), Vector3(5.0, 3.0, 4.0), _mat(BASALT), true, hull)
@@ -312,7 +315,7 @@ func _wreck_climb(hull: Node3D) -> void:
 	foot.y = 0.0
 	# Ends just above the hull edge, so Juno steps down onto the spine instead of into its side.
 	var lip := hull.transform * Vector3(-3.3, 5.5, -10.0)
-	_ramp(foot, lip, 2.6, _mat(HULL.darkened(0.15), 0.6))
+	_ramp(foot, lip, 2.6, _tex("hauler_hull", 6.0, false, Color(0.85, 0.85, 0.85), _mat(HULL.darkened(0.15), 0.6)))
 	# The locker: a squat oxide box on the spine near the tail, an amber tell-tale on top.
 	var locker_local := Vector3(0.0, 5.1 + 0.45, 9.0)
 	_box(locker_local, Vector3(1.4, 0.9, 1.0), _mat(OXIDE, 0.55), true, hull)
@@ -472,6 +475,14 @@ func _mat(color: Color, roughness := 0.9) -> StandardMaterial3D:
 		m.roughness = roughness
 		_mats[key] = m
 	return _mats[key]
+
+
+## A material from one of the Shatterlands PBR sets (`PbrSet`), or `fallback` if the set's
+## textures aren't there.
+func _tex(set_name: String, metres: float, world: bool, tint: Color, fallback: Material, emission := Color.BLACK, energy := 1.0) -> Material:
+	if not PbrSet.exists("shatterlands", set_name):
+		return fallback
+	return PbrSet.material("shatterlands", set_name, metres, world, tint, emission, energy)
 
 
 func _glow(color: Color, energy: float) -> StandardMaterial3D:

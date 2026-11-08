@@ -247,6 +247,7 @@ func _regions() -> void:
 	_check("the waypoint points into the region", main._waypoint() != null and (main._waypoint() as Vector3).distance_to(rm.scene.global_position) < 80.0)
 	_check("the region has its own look", absf(main._env.fog_density - rm.scene.look["fog_density"]) < 0.0001)
 	_check("the region keeps to its budget", _region_budget(rm.scene))
+	_check("the pocket wears Jake's PBR sets, compressed and mipmapped", _pbr_ok(), "")
 
 	# The pocket's own wildlife belongs to it.
 	var residents: Array[Enemy] = rm.scene.spawn_residents(main)
@@ -431,6 +432,22 @@ func _wait_travel(rm: RegionManager) -> void:
 
 ## Draw-call proxies for the prototype: few meshes (the undergrowth is one multimesh), a handful
 ## of unshadowed lights.
+## Every map in the Shatterlands sets imports VRAM-compressed with mipmaps (their .import files
+## are checked in; without them Godot would import them raw), and the ground uses them.
+func _pbr_ok() -> bool:
+	for set_name in ["shatterlands_ground", "fungus_cap_underside", "fungus_stem", "hauler_hull"]:
+		for map in ["albedo", "normal", "roughness"]:
+			var t := load("res://assets/textures/shatterlands/%s/%s.png" % [set_name, map]) as Texture2D
+			if t == null:
+				print("  missing %s/%s" % [set_name, map])
+				return false
+			var img := t.get_image()
+			if not img.is_compressed() or not img.has_mipmaps():
+				print("  %s/%s: compressed %s, mipmaps %s" % [set_name, map, img.is_compressed(), img.has_mipmaps()])
+				return false
+	return PbrSet.exists("shatterlands", "shatterlands_ground")
+
+
 func _region_budget(region: Node) -> bool:
 	var meshes := 0
 	var lights := 0

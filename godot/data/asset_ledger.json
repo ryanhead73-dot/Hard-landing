@@ -16,6 +16,11 @@
    "licence": "Project original",
    "author": "Hard Landing team"
   },
+  "jake_pbr": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-08 (Shatterlands PBR pack): generated albedos processed for tiling, normal and roughness derived from them; hull authored procedurally. No third-party imagery.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
   "godot": {
    "origin": "Godot Engine 4.7 (engine, default font and editor-generated resources)",
    "licence": "MIT (Godot Engine); default font Open Sans / Noto under OFL 1.1 via the engine",
@@ -401,6 +406,10 @@
   {
    "path": "assets/world/*.glb",
    "source": "blender_scripts"
+  },
+  {
+   "path": "assets/textures/shatterlands/*/*.png",
+   "source": "jake_pbr"
   },
   {
    "path": "assets/kestrel/*.glb",
