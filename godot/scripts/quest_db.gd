@@ -58,6 +58,13 @@ const EXTRA: Array[Dictionary] = [
 		],
 	},
 	{
+		"id": "marigold", "title": "The Marigold", "act": 2, "kind": "discovery", "region": "shatterlands",
+		"summary": "A hauler lies nose-down in the growth, its back still dry. Someone stowed something up there.",
+		"requires": [{"type": "flag", "id": "shatterlands_open"}],
+		"steps": [{"text": "Climb the wrecked hauler and open its dorsal locker", "done": {"type": "flag", "id": "marigold_locker"}}],
+		"rewards": {"scrap": 15},
+	},
+	{
 		"id": "ilse_trail", "title": "Ilse Marrow's trail", "act": 1, "kind": "discovery", "region": "kettle",
 		"summary": "The relay technician left notes everywhere she went. Find them all.",
 		"requires": [{"type": "logs", "ids": ["relay_1"]}],

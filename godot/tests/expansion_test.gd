@@ -273,6 +273,35 @@ func _regions() -> void:
 	_check("hailing it meets Reyes and finishes the quest", gh.hailed() and main.quests.is_done("the_lost"))
 	_check("the gate stays shut for now", _label().contains("stays shut"), _label())
 
+	# The Marigold: walk up the fallen plate and along the spine to the locker.
+	var sh := rm.scene as ShatterlandsThreshold
+	_check("the hauler's locker waits on its back", sh.locker_pos != Vector3.INF and sh.locker_pos.y - sh.global_position.y > 4.0, str(sh.locker_pos - sh.global_position))
+	var foot: Vector3 = sh.to_global(sh.get_node("Marigold").transform * Vector3(-11.5, 0.0, -10.0)) if sh.has_node("Marigold") else Vector3.INF
+	_check("the climb starts on the ground", foot != Vector3.INF)
+	var route: Array[Vector3] = [sh.to_global(sh.get_node("Marigold").transform * Vector3(-2.0, 5.2, -10.0)), sh.to_global(sh.get_node("Marigold").transform * Vector3(0.0, 5.2, 0.0)), sh.locker_pos]
+	_place(Vector3(foot.x, sh.global_position.y + 0.5, foot.z), 0.0)
+	await _frames(5)
+	var leg := 0
+	var t := 0.0
+	Input.action_press("move_forward")
+	while t < 20.0 and leg < route.size():
+		var d: Vector3 = route[leg] - player.global_position
+		d.y = 0.0
+		if d.length() < 0.9:
+			leg += 1
+			continue
+		player.face(atan2(-d.x, -d.z))
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+	Input.action_release("move_forward")
+	await _frames(5)
+	_check("Juno can walk up onto the wreck and along to the locker", leg == route.size() and player.global_position.y - sh.global_position.y > 4.0, "leg %d at %s after %.1f s" % [leg, player.global_position - sh.global_position, t])
+	_check("the locker can be opened", _label().contains("dorsal locker"), _label())
+	var charges := Game.charges
+	await _press("interact")
+	await _frames(3)
+	_check("it holds Voss's log and two charges", sh.locker_open() and Game.has_log("voss_1") and Game.charges == mini(charges + 2, Game.max_charges()) and main.quests.is_done("marigold"))
+
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)
 	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout

@@ -5,6 +5,9 @@ extends "res://tests/test_base.gd"
 ##   godot --headless --path . res://tests/story_test.tscn
 
 
+## Where each region's logs are found (checked again in expansion_test, where the region loads).
+const REGION_SOURCES := {"shatterlands": ["marigold_locker"]}
+
 func _name() -> String:
 	return "STORY TEST"
 
@@ -36,6 +39,10 @@ func _data() -> void:
 			var cache_src: String = l["source"]
 			if not cache_src.begins_with("cache:") or int(cache_src.substr(6)) >= main.wildlife.caches.size():
 				bad.append("no drift cache for " + key)
+			continue
+		if l["site"] in RegionDB.travel_regions():
+			if not REGION_SOURCES.get(l["site"], []).has(l["source"]):
+				bad.append("no place for " + key)
 			continue
 		if l["site"] == "discovery":
 			if not main.discoveries.ids().has(l["source"]):

@@ -247,6 +247,12 @@ const LOGS: Array[Dictionary] = [
 		"title": "Depot core, last state", "author": "WREN, survey ship mind",
 		"text": "Crew of four went north to the spire on day nineteen. Crew of four did not come back. I have kept the lamps on the emergency circuit for six hundred and two days so the door would be easy to find. I am shutting down to save what is left. If you are a ship mind, take my core: the pulse timings for nineteen days are in it, and so is a song the geologist liked. If you are not a ship mind, please find one. I would like the song to be heard.",
 	},
+	# Shatterlands logs ("shatterlands", a place in that region).
+	{
+		"id": "voss_1", "site": "shatterlands", "source": "marigold_locker",
+		"title": "Marigold, dorsal locker", "author": "Hester Voss, hauler Marigold",
+		"text": "Last glass run, and the Marigold's done flying. Doesn't matter. The houses are up, under the big cap, and the big cap is the point: the pulse comes through the rock and the caps drink it. Under there the instruments stop twitching and the seedlings stop dying. Two charges in here for whoever needs them more than a dead hauler does. Plant something.",
+	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{
 		"id": "basin_1", "site": "basin", "source": "cache:0",

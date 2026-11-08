@@ -81,6 +81,10 @@ func _pocket(out: String, r: RegionScene) -> void:
 	await _shot(out, "shatter_arrival", r.to_global(r.entry), r.to_global(Vector3(-6.0, 8.0, -20.0)))
 	await _shot(out, "shatter_wreck", r.to_global(Vector3(4.0, 0.3, 14.0)), r.to_global(Vector3(16.0, 3.0, -10.0)))
 	await _shot(out, "shatter_shelves", r.to_global(Vector3(-24.0, 9.3, -38.0)), r.to_global(Vector3(10.0, 2.0, 10.0)))
+	var sh := r as ShatterlandsThreshold
+	var hull: Node3D = sh.get_node("Marigold")
+	await _shot(out, "shatter_marigold_climb", sh.to_global(hull.transform * Vector3(-15.0, 0.0, -16.0)) * Vector3(1, 0, 1) + Vector3(0.0, sh.global_position.y + 0.3, 0.0), sh.to_global(hull.transform * Vector3(-3.0, 4.0, -4.0)))
+	await _shot(out, "shatter_marigold_top", sh.locker_pos + Vector3(0.0, 0.3, 0.0), sh.greenhouses.to_global(Vector3(0.0, 3.0, 0.0)))
 
 
 ## Voss's greenhouses: from the shelves' foot across the pocket, and at the gate.

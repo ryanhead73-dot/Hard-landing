@@ -38,6 +38,9 @@ const WRECK_POS := Vector3(16.0, 0.0, -10.0)
 var greenhouses: Greenhouses
 var _rng := RandomNumberGenerator.new()
 var _spots: Array[Transform3D] = []
+## Where Juno stands to open the wrecked hauler's dorsal locker (world space).
+var locker_pos := Vector3.INF
+var _locker_tell: MeshInstance3D
 var _mats := {}
 
 
@@ -87,6 +90,8 @@ func build() -> void:
 
 
 func interaction(pos: Vector3) -> Dictionary:
+	if not locker_open() and pos.distance_to(locker_pos) < 2.2:
+		return {"label": "[E] Open the hauler's dorsal locker", "action": open_locker}
 	return greenhouses.interaction(pos) if greenhouses else {}
 
 
@@ -241,10 +246,11 @@ func _build_spots() -> void:
 	add_child(mmi)
 
 
-## A survey hauler that came down nose-first into the growth: a long ivory hull with oxide
+## Voss's supply hauler, the Marigold, that came down nose-first into the growth: a long ivory hull with oxide
 ## bands, tipped and half-buried, ribs showing where the plating tore away.
 func _wreck() -> void:
 	var hull := Node3D.new()
+	hull.name = "Marigold"
 	hull.position = WRECK_POS
 	hull.rotation = Vector3(deg_to_rad(-9.0), deg_to_rad(28.0), deg_to_rad(6.0))
 	add_child(hull)
@@ -261,6 +267,48 @@ func _wreck() -> void:
 	lamp.omni_range = 7.0
 	lamp.position = Vector3(0.0, 3.0, 13.0)
 	hull.add_child(lamp)
+	_wreck_climb(hull)
+
+
+## The way up: a torn-off hull plate leans from the ground onto the buried nose, and the hull's
+## spine climbs from there to the raised tail, where the dorsal locker still holds. From the top
+## Juno sees the whole pocket, the greenhouses' glow included.
+func _wreck_climb(hull: Node3D) -> void:
+	var foot := hull.transform * Vector3(-9.5, 0.0, -10.0)
+	foot.y = 0.0
+	# Ends just above the hull edge, so Juno steps down onto the spine instead of into its side.
+	var lip := hull.transform * Vector3(-3.3, 5.5, -10.0)
+	_ramp(foot, lip, 2.6, _mat(HULL.darkened(0.15), 0.6))
+	# The locker: a squat oxide box on the spine near the tail, an amber tell-tale on top.
+	var locker_local := Vector3(0.0, 5.1 + 0.45, 9.0)
+	_box(locker_local, Vector3(1.4, 0.9, 1.0), _mat(OXIDE, 0.55), true, hull)
+	var tell := MeshInstance3D.new()
+	var tm := BoxMesh.new()
+	tm.size = Vector3(0.25, 0.12, 0.25)
+	tell.mesh = tm
+	tell.material_override = _glow(Color("e8a44e"), 3.0)
+	tell.position = locker_local + Vector3(0.45, 0.5, 0.0)
+	hull.add_child(tell)
+	locker_pos = hull.to_global(locker_local + Vector3(0.0, -0.45, -1.2))
+	_locker_tell = tell
+	_locker_tell.visible = not locker_open()
+
+
+func locker_open() -> bool:
+	return Game.flags.get("marigold_locker", false) == true
+
+
+## Voss's hauler: the locker holds her log and what she left for whoever came next.
+func open_locker() -> void:
+	if locker_open():
+		return
+	Game.set_flag("marigold_locker")
+	Game.find_log("voss_1")
+	Game.add_charges(2)
+	Game.add_scrap(20)
+	if _locker_tell:
+		_locker_tell.visible = false
+	Sfx.play("scrap_pickup", locker_pos, 0.0)
 
 
 ## Small glowing caps scattered across the floor, instanced in one draw call.
@@ -340,7 +388,7 @@ func _columns(xforms: Array[Transform3D]) -> void:
 	add_child(mmi)
 
 
-func _ramp(from: Vector3, to: Vector3, width: float) -> void:
+func _ramp(from: Vector3, to: Vector3, width: float, mat: Material = null) -> void:
 	var run := Vector3(to.x - from.x, 0.0, to.z - from.z)
 	var length := Vector3(run.x, to.y - from.y, run.z).length()
 	var body := StaticBody3D.new()
@@ -348,7 +396,7 @@ func _ramp(from: Vector3, to: Vector3, width: float) -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(width, 0.6, length + 1.0)
 	mi.mesh = mesh
-	mi.material_override = _mat(BASALT)
+	mi.material_override = mat if mat else _mat(BASALT)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = mesh.size
@@ -357,7 +405,8 @@ func _ramp(from: Vector3, to: Vector3, width: float) -> void:
 	body.add_child(shape)
 	add_child(body)
 	body.position = (from + to) * 0.5 + Vector3(0.0, -0.2, 0.0)
-	body.look_at(body.position + Vector3(run.x, to.y - from.y, run.z), Vector3.UP)
+	# look_at takes a world-space target, and the region sits far from the world origin.
+	body.look_at(body.global_position + Vector3(run.x, to.y - from.y, run.z), Vector3.UP)
 
 
 func _box(pos: Vector3, size: Vector3, mat: Material, solid: bool, parent: Node3D = self) -> void:
