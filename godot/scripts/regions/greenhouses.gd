@@ -32,12 +32,26 @@ const FOOTING := 1.0
 const WALK_IN := 1
 const TALK_RANGE := 2.4
 const GATE_SLIDE := 3.6
+## Crew colours, [suit, trim]: Ferro-9's rescue crew, and Ilse's survey expedition.
+const FERRO := [Color("6f7d84"), Color("c98a3c")]
+const EXPEDITION := [Color("8a7a62"), Color("5f8f4e")]
+## The camp's heater, and the lookout platform's top, inside the west wall (local).
+const HEATER := Vector3(-3.6, 0.0, 6.8)
+const LOOKOUT := Vector3(-13.6, 1.6, 0.0)
+## Some of the eleven: [name, local position, yaw, crew, loop]. Their words are Story.SURVIVORS.
+const SURVIVORS := [
+	["Okafor", HEATER + Vector3(1.0, 0.0, -0.6), -1.03, "ferro", "idle"],
+	["Brandt", HEATER + Vector3(-1.1, 0.0, 0.4), 1.9, "ferro", "crouch"],
+	["Haddad", LOOKOUT, -PI * 0.5, "expedition", "idle"],
+	["Teo", Vector3(-1.0, FOOTING, -3.5), -PI * 0.5, "expedition", "crouch"],
+]
 ## Where Reyes stands, inside the gate under its lamp (local).
 const REYES_AT := Vector3(2.6, 0.0, 7.6)
 
 var gate_pos := Vector3.ZERO
 var intercom_pos := Vector3.ZERO
 var reyes: Node3D
+var survivors: Array[Node3D] = []
 ## The walk-in glasshouse's door and the middle of its floor (world space).
 var house_door := Vector3.ZERO
 var house_inside := Vector3.ZERO
@@ -52,6 +66,7 @@ func _ready() -> void:
 		_glasshouse(Vector3(-8.0 + i * 8.0, 0.0, -2.0), i < 2, i == WALK_IN)
 	_gate()
 	_reyes()
+	_camp()
 	_sync_gate(false)
 
 
@@ -90,6 +105,9 @@ func _process(_delta: float) -> void:
 func interaction(pos: Vector3) -> Dictionary:
 	if reyes and reyes.visible and pos.distance_to(reyes.global_position) < TALK_RANGE:
 		return {"label": "[E] Talk to Reyes", "action": talk}
+	for p in survivors:
+		if pos.distance_to(p.global_position) < TALK_RANGE:
+			return {"label": "[E] Talk to %s" % p.name, "action": func(): _bark(p.name)}
 	if pos.distance_to(intercom_pos) > HAIL_RANGE or is_open():
 		return {}
 	if hailed():
@@ -132,6 +150,12 @@ func talk() -> void:
 		return
 	Game.set_flag("reyes_talked")
 	main.voice.say(Story.REYES_TALK)
+
+
+func _bark(who: String) -> void:
+	var main := _main()
+	if main:
+		main.voice.say(Story.SURVIVORS.get(who, []))
 
 
 ## Gate and Reyes follow the flag: shut with nobody inside, or slid aside with Reyes waiting.
@@ -376,11 +400,63 @@ func _gate() -> void:
 ## Lt. Sana Reyes: Juno's own suit model in Ferro-9's colours (slate with an amber stripe), standing
 ## easy inside the gate. Hidden until the gate opens.
 func _reyes() -> void:
-	reyes = Node3D.new()
-	reyes.name = "Reyes"
-	reyes.position = REYES_AT
-	add_child(reyes)
-	var rig := Rig.spawn("juno_rigged", reyes)
+	reyes = _person("Reyes", REYES_AT, 0.0, FERRO, "idle")
+
+
+## Some of the eleven, about the compound: around the heater by the gate, on the west wall's
+## lookout, and at the beds in the walk-in house. Each has a word for Juno.
+func _camp() -> void:
+	# The heater: a drum with a glowing grate, and the warm light that fills the yard.
+	var drum := MeshInstance3D.new()
+	var dm := CylinderMesh.new()
+	dm.top_radius = 0.42
+	dm.bottom_radius = 0.45
+	dm.height = 0.9
+	dm.radial_segments = 12
+	drum.mesh = dm
+	drum.material_override = _mat(OXIDE.darkened(0.3), 0.7)
+	drum.position = HEATER + Vector3(0.0, 0.45, 0.0)
+	add_child(drum)
+	var grate := MeshInstance3D.new()
+	var gm := CylinderMesh.new()
+	gm.top_radius = 0.38
+	gm.bottom_radius = 0.38
+	gm.height = 0.04
+	gm.radial_segments = 12
+	grate.mesh = gm
+	var fire := StandardMaterial3D.new()
+	fire.albedo_color = AMBER.darkened(0.2)
+	fire.emission_enabled = true
+	fire.emission = Color("ff9a3c")
+	fire.emission_energy_multiplier = 4.0
+	grate.material_override = fire
+	grate.position = HEATER + Vector3(0.0, 0.91, 0.0)
+	add_child(grate)
+	var light := OmniLight3D.new()
+	light.light_color = Color("ffb060")
+	light.light_energy = 1.5
+	light.omni_range = 8.5
+	light.shadow_enabled = false
+	light.position = HEATER + Vector3(0.0, 1.4, 0.0)
+	add_child(light)
+	# Salvage stacked by the heater, and the lookout's platform on the west wall.
+	_solid(HEATER + Vector3(-2.2, 0.45, 1.3), Vector3(1.1, 0.9, 0.9), _mat(SLATE, 0.7))
+	_solid(HEATER + Vector3(-2.3, 1.15, 1.3), Vector3(0.8, 0.5, 0.7), _mat(IVORY.darkened(0.2), 0.7))
+	_solid(LOOKOUT + Vector3(0.0, -0.8, 0.0), Vector3(1.6, 1.6, 1.6), _mat(SLATE, 0.8))
+	for s in SURVIVORS:
+		var at: Vector3 = s[1]
+		var p := _person(s[0], at, s[2], FERRO if s[3] == "ferro" else EXPEDITION, s[4])
+		survivors.append(p)
+
+
+## A person on Juno's rig, recoloured: `palette` is [suit, trim]; `clip` is the loop they hold.
+func _person(who: String, at: Vector3, yaw: float, palette: Array, clip: String) -> Node3D:
+	var n := Node3D.new()
+	n.name = who
+	n.position = at
+	n.rotation.y = yaw
+	add_child(n)
+	var rig := Rig.spawn("juno_rigged", n)
 	for mi in Rig.meshes(rig):
 		var mesh := mi.mesh
 		if mesh == null:
@@ -389,18 +465,24 @@ func _reyes() -> void:
 			var src := mi.get_active_material(i) as StandardMaterial3D
 			if src == null:
 				continue
-			var m := src.duplicate() as StandardMaterial3D
-			# Ivory suit panels go Ferro slate; oxide trim goes amber; dark parts stay.
-			var c := m.albedo_color
-			if c.get_luminance() > 0.55:
-				m.albedo_color = Color("6f7d84")
-			elif c.r > c.b * 1.6 and c.r > 0.35:
-				m.albedo_color = AMBER.darkened(0.15)
-			mi.set_surface_override_material(i, m)
+			var key := "%s/%d/%s" % [mesh.resource_path, i, palette[0].to_html()]
+			if not _mats.has(key):
+				var m := src.duplicate() as StandardMaterial3D
+				# Ivory suit panels take the crew's colour; oxide trim takes the trim; dark parts stay.
+				var c := m.albedo_color
+				if c.get_luminance() > 0.55:
+					m.albedo_color = palette[0]
+				elif c.r > c.b * 1.6 and c.r > 0.35:
+					m.albedo_color = palette[1]
+				_mats[key] = m
+			mi.set_surface_override_material(i, _mats[key])
 	var clips := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	if clips and clips.has_animation("idle"):
-		clips.get_animation("idle").loop_mode = Animation.LOOP_LINEAR
-		clips.play("idle")
+	if clips and clips.has_animation(clip):
+		clips.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
+		clips.play(clip)
+		# Not all in step.
+		clips.seek(randf() * clips.current_animation_length, true)
+	return n
 
 
 ## A ramp rising north to `rise` over `run` metres, its top edge at `edge` (local, ground level).

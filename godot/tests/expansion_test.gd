@@ -364,6 +364,19 @@ func _regions() -> void:
 	await _press("interact")
 	await _frames(3)
 	_check("and talking to her is remembered", Game.flags.get("reyes_talked", false) == true)
+	# Some of the eleven about the camp, each with a word for Juno.
+	_check("the camp has more of the eleven", gh.survivors.size() >= 4)
+	var words := 0
+	for p in gh.survivors:
+		_place(p.global_position + Vector3(0.0, 0.5, 0.0) - p.global_transform.basis.z * 1.0, 0.0)
+		await _frames(3)
+		if _label().contains("Talk to %s" % p.name) and not Story.SURVIVORS.get(p.name, []).is_empty():
+			words += 1
+		else:
+			print("  no word from %s: %s" % [p.name, _label()])
+	_check("each can be talked to", words == gh.survivors.size(), "%d of %d" % [words, gh.survivors.size()])
+	var haddad: Node3D = gh.survivors.filter(func(p): return p.name == "Haddad")[0]
+	_check("the lookout stands high enough to see over the wall", haddad.global_position.y - gh.global_position.y > 1.4)
 
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)

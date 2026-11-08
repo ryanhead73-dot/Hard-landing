@@ -121,6 +121,8 @@ func _greenhouses(out: String, r: RegionScene) -> void:
 	Game.set_flag("greenhouse_open")
 	gh._sync_gate(false)
 	await _shot(out, "greenhouses_open", gh.gate_pos + Vector3(-2.5, 0.3, -6.5), gh.reyes.global_position + Vector3(0.0, 1.4, 0.0))
+	await _shot(out, "greenhouses_camp", gh.to_global(Greenhouses.HEATER + Vector3(5.0, 0.3, -4.0)), gh.to_global(Greenhouses.HEATER + Vector3(0.0, 1.0, 0.5)))
+	await _shot(out, "greenhouses_lookout", gh.to_global(Greenhouses.LOOKOUT + Vector3(5.0, -1.3, 3.5)), gh.to_global(Greenhouses.LOOKOUT + Vector3(0.0, 1.0, 0.0)))
 	await _shot(out, "greenhouses_inside", gh.house_inside + Vector3(0.0, 0.3, 5.0), gh.house_inside + Vector3(0.0, 1.2, -6.0))
 
 

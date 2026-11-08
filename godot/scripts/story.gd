@@ -99,6 +99,13 @@ const REYES_TALK := [
 	[REYES, "Some nights it gets through. Then we sit very still and wait for morning."],
 	[REYES, "You've got a ship with a frame. We've got hands and a greenhouse full of salvage. Let's talk about getting both of us off this rock."],
 ]
+## Some of Reyes's eleven, a word each when Juno stops by (Claude's draft names and lines).
+const SURVIVORS := {
+	"Okafor": [["Okafor", "Okafor, Ferro-9's medic. If you're going to bleed, bleed over here, not on the beans."]],
+	"Brandt": [["Brandt", "Brandt. I flew Ferro-9 in. Not my best landing. Not yours either, I hear."]],
+	"Haddad": [["Haddad", "I watch the caps. When the violet goes dark all at once, the pulse is coming. Get inside."]],
+	"Teo": [["Teo", "Voss's seed stock, sixty years in a locker, and it still comes up. Mind the squash."]],
+}
 const REYES_AGAIN := [
 	[REYES, "Look around, Vale. Middle house is ours to eat from. Mind the beds."],
 ]
