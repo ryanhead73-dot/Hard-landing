@@ -210,9 +210,13 @@ func _opening(out: String) -> void:
 	await get_tree().create_timer(2.5).timeout
 	main.player.aim_at(a._at(Vector3(-30.0, -4.0, 13.0)))
 	await _still(out, "open_drift")
-	op._on_fell(2)
-	await _frames(10)
-	main.end_intro()
+	await op._on_fell(2)
+	var waited := 0
+	while not main.intro_playing and waited < 120:
+		await _frames(1)
+		waited += 1
+	if main.intro_playing:
+		main.end_intro()
 	await _frames(10)
 	main.player.aim_at(op._ship(Opening.MEDSEAL))
 	await _still(out, "open_wake")

@@ -39,6 +39,11 @@
    "origin": "Drawn by tools/make_icon.py in this repository",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "jake_audio": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-08 (Kestrel opening asset batches 01-04): original synthesised sound design and music loops, converted to the project's formats. No third-party recordings.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -395,6 +400,98 @@
   },
   "wind_loop": {
    "source": "synth_music",
+   "tier": "bed"
+  },
+  "hob_chime": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "hob_warning": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "hob_warning_detuned": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "triple_click": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scanner_ping": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "med_seal": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "relay_two_note": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "breaker_clunk": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "fence_snap": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "relay_surge": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_cell_seat": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_rail_align": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_first_shot": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_hiss": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_chitter": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_attack": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_step": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "music_ship_theme": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "music_sighting": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "music_first_fight": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "amb_basin_loop": {
+   "source": "jake_audio",
+   "tier": "bed"
+  },
+  "amb_gully_loop": {
+   "source": "jake_audio",
+   "tier": "bed"
+  },
+  "amb_cold_ship_loop": {
+   "source": "jake_audio",
    "tier": "bed"
   }
  },

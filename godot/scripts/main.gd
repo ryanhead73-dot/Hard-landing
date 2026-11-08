@@ -133,6 +133,7 @@ var regions: RegionManager
 var opening: Opening
 ## Optional places off the repair routes (Discoveries).
 var discoveries: Discoveries
+var finds: WalkFinds
 ## The Kettle's big shapes: the Split round the canyon gate and the Chimney geyser.
 var landmarks: Landmarks
 var onboarding: Onboarding
@@ -309,6 +310,10 @@ func _ready() -> void:
 	discoveries.name = "Discoveries"
 	add_child(discoveries)
 	discoveries.setup(self)
+	finds = WalkFinds.new()
+	finds.name = "WalkFinds"
+	add_child(finds)
+	finds.setup(self)
 	landmarks = Landmarks.new()
 	add_child(landmarks)
 	landmarks.setup(self)
@@ -662,8 +667,11 @@ func _find_interaction() -> Dictionary:
 		return {}
 	var pos := player.global_position
 	var gate := regions.interaction(pos)
-	if not gate.is_empty() or not regions.in_kettle():
+	if not gate.is_empty():
 		return gate
+	var find := finds.interaction(pos)
+	if not find.is_empty() or not regions.in_kettle():
+		return find
 	var scripted := opening.interaction(pos)
 	if not scripted.is_empty():
 		return scripted

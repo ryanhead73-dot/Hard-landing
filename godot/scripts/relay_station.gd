@@ -90,7 +90,13 @@ func _build_cover() -> void:
 
 
 ## The backup generator comes back: the station's lamps light, and the mast blinks.
-func on_stage_done(stage: int, _animate: bool) -> void:
+func on_stage_done(stage: int, animate: bool) -> void:
+	if animate:
+		match stage:
+			0:
+				Sfx.play("breaker_clunk", to_global(Vector3(-12.0, 1.0, 0.5)), 0.0, 0.0)
+			1:
+				Sfx.play("relay_surge", to_global(Vector3(2.4, 1.5, -8.0)), -2.0, 0.0)
 	if stage == 0 and _station_lights.is_empty():
 		for p in [Vector3(-2.5, 3.4, -5.0), Vector3(2.5, 3.4, -7.0)]:
 			_station_lights.append(_light(p, Color("ffd9a0"), 1.4, 8.0))

@@ -132,6 +132,9 @@ func _idle() -> Vector3:
 			var a := randf() * TAU
 			_wander = home + Vector3(cos(a), 0.0, sin(a)) * randf_range(minf(1.0, wander_radius), wander_radius)
 			_timer = randf_range(1.5, 4.0)
+			# Now and then an idle one chitters to itself: you hear the pack before you see it.
+			if randf() < 0.3:
+				Sfx.play("scuttler_chitter", global_position, -10.0, 0.1)
 		return Vector3.ZERO
 	var dir := _flat(_wander - global_position).normalized()
 	_face(global_position + dir, 0.1)
@@ -147,6 +150,7 @@ func _chase(delta: float) -> Vector3:
 		state = State.WINDUP
 		_timer = windup_time
 		Sfx.play("scuttler_lunge", global_position, -4.0, 0.1)
+		Sfx.play("scuttler_hiss", global_position, -6.0, 0.1)
 		return Vector3.ZERO
 	if _out_of_leash(to_target):
 		calm()
@@ -182,6 +186,7 @@ func is_waiting() -> bool:
 func _lunge() -> void:
 	state = State.RECOVER
 	_anim("attack")
+	Sfx.play("scuttler_attack", global_position, -4.0, 0.08)
 	_timer = recover_time
 	if not _target_alive():
 		return

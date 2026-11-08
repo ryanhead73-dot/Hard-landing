@@ -29,6 +29,11 @@ const SOUNDS: Array[String] = [
 	"signal_ping",
 	"skimmer_screech", "skimmer_dive", "skimmer_rake", "skimmer_flap", "skimmer_hurt", "skimmer_death",
 	"hull_groan",
+	# The opening (Jake's asset batch, 2026-11-08).
+	"hob_chime", "hob_warning", "hob_warning_detuned", "triple_click", "scanner_ping", "med_seal",
+	"relay_two_note", "breaker_clunk", "fence_snap", "relay_surge", "rifle_cell_seat", "rifle_rail_align",
+	"rifle_first_shot", "scuttler_hiss", "scuttler_chitter", "scuttler_attack", "scuttler_step",
+	"music_ship_theme", "music_sighting", "music_first_fight", "amb_basin_loop", "amb_gully_loop", "amb_cold_ship_loop",
 ]
 const MAX_VARIANTS := 8
 

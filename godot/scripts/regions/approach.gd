@@ -65,6 +65,7 @@ func build() -> void:
 	_main = get_parent()
 	kestrel = Kestrel.new()
 	kestrel.name = "KestrelAloft"
+	kestrel.pristine = true
 	add_child(kestrel)
 	kestrel.remove_from_group("kestrel")
 	for id in Kestrel.REPAIR_ORDER:
@@ -84,7 +85,7 @@ func build() -> void:
 
 func _ready() -> void:
 	super._ready()
-	Sfx.play("log_chime", null, -4.0, 0.0)
+	Sfx.play("hob_chime", null, -4.0, 0.0)
 	if _main and _main.get("voice"):
 		_main.voice.say(Story.APPROACH_WAKE)
 
@@ -174,7 +175,9 @@ func trace() -> void:
 		beat = Beat.TRACING
 		for d in _trace_dots:
 			d.visible = true
-		Sfx.play("signal_ping", null, -6.0, 0.0)
+		Sfx.play("scanner_ping", null, -6.0, 0.0)
+		# The planet fills the canopy, and with it the interference: three dry clicks.
+		Sfx.play("triple_click", null, -8.0, 0.0)
 		return
 	if traced < _trace_dots.size():
 		(_trace_dots[traced].material_override as StandardMaterial3D).emission = TEAL
@@ -184,6 +187,7 @@ func trace() -> void:
 	if traced >= 3:
 		beat = Beat.DRIFT
 		_main.voice.interrupt(Story.APPROACH_TRACE)
+		Sfx.play("hob_warning", null, -6.0, 0.0)
 		# The autopilot slips a degree off course.
 		create_tween().tween_property(_sky, "rotation:z", deg_to_rad(1.5), 1.5).set_trans(Tween.TRANS_SINE)
 
@@ -199,6 +203,7 @@ func override() -> void:
 	_main.voice.interrupt(Story.APPROACH_DRIFT)
 	_arc.visible = true
 	Sfx.play("loom_hum", null, 0.0, 0.0)
+	Sfx.play("triple_click", null, -2.0, 0.0)
 	_main.player.add_trauma(0.35)
 
 
@@ -208,6 +213,8 @@ func hold_harness() -> void:
 	_brace_prompted = 0
 	_main.voice.interrupt(Story.APPROACH_FALL)
 	Sfx.play("hull_groan", null, 2.0, 0.0)
+	# The warning chimes detune as the field takes hold.
+	Sfx.play("hob_warning_detuned", null, -2.0, 0.0)
 	_next_brace()
 
 

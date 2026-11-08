@@ -191,7 +191,7 @@ func _loudest_window_db(path: String) -> float:
 func _music() -> void:
 	var m: MusicDirector = main.music
 	var playing := m.players.values().all(func(p): return p.playing and p.bus == "Music")
-	_check("all three music layers play together", m.players.size() == 3 and playing)
+	_check("every music layer plays together", m.players.size() == MusicDirector.LAYERS.size() and playing)
 	player.revive(ARENA)
 	await get_tree().create_timer(0.6).timeout
 	_check("music starts calm", m.mood == "calm" and m.levels["music_combat"] < 0.1)
@@ -218,7 +218,10 @@ func _ambience() -> void:
 	_check("open ground is wind", a.zone == "wind")
 	player.revive(kestrel.to_global(kestrel.plan(6.0, 1.3, 13.0)))
 	await _frames(5)
-	_check("inside Kestrel is the interior", a.zone == "interior")
+	_check("inside the dark Kestrel is the cold wreck", a.zone == ("interior" if kestrel.is_repaired("aux_power") else "cold"), a.zone)
+	kestrel.set_repaired("aux_power", true)
+	await _frames(5)
+	_check("with aux power it is the interior", a.zone == "interior", a.zone)
 	player.revive(main.sites["cooling"].global_position + Vector3(0.0, 1.0, 6.0))
 	await _frames(5)
 	_check("the hauler wreck has the hot springs", a.zone == "springs", a.zone)

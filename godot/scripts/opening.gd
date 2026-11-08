@@ -176,6 +176,35 @@ func _process(delta: float) -> void:
 			_hungry_tick(delta)
 
 
+## Music for where the opening is, by layer (see MusicDirector.OPENING_LAYERS): the ship's theme
+## aboard in orbit, silence after the crash, a quiet bass pulse once she has the rifle, the
+## sighting's tension while the watcher is in the gully, the bass full once the hungry scuttler
+## commits, and quiet again at the relay until the cell's two-note motif.
+func music_levels() -> Dictionary:
+	var out := {"music_ship_theme": 0.0, "music_sighting": 0.0, "music_first_fight": 0.0}
+	match beat():
+		Beat.APPROACH:
+			if main.regions.current == "approach":
+				out["music_ship_theme"] = 0.8
+		Beat.TRAIL:
+			if main.player.armed:
+				out["music_first_fight"] = 0.3
+		Beat.ARMED:
+			if _watcher and is_instance_valid(_watcher) and not _watcher.dead:
+				out["music_sighting"] = 1.0
+			else:
+				out["music_first_fight"] = 0.25
+		Beat.WATCHED:
+			var fighting: bool = _hungry != null and is_instance_valid(_hungry) and _hungry.hunting and not _hungry.dead
+			out["music_first_fight"] = 1.0 if fighting else 0.3
+	return out
+
+
+## The ambience bed outdoors in the opening: the reed gully near it, the open basin elsewhere.
+func ambience_zone(at: Vector3) -> String:
+	return "gully" if Vector2(at.x, at.z).distance_to(GULLY_AT) < 16.0 else "basin"
+
+
 ## The prompt the opening offers at `pos`, or {}. Main asks this first while it is active.
 func interaction(pos: Vector3) -> Dictionary:
 	if not active() or not main.regions.in_kettle():
@@ -245,6 +274,7 @@ func on_stim() -> void:
 	if beat() != Beat.WAKE:
 		return
 	main.player.regen_blocked = false
+	Sfx.play("med_seal", null, -2.0, 0.0)
 	_set_beat(Beat.SEALED)
 	main.voice.interrupt(Story.SEALED)
 	main.save_game()
@@ -260,7 +290,7 @@ func _scans() -> Array:
 
 func _scan(id: String) -> void:
 	Game.set_flag(id, true)
-	Sfx.play("signal_ping", null, -4.0, 0.0)
+	Sfx.play("scanner_ping", null, -4.0, 0.0)
 	main.player.anim.play("interact")
 	main.voice.interrupt(Story.SCANS[id])
 	if _scans().all(func(s): return Game.flags.get(s[0], false)):
@@ -270,7 +300,7 @@ func _scan(id: String) -> void:
 
 func _scan_spool() -> void:
 	Game.set_flag("spool_scanned", true)
-	Sfx.play("signal_ping", null, -4.0, 0.0)
+	Sfx.play("scanner_ping", null, -4.0, 0.0)
 	main.voice.interrupt(Story.SPOOL)
 
 
@@ -303,7 +333,7 @@ func _open_pod() -> void:
 func _assemble(step: String) -> void:
 	Game.set_flag(step, true)
 	main.player.anim.play("interact")
-	Sfx.play("rifle_reload", null, -2.0, 0.0)
+	Sfx.play("rifle_cell_seat" if step == "rifle_cell" else "rifle_rail_align", null, -2.0, 0.0)
 	if not (Game.flags.get("rifle_cell", false) and Game.flags.get("rifle_rail", false)):
 		main.voice.interrupt(Story.ASSEMBLE_1)
 		return
@@ -342,8 +372,12 @@ func _start_watcher() -> void:
 	_watcher.set_physics_process(false)
 	_watcher.died.connect(func(_e): _watcher_gone(), CONNECT_ONE_SHOT)
 	main.voice.say(Story.WATCHER)
-	Sfx.play("scuttler_alert", _watcher.global_position, -8.0, 0.0)
+	Sfx.play("scuttler_chitter", _watcher.global_position, -6.0, 0.0)
 	var to := _ground(WATCHER_TO, 0.5)
+	for i in 6:
+		get_tree().create_timer(0.5 + i * 0.55).timeout.connect(func():
+			if is_instance_valid(_watcher):
+				Sfx.play("scuttler_step", _watcher.global_position, -8.0, 0.08))
 	_watcher.look_at(to, Vector3.UP)
 	var t := create_tween()
 	t.tween_property(_watcher, "global_position", to, 3.5)
@@ -378,7 +412,8 @@ func _hungry_tick(delta: float) -> void:
 		_hungry.sight_range = 0.0
 		_hungry.died.connect(_on_hungry_died, CONNECT_ONE_SHOT)
 		_hungry_warned = 0.0
-		Sfx.play("arc_zap", yard, 2.0, 0.0)
+		Sfx.play("fence_snap", yard, 2.0, 0.0)
+		Sfx.play("arc_zap", yard, -2.0, 0.0)
 		Sfx.play("scuttler_alert", _hungry.global_position, 0.0, 0.0)
 		main.voice.interrupt(Story.YARD_SURGE)
 		return
@@ -389,7 +424,7 @@ func _hungry_tick(delta: float) -> void:
 	if d < 9.0 or _hungry_warned > 0.0:
 		_hungry_warned += delta
 		if _hungry_warned == delta:
-			Sfx.play("scuttler_lunge", _hungry.global_position, 2.0, 0.0)
+			Sfx.play("scuttler_hiss", _hungry.global_position, 2.0, 0.0)
 			main.voice.interrupt(Story.YARD_WARNING)
 		if _hungry_warned > 1.8:
 			_hungry.sight_range = 18.0
@@ -417,6 +452,7 @@ func on_component_taken(id: String) -> void:
 		return
 	_set_beat(Beat.DONE)
 	mark_seen()
+	Sfx.play("relay_two_note", null, -4.0, 0.0)
 	main.spawn_roamers()
 	main.voice.interrupt(Story.CELL_TAKEN)
 	_clear_props()

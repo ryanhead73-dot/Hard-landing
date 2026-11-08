@@ -77,6 +77,19 @@ const YARD_WARNING: Array = [[JUNO, "I said easy!"]]
 const YARD_AFTER: Array = [[JUNO, "Sorry. You gave me no room."], [JUNO, "It's got a battery contact in its teeth. The relay's breaker will want that."]]
 const CELL_TAKEN: Array = [[JUNO, "There you are."], [JUNO, "Hang on, HOB. I found you a heartbeat."]]
 
+## Small finds on the walks between sites (WalkFinds).
+const FIND_RAIN_CUP: Array = [[JUNO, "Rainwater, clean as a lab sample. No: there's fibre in it, fine as hair."], [JUNO, "And it conducts. Wired it into the scanner. Huh. Better range."]]
+const FIND_RAIN_CUP_AGAIN: Array = [[JUNO, "Fibre in the rain. It conducts. Worth something to the fabricator, anyway."]]
+const FIND_TOWING_MARKS: Array = [[JUNO, "Something dragged a crate in here and never came back for it. Its loss."]]
+const FIND_BEACON: Array = [[JUNO, "Back to the sky, old thing."], [JUNO, "It's pinging. And it's got a bearing on the canyon east: marked."]]
+const FIND_GLASS_WIND: Array = [[JUNO, "Low, high, middle. The wind told me the combination. Spare rifle parts inside."]]
+const FIND_BOLT_TAKEN: Array = [[JUNO, "Kestrel's stamp. Bolt fourteen-C. She's shedding."]]
+const FIND_BOLT_RETURNED: Array = [[HOB, "Bolt fourteen-C. I'd been wondering where you'd gone."], [JUNO, "You talk to the bolts?"], [HOB, "Only the ones that come back."]]
+const FIND_HELMET: Array = [[JUNO, "Someone's suit recorder. They were humming."], [JUNO, "The same three clicks. Before they crashed, or after?"]]
+const FIND_BOOT: Array = [[JUNO, "One boot. Inside: a ration, never opened, and coordinates in pencil. The greenhouse."], [JUNO, "Whoever left this wanted the next one to find their way. Thanks."]]
+const FIND_ORCHARD: Array = [[JUNO, "Seed pods that keep a charge. Slow feet, no flash. I'll take one."]]
+const FIND_POCKET_WEATHER: Array = [[JUNO, "Rain from nowhere, and it falls in threes. Same beat as the Loom pulse."], [JUNO, "Spore fibre in the puddle, too. Into the pouch."]]
+
 ## New game: Juno, alone, Kestrel dark.
 const OPENING: Array = [
 	[JUNO, "Kestrel? ...Nothing. Every board's red and the ship mind's dark."],

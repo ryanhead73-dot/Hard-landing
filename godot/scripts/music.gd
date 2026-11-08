@@ -5,14 +5,23 @@ extends Node
 ## when wildlife is hunting near Juno or Kestrel is under siege, and the finale layer drives the
 ## engine spool and the launch.
 
-const LAYERS := ["music_calm", "music_combat", "music_finale"]
-const BASE_DB := {"music_calm": -8.0, "music_combat": -7.0, "music_finale": -6.0}
+const LAYERS := ["music_calm", "music_combat", "music_finale", "music_ship_theme", "music_sighting", "music_first_fight"]
+## The opening's own cues (Opening.music_levels): free-running loops, restarted from the top
+## whenever one comes in from silence, so each cue starts on its first bar.
+const OPENING_LAYERS := ["music_ship_theme", "music_sighting", "music_first_fight"]
+const BASE_DB := {
+	"music_calm": -8.0, "music_combat": -7.0, "music_finale": -6.0,
+	"music_ship_theme": -11.0, "music_sighting": -9.0, "music_first_fight": -8.0,
+}
 const COMBAT_RANGE := 45.0
 const FADE := 0.5  ## Linear volume per second.
 
 var main: Node
 var mood := "calm"
-var levels := {"music_calm": 1.0, "music_combat": 0.0, "music_finale": 0.0}
+var levels := {
+	"music_calm": 1.0, "music_combat": 0.0, "music_finale": 0.0,
+	"music_ship_theme": 0.0, "music_sighting": 0.0, "music_first_fight": 0.0,
+}
 var players := {}
 var _check := 0.0
 
@@ -41,11 +50,18 @@ func _process(delta: float) -> void:
 		mood = pick_mood()
 	var want := targets(mood)
 	for id in LAYERS:
-		levels[id] = move_toward(levels[id], want[id], FADE * delta)
+		var target: float = want.get(id, 0.0)
+		if id in OPENING_LAYERS and levels[id] < 0.01 and target > 0.0 and players.has(id) and players[id].stream:
+			players[id].play(0.0)
+		levels[id] = move_toward(levels[id], target, FADE * delta)
 	_apply()
 
 
 func targets(m: String) -> Dictionary:
+	if m == "opening":
+		var cue: Dictionary = main.opening.music_levels()
+		cue.merge({"music_calm": 0.0, "music_combat": 0.0, "music_finale": 0.0})
+		return cue
 	match m:
 		"combat":
 			return {"music_calm": 0.8, "music_combat": 1.0, "music_finale": 0.0}
@@ -61,6 +77,8 @@ func pick_mood() -> String:
 		return "calm"
 	if main.ending_shown:
 		return "ending"
+	if main.opening and main.opening.active():
+		return "opening"
 	if main.finale.state != Finale.State.IDLE:
 		return "finale"
 	if main.siege.is_active():
