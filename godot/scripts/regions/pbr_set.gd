@@ -1,7 +1,7 @@
 class_name PbrSet
 extends RefCounted
 ## Materials from the tiling PBR sets in assets/textures/<folder>/<set>/ (albedo, normal,
-## roughness, and an optional emission_mask), made by Jake for the Shatterlands. Mapped
+## roughness, and optional metallic and emission_mask maps), made by Jake for the Shatterlands. Mapped
 ## triplanar, so one material fits any size of mesh without UV work: `metres` is how much
 ## surface one repeat of the texture covers. World-space by default, so neighbouring pieces line
 ## up; `world = false` maps in the mesh's own space, for things that are rotated (the wreck).
@@ -32,6 +32,11 @@ static func material(folder: String, set_name: String, metres: float, world := t
 	if rough:
 		m.roughness_texture = rough
 		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	var metal := _load(path + "metallic.png")
+	if metal:
+		m.metallic = 1.0
+		m.metallic_texture = metal
+		m.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	var mask := _load(path + "emission_mask.png")
 	if mask and emission != Color.BLACK:
 		m.emission_enabled = true

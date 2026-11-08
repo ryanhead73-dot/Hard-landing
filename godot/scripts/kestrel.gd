@@ -31,6 +31,15 @@ const RAMP_HINGE_Y := -0.1
 const RAMP_LENGTH := 3.0
 const RAMP_OPEN_DEG := -118.0
 
+# Materials from the Kestrel PBR sets (assets/textures/kestrel): set, metres per repeat, tint.
+const PBR := {
+	"hull": ["kestrel_ivory_hull", 4.0, Color.WHITE],
+	"nacelle": ["kestrel_engine_nacelle", 3.0, Color(1.35, 1.35, 1.4)],
+	"frame": ["kestrel_canopy_frame", 1.5, Color(0.55, 0.57, 0.6)],
+	"deck": ["kestrel_interior_floor_grating", 1.6, Color.WHITE],
+	"panel": ["kestrel_interior_wall_panels", 2.4, Color(0.95, 0.93, 0.88)],
+}
+
 const PALETTE := {
 	"hull": Color("e9e1cc"),
 	"oxide": Color("c4622d"),
@@ -44,20 +53,6 @@ const PALETTE := {
 	"bare_metal": Color("9aa0a3"),
 	"void": Color("0b0c0d"),
 }
-
-# Outer oxide stripes: [x range, y range, z range]. Each sits 0.04 m proud of the hull face.
-const OXIDE_BANDS := [
-	[[11.35, 23.65], [0.55, 0.85], [8.86, 8.92]],
-	[[11.35, 23.65], [0.55, 0.85], [17.08, 17.14]],
-	[[7.95, 11.25], [0.55, 0.85], [9.06, 9.12]],
-	[[7.95, 11.25], [0.55, 0.85], [16.88, 16.94]],
-	[[28.65, 30.05], [0.55, 0.85], [10.06, 10.12]],
-	[[28.65, 30.05], [0.55, 0.85], [15.88, 15.94]],
-	[[23.95, 28.55], [0.55, 0.85], [9.06, 9.12]],
-	[[23.95, 28.55], [0.55, 0.85], [16.88, 16.94]],
-	[[3.55, 8.05], [1.6, 1.9], [10.46, 10.52]],
-	[[3.55, 8.05], [1.6, 1.9], [15.48, 15.54]],
-]
 
 const AUX_LIGHTS := [
 	Vector3(14.0, 3.0, 11.0), Vector3(14.0, 3.0, 15.0), Vector3(20.0, 3.0, 11.0), Vector3(20.0, 3.0, 15.0),
@@ -78,15 +73,21 @@ const EMERGENCY_LIGHTS := [
 	Vector3(12.0, 3.0, 13.0), Vector3(23.0, 3.0, 13.0), Vector3(9.6, 3.4, 13.0), Vector3(27.0, 2.8, 13.0),
 ]
 
+# Wings sit through the engine pods at mid-hull, as on the model sheet: 20 m span.
+const WING_Y := [1.75, 2.15]
 const WING_OUTLINE := [
-	Vector2(13.4, 8.9), Vector2(15.5, 3.5), Vector2(16.6, 0.6), Vector2(20.0, 0.6), Vector2(21.0, 3.5), Vector2(23.5, 8.9),
+	Vector2(13.5, 8.8), Vector2(21.8, 3.0), Vector2(24.4, 3.0), Vector2(26.0, 6.5), Vector2(26.0, 8.8),
 ]
-const PORT_WING_ROOT := [Vector2(13.4, 8.9), Vector2(15.5, 3.5), Vector2(21.0, 3.5), Vector2(23.5, 8.9)]
-const PORT_WING_TIP := [Vector2(15.5, 3.5), Vector2(16.6, 0.6), Vector2(20.0, 0.6), Vector2(21.0, 3.5)]
+const PORT_WING_ROOT := [Vector2(13.5, 8.8), Vector2(18.94, 5.0), Vector2(25.31, 5.0), Vector2(26.0, 6.5), Vector2(26.0, 8.8)]
+const PORT_WING_TIP := [Vector2(18.94, 5.0), Vector2(21.8, 3.0), Vector2(24.4, 3.0), Vector2(25.31, 5.0)]
 const PORT_WING_BROKEN := [
-	Vector2(13.4, 8.9), Vector2(15.5, 3.5), Vector2(16.7, 3.9), Vector2(17.6, 3.1),
-	Vector2(18.8, 4.2), Vector2(20.1, 3.4), Vector2(21.0, 3.5), Vector2(23.5, 8.9),
+	Vector2(13.5, 8.8), Vector2(18.94, 5.0), Vector2(20.2, 5.5), Vector2(21.3, 4.6), Vector2(22.6, 5.6),
+	Vector2(23.8, 4.8), Vector2(25.31, 5.0), Vector2(26.0, 6.5), Vector2(26.0, 8.8),
 ]
+# Oxide panels near each wing tip (plan view on the sheet).
+const WING_OXIDE := [Vector2(21.3, 4.6), Vector2(22.3, 3.5), Vector2(24.0, 3.5), Vector2(24.4, 4.6)]
+const POD_Z := [7.6, 18.4]
+const POD_AFT := 33.0
 
 var layout: Dictionary = {}
 var repairs: Dictionary = {}
@@ -112,6 +113,8 @@ var _ramp_hinge: Node3D
 var _ramp_tween: Tween
 ## The wing's point-defence turret (live only while the wing is repaired).
 var turret: PointDefense
+## The pre-crash ship: no soot. Set before adding to the tree, or call set_pristine.
+var pristine := false
 
 
 func _ready() -> void:
@@ -168,6 +171,13 @@ func is_inside(world: Vector3) -> bool:
 	return false
 
 
+func set_pristine(on: bool) -> void:
+	pristine = on
+	var soot := get_node_or_null("Exterior/KestrelScorch")
+	if soot:
+		soot.visible = not on
+
+
 func is_repaired(id: String) -> bool:
 	return repairs.has(id) and (repairs[id] as Repairable).repaired
 
@@ -215,8 +225,6 @@ func _build_shell() -> void:
 	var t: float = layout["wall"] * 0.5
 	for r in layout["rooms"]:
 		_csg(shell, [r["x"][0] - t, r["x"][1] + t], [-0.2, r["ceiling"] + 0.2], [r["z"][0] - t, r["z"][1] + t], "hull")
-	for band in OXIDE_BANDS:
-		_csg(shell, band[0], band[1], band[2], "oxide")
 	for r in layout["rooms"]:
 		_csg(shell, [r["x"][0] + t, r["x"][1] - t], [r["floor"], r["ceiling"]], [r["z"][0] + t, r["z"][1] - t], "panel", true)
 	for o in layout["openings"]:
@@ -288,32 +296,38 @@ func _build_exterior() -> void:
 	for pt in WING_OUTLINE:
 		stbd_wing.append(Vector2(pt.x, 26.0 - pt.y))
 	_wing(ext, stbd_wing, "hull")
-	_box(ext, [16.6, 20.0], [3.0, 3.8], [24.9, 25.4], "oxide", false)
-	# The modelled skin (blender/build_kestrel.py): arched roof, keel, nose, fins, nacelle.
-	for part in ["kestrel_roof", "kestrel_keel", "kestrel_fins"]:
-		_skin(ext, part)
-	var nose := _skin(ext, "kestrel_nose")
-	var nose_body := StaticBody3D.new()
-	nose_body.name = "NoseCollision"
-	var nose_shape := CollisionShape3D.new()
-	for m in nose.find_children("*", "MeshInstance3D", true, false):
-		if String(m.name).begins_with("nose"):
-			nose_shape.shape = (m as MeshInstance3D).mesh.create_convex_shape(true, true)
-			break
-	nose_body.add_child(nose_shape)
-	ext.add_child(nose_body)
-	_nacelle(ext, 18.4, "hull")
-	_box(ext, [29.6, 33.2], [1.9, 2.05], [5.4, 5.9], "hull", false)
-	_box(ext, [29.6, 33.2], [1.9, 2.05], [20.1, 20.6], "hull", false)
-	_box(ext, [25.0, 28.6], [1.4, 2.4], [8.4, 9.3], "metal", false)
-	_box(ext, [25.0, 28.6], [1.4, 2.4], [16.7, 17.6], "metal", false)
+	var stbd_oxide: Array = []
+	for pt in WING_OXIDE:
+		stbd_oxide.append(Vector2(pt.x, 26.0 - pt.y))
+	_wing(ext, stbd_oxide, "oxide", WING_Y[1] - 0.06, WING_Y[1] + 0.025)
+	# The modelled shell (blender/build_kestrel.py): faceted hull, canopy frame, fin, vents.
+	var hull := _skin(ext, "kestrel_hull")
+	_skin(ext, "kestrel_scorch").visible = not pristine
+	var body := StaticBody3D.new()
+	body.name = "HullCollision"
+	for m in hull.find_children("*", "MeshInstance3D", true, false):
+		if String(m.name).begins_with("hull"):
+			var shape := CollisionShape3D.new()
+			shape.shape = (m as MeshInstance3D).mesh.create_trimesh_shape()
+			shape.transform = (m as Node3D).transform
+			body.add_child(shape)
+	ext.add_child(body)
+	_nacelle(ext, POD_Z[1], "nacelle")
+	# Jambs that close the gap between the shell and the rooms at the side door and stern ramp.
+	var door: Array = layout["door_steps"]["x"]
+	for x in [[door[0] - 0.12, door[0] - 0.02], [door[1] + 0.02, door[1] + 0.12]]:
+		_box(ext, x, [-0.6, 2.5], [17.1, 17.42], "metal_dark", false)
+	_box(ext, [door[0] - 0.12, door[1] + 0.12], [2.42, 2.52], [17.1, 17.42], "metal_dark", false)
+	for z in [[10.6, 10.7], [15.3, 15.4]]:
+		_box(ext, [30.1, 30.42], [-0.25, 3.05], z, "metal_dark", false)
+	_box(ext, [30.1, 30.42], [2.95, 3.05], [10.6, 15.4], "metal_dark", false)
 	# Aft ramp, jammed shut until the landing gear is fixed. It swings down on a hinge at deck level.
 	_ramp_hinge = Node3D.new()
 	_ramp_hinge.name = "CargoRamp"
 	_ramp_hinge.position = plan(30.2, RAMP_HINGE_Y, 13.0)
 	add_child(_ramp_hinge)
-	var door := _box(_ramp_hinge, [30.1, 30.3], [RAMP_HINGE_Y, RAMP_HINGE_Y + RAMP_LENGTH], [10.8, 15.2], "metal")
-	door.position -= _ramp_hinge.position
+	var door_panel := _box(_ramp_hinge, [30.1, 30.3], [RAMP_HINGE_Y, RAMP_HINGE_Y + RAMP_LENGTH], [10.8, 15.2], "metal")
+	door_panel.position -= _ramp_hinge.position
 	for i in 4:
 		var band := _box(_ramp_hinge, [30.3, 30.33], [0.3 + i * 0.6, 0.5 + i * 0.6], [10.9, 15.1], "oxide", false)
 		band.position -= _ramp_hinge.position
@@ -583,6 +597,8 @@ func _puff_material(color: Color) -> StandardMaterial3D:
 
 
 func _build_canopy(damaged: Node3D, fixed: Node3D) -> void:
+	_skin(damaged, "kestrel_canopy", "canopy_cracked")
+	_skin(fixed, "kestrel_canopy", "canopy_glass")
 	_box(damaged, [3.57, 3.63], [2.0, 3.3], [11.3, 14.7], "glass_cracked")
 	_box(damaged, [4.2, 7.4], [2.3, 3.3], [15.37, 15.43], "glass_cracked")
 	for angle in [0.6, -0.6]:
@@ -611,42 +627,60 @@ func _build_landing_gear(damaged: Node3D, fixed: Node3D) -> void:
 
 func _build_wing(damaged: Node3D, fixed: Node3D) -> void:
 	_wing(damaged, PORT_WING_BROKEN, "hull")
-	_box(damaged, [17.4, 17.6], [3.45, 3.65], [2.6, 3.8], "metal_dark", false)
-	var tip := _box(damaged, [16.6, 20.2], [-1.75, -1.55], [0.8, 3.4], "hull", false)
-	tip.rotation = Vector3(0.0, 0.3, 0.15)
-	_rot(_box(damaged, [16.6, 20.2], [-1.6, -1.5], [0.7, 0.9], "oxide", false), Vector3(0.0, 0.3, 0.15))
+	_box(damaged, [21.5, 21.7], [1.85, 2.05], [4.2, 5.2], "metal_dark", false)
+	# The torn tip lies on the ground under the wing.
+	var tip := _wing(damaged, PORT_WING_TIP, "hull", -1.05, -0.7)
+	tip.position += Vector3(-0.8, 0.0, -1.5)
+	var tip_oxide := _wing(damaged, WING_OXIDE, "oxide", -0.78, -0.68)
+	tip_oxide.position = tip.position
 	_wing(fixed, PORT_WING_ROOT, "hull")
 	_wing(fixed, PORT_WING_TIP, "salvage")
-	_box(fixed, [15.4, 21.1], [3.0, 3.8], [3.4, 3.6], "metal_dark", false)
-	_box(fixed, [16.6, 20.0], [3.0, 3.8], [0.6, 1.1], "oxide", false)
+	_wing(fixed, WING_OXIDE, "oxide", WING_Y[1] - 0.06, WING_Y[1] + 0.025)
+	_box(fixed, [18.9, 25.35], [1.82, 2.2], [4.9, 5.1], "metal_dark", false)
+	_sphere(fixed, Vector3(23.1, 1.95, 2.95), 0.1, "nav_red")
 	# Point-defence turret on the wing root, salvaged from the dropship.
-	_cyl(fixed, Vector3(19.5, 4.2, 6.5), 0.45, 0.3, "y", "metal_dark")
+	_cyl(fixed, Vector3(21.5, 2.3, 5.8), 0.45, 0.3, "y", "metal_dark")
 	turret = PointDefense.new()
 	turret.name = "PointDefense"
-	turret.position = plan(19.5, 4.6, 6.5)
+	turret.position = plan(21.5, 2.7, 5.8)
 	fixed.add_child(turret)
 
 
 func _build_engine(damaged: Node3D, fixed: Node3D) -> void:
-	var wreck := _cyl(damaged, Vector3(30.0, 1.4, 7.4), 1.0, 7.0, "x", "metal_dark")
-	wreck.rotation = Vector3(0.0, 0.08, PI * 0.5 + 0.12)
-	_box(damaged, [26.2, 26.8], [0.9, 1.9], [6.9, 7.9], "void", false)
+	# The port pod tore off in the crash: a stub at the wing and the pod's tail on the ground.
+	_cyl(damaged, Vector3(18.8, 1.9, 7.6), 1.0, 1.6, "x", "metal_dark")
+	_box(damaged, [19.55, 19.65], [1.0, 2.8], [6.7, 8.5], "void", false)
+	# A thin wisp still curls out of the torn mount: the drive is cold, the wiring isn't.
+	var wisp := Vfx.smoke(damaged, plan(19.8, 2.2, 7.6))
+	wisp.amount = 26
+	wisp.lifetime = 4.0
+	wisp.initial_velocity_min = 0.3
+	wisp.initial_velocity_max = 0.7
+	wisp.gravity = Vector3(0.4, 0.5, 0.0)
+	wisp.scale_amount_min = 0.5
+	wisp.scale_amount_max = 1.3
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	fade.colors = PackedColorArray([Color(0.2, 0.2, 0.2, 0.0), Color(0.22, 0.22, 0.22, 0.45), Color(0.45, 0.45, 0.45, 0.0)])
+	wisp.color_ramp = fade
+	var wreck := _cyl(damaged, Vector3(29.5, -0.55, 3.2), 0.95, 6.0, "x", "nacelle")
+	wreck.rotation = Vector3(0.0, 0.32, PI * 0.5 + 0.06)
 	for i in 4:
-		_rot(_box(damaged, [24.0 + i * 0.9, 24.6 + i * 0.9], [-0.9, -0.6], [5.6 - i * 0.4, 6.2 - i * 0.4], "metal", false), Vector3(0.0, i * 0.7, 0.0))
-	_nacelle(fixed, 7.6, "bare_metal")
-	_cyl(fixed, Vector3(25.3, 1.9, 7.6), 1.05, 0.25, "x", "oxide")
+		_rot(_box(damaged, [21.0 + i * 1.3, 21.6 + i * 1.3], [-0.95, -0.65], [5.0 - i * 0.5, 5.6 - i * 0.5], "metal", false), Vector3(0.0, i * 0.7, 0.0))
+	_nacelle(fixed, POD_Z[0], "bare_metal")
+	_cyl(fixed, Vector3(19.0, 1.9, POD_Z[0]), 1.08, 0.25, "x", "oxide")
 
 
 func _build_navigation(damaged: Node3D, fixed: Node3D) -> void:
 	# Modelled mast and dish (blender/build_props.py): torn down by the crash, then re-stepped.
 	var down := Rig.spawn("prop_mast_down", damaged)
-	down.position = plan(26.5, 3.65, 13.0)
+	down.position = plan(19.5, 3.92, 13.0)
 	down.rotation.y = 0.4
-	Rig.spawn("prop_mast", fixed).position = plan(26.5, 3.65, 13.0)
-	_sphere(fixed, Vector3(26.5, 5.78, 12.85), 0.08, "nav_red")
-	_sphere(fixed, Vector3(26.5, 5.78, 13.15), 0.08, "nav_green")
-	_sphere(fixed, Vector3(18.3, 3.4, 25.45), 0.1, "nav_green")
-	var beacon := _omni(Vector3(26.5, 5.9, 13.0), Color("ff4030"), 0.8, 4.0)
+	Rig.spawn("prop_mast", fixed).position = plan(19.5, 3.92, 13.0)
+	_sphere(fixed, Vector3(19.5, 6.05, 12.85), 0.08, "nav_red")
+	_sphere(fixed, Vector3(19.5, 6.05, 13.15), 0.08, "nav_green")
+	_sphere(fixed, Vector3(23.1, 1.95, 23.05), 0.1, "nav_green")
+	var beacon := _omni(Vector3(19.5, 6.17, 13.0), Color("ff4030"), 0.8, 4.0)
 	beacon.reparent(fixed)
 
 
@@ -785,14 +819,14 @@ func _sphere(parent: Node, centre: Vector3, radius: float, mat_id: String) -> Me
 ## Wing panel from a plan-view outline (x, z), sitting on top of the hull at roof height.
 ## A wing panel from its plan outline: a plate with airfoil-tapered edges (visual only; the
 ## wings have never had collision).
-func _wing(parent: Node, outline: Array, mat_id: String) -> MeshInstance3D:
+func _wing(parent: Node, outline: Array, mat_id: String, y0: float = WING_Y[0], y1: float = WING_Y[1]) -> MeshInstance3D:
 	var points := PackedVector2Array()
 	for pt in outline:
 		var v := plan(pt.x, 0.0, pt.y)
 		points.append(Vector2(v.x, v.z))
 	var mesh := MeshInstance3D.new()
 	mesh.name = "WingPanel"
-	mesh.mesh = Bevel.tapered_plate(points, 3.4, 3.75)
+	mesh.mesh = Bevel.tapered_plate(points, y0, y1)
 	mesh.material_override = _mat(mat_id)
 	parent.add_child(mesh)
 	return mesh
@@ -801,8 +835,8 @@ func _wing(parent: Node, outline: Array, mat_id: String) -> MeshInstance3D:
 ## Exhaust from both nacelles: 0 is off, 1 is full lift-off thrust.
 func set_engine_power(power: float) -> void:
 	if _exhausts.is_empty():
-		for zc in [18.4, 7.6]:
-			_exhausts.append(Vfx.exhaust(self, plan(33.7, 1.9, zc), Vector3.RIGHT))
+		for zc in POD_Z:
+			_exhausts.append(Vfx.exhaust(self, plan(POD_AFT + 0.2, 1.9, zc), Vector3.RIGHT))
 	for e in _exhausts:
 		e.emitting = power > 0.01
 		e.initial_velocity_min = 3.0 + 12.0 * power
@@ -819,7 +853,17 @@ func _skin(parent: Node, part: String, mat_id := "hull") -> Node3D:
 	node.name = part.capitalize().replace(" ", "")
 	for m in node.find_children("*", "MeshInstance3D", true, false):
 		var n := String(m.name)
-		(m as MeshInstance3D).material_override = _mat("oxide" if n.begins_with("oxide") else ("metal_dark" if n.begins_with("dark") else mat_id))
+		var id := mat_id
+		if n.begins_with("oxide"):
+			id = "oxide"
+		elif n.begins_with("dark"):
+			id = "metal_dark"
+		elif n.begins_with("frame"):
+			id = "frame"
+		elif n.begins_with("decal"):
+			id = "decal"
+			(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		(m as MeshInstance3D).material_override = _mat(id)
 	parent.add_child(node)
 	return node
 
@@ -893,6 +937,26 @@ func _mat(id: String) -> StandardMaterial3D:
 			m.albedo_color = Color(0.85, 0.88, 0.86, 0.6)
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.roughness = 0.7
+		"canopy_glass":
+			m.albedo_color = Color(0.08, 0.17, 0.19, 0.55)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.roughness = 0.06
+			m.metallic = 0.6
+			m.metallic_specular = 0.9
+		"canopy_cracked":
+			m.albedo_color = Color(0.42, 0.48, 0.48, 0.78)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.roughness = 0.55
+			m.metallic = 0.2
+			Surfaces.apply_grime(m, 1.5, false)
+		"decal":
+			m.albedo_texture = load("res://assets/textures/kestrel/decal_atlas.png")
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.roughness = 0.8
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		"amber_glow":
 			m.albedo_color = Color("f2a93b")
 			m.emission_enabled = true
@@ -916,6 +980,11 @@ func _mat(id: String) -> StandardMaterial3D:
 			m.albedo_color = Color(0.25, 0.82, 0.71, 0.6)
 			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ when PBR.has(id) and PbrSet.exists("kestrel", PBR[id][0]):
+			var spec: Array = PBR[id]
+			m = PbrSet.material("kestrel", spec[0], spec[1], false, spec[2]).duplicate() as StandardMaterial3D
+			if id == "nacelle":
+				m.metallic = 0.55
 		_:
 			m.albedo_color = PALETTE.get(id, Color.MAGENTA)
 			m.roughness = 0.85 if id in ["hull", "panel", "fabric", "crate", "oxide"] else 0.5
