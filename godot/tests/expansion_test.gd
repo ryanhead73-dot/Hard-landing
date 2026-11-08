@@ -473,6 +473,41 @@ func _regions() -> void:
 	await get_tree().create_timer(1.5).timeout
 	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0)
 	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
+	# The Gillwood's own creature: roosts under the caps, flares, swoops; stepping aside dodges.
+	_check("veilwings roost in the Gillwood", gw.residents.filter(func(r): return r[0] == "veilwing").size() == 3)
+	var vw_at: Vector3 = gw.to_global(Vector3(-20.0, 0.0, 30.0))
+	_place(vw_at + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	var vw := main.spawn_enemy("veilwing", vw_at + Vector3(0.0, 7.0, -8.0), "", gw) as Veilwing
+	var hp := player.health
+	var waited := 0.0
+	while waited < 4.0 and vw.state != Veilwing.State.FLARE:
+		await get_tree().physics_frame
+		waited += get_physics_process_delta_time()
+	_check("a veilwing that sees Juno flares, its gills open to a shot", vw.state == Veilwing.State.FLARE and vw.weak_spot() != Vector3.INF)
+	waited = 0.0
+	while waited < 4.0 and vw.hits == 0:
+		await get_tree().physics_frame
+		waited += get_physics_process_delta_time()
+	_check("standing still, its swoop hits her", vw.hits == 1 and player.health < hp and vw.passes == 1, "hits %d, passes %d" % [vw.hits, vw.passes])
+	# Next pass: as it dives, she steps aside.
+	waited = 0.0
+	while waited < 10.0 and vw.passes < 2:
+		await get_tree().physics_frame
+		waited += get_physics_process_delta_time()
+	var dodge_from := player.global_position
+	while waited < 12.0 and vw.state == Veilwing.State.SWOOP and vw.global_position.distance_to(player.global_position + Vector3.UP * 1.2) > Veilwing.COMMIT_RANGE + 0.5:
+		await get_tree().physics_frame
+		waited += get_physics_process_delta_time()
+	var away := (vw.global_position - player.global_position).cross(Vector3.UP).normalized()
+	player.face(atan2(-away.x, -away.z))
+	Input.action_press("move_forward")
+	await get_tree().create_timer(0.8).timeout
+	Input.action_release("move_forward")
+	_check("stepping aside as it commits makes it miss", vw.passes == 2 and vw.hits == 1, "hits %d, passes %d, moved %.1f m" % [vw.hits, vw.passes, _flat_distance(player.global_position, dodge_from)])
+	vw.take_damage(999.0, vw.global_position, Vector3.FORWARD)
+	player.health = 100.0
+	await _frames(3)
 	# The recorder pointed west, to the crew's jettison locker in the trees.
 	_check("the recorder starts the hunt for the jettison locker", main.quests.state_of("ferro_locker") == QuestLog.ACTIVE)
 	_place(gw.locker_pos + Vector3(0.0, 0.5, 0.0), PI)

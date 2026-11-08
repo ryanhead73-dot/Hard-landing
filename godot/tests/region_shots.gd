@@ -168,6 +168,18 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	await _shot(out, "gillwood_ferro", wreck + Vector3(-6.0, 0.3, 18.0), wreck + Vector3(4.0, 2.0, 2.0))
 	await _shot(out, "gillwood_canopy", gw.canopy_pos + Vector3(-3.0, 0.3, 2.0), gw.canopy.global_position)
 	await _shot(out, "gillwood_strut", gw.strut_pos + Vector3(-4.0, 0.3, 1.0), gw.strut.global_position)
+	# A veilwing hanging at its roost, and one with its wings flared, held still.
+	var vw_at := gw.to_global(Vector3(-6.0, 3.2, 40.0))
+	var flyers: Array = [main.spawn_enemy("veilwing", vw_at, "", gw), main.spawn_enemy("veilwing", vw_at + Vector3(2.2, -0.6, 1.5), "", gw)]
+	await _frames(5)
+	for v in flyers:
+		v.set_physics_process(false)
+	flyers[1]._wings[0].rotation.z = -0.7
+	flyers[1]._wings[1].rotation.z = 0.7
+	flyers[1]._gill_mat.emission_energy_multiplier = 4.0
+	await _shot(out, "gillwood_veilwing", vw_at + Vector3(1.0, -2.9, 6.0), vw_at + Vector3(1.0, -0.4, 0.0))
+	for v in flyers:
+		v.queue_free()
 	await _shot(out, "gillwood_locker", gw.locker_pos + Vector3(2.5, 0.3, 3.0), gw.to_global(Gillwood.LOCKER + Vector3(0.0, 0.6, 0.0)))
 	gw.free_canopy()
 	gw.free_strut()

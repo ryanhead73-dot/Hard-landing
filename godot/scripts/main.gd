@@ -458,7 +458,7 @@ func _wake_packs() -> void:
 				spawn_enemy("scuttler", points[i] + Vector3(1.5, 0.0, 1.5))
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer", "drifter" or "warden". A name makes it an elite.
+## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer", "drifter", "veilwing" or "warden". A name makes it an elite.
 ## `parent`, when given, owns it instead of main (a region scene, so it goes when the region does).
 func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = null) -> Enemy:
 	var e: Enemy
@@ -473,6 +473,8 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = nul
 			e = Skimmer.new()
 		"drifter":
 			e = Drifter.new()
+		"veilwing":
+			e = Veilwing.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)

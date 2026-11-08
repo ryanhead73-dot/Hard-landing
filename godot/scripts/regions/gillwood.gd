@@ -41,6 +41,8 @@ var strut_pos := Vector3.INF
 var locker_pos := Vector3.INF
 var _locker_tell: MeshInstance3D
 var _beacon: OmniLight3D
+## The gill-trees as [base, height, cap radius], for roosts.
+var _tree_list: Array = []
 var _t := 0.0
 
 
@@ -78,6 +80,7 @@ func build() -> void:
 		_fungus(g[0], g[1], g[2])
 	_build_spots()
 	_trees()
+	_roosts()
 	_outcrop()
 	_ferro()
 	_locker()
@@ -234,6 +237,7 @@ func _trees() -> void:
 		if not clear:
 			continue
 		xforms.append([p, _rng.randf_range(5.0, 11.0), _rng.randf_range(2.4, 4.6)])
+	_tree_list = xforms
 	var stems := MultiMesh.new()
 	var caps := MultiMesh.new()
 	var gills := MultiMesh.new()
@@ -285,6 +289,24 @@ func _trees() -> void:
 		mmi.material_override = mats[i]
 		add_child(mmi)
 		i += 1
+
+
+## Veilwings roost under the caps of the trees nearest these points: one over the path in, one
+## on the east side of the clearing, one west toward the locker.
+const ROOST_NEAR := [Vector3(-9.0, 0.0, 22.0), Vector3(20.0, 0.0, -10.0), Vector3(-24.0, 0.0, -8.0)]
+
+
+func _roosts() -> void:
+	for near in ROOST_NEAR:
+		var best: Array = []
+		for t in _tree_list:
+			if best.is_empty() or Vector2(t[0].x - near.x, t[0].z - near.z).length() < Vector2(best[0].x - near.x, best[0].z - near.z).length():
+				best = t
+		if best.is_empty():
+			continue
+		var h: float = best[1]
+		var r: float = best[2]
+		residents.append(["veilwing", best[0] + Vector3(r * 0.45, h - r * 0.3 - 0.7, 0.0)])
 
 
 ## A basalt outcrop over the clearing, a ramp up its back: the spitter's perch, and Juno's if
