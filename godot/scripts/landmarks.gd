@@ -29,9 +29,13 @@ var _caps: Array[StandardMaterial3D] = []
 func setup(m: Node) -> void:
 	main = m
 	name = "Landmarks"
-	_rock = StandardMaterial3D.new()
-	_rock.albedo_color = BASALT
-	_rock.roughness = 0.85
+	# Jake's hex-column basalt where it's there (world-mapped, so every column lines up).
+	if PbrSet.exists("shatterlands", "basalt_hex_columns"):
+		_rock = PbrSet.material("shatterlands", "basalt_hex_columns", 10.0)
+	else:
+		_rock = StandardMaterial3D.new()
+		_rock.albedo_color = BASALT
+		_rock.roughness = 0.85
 	_build_split()
 	chimney = Geyser.new()
 	chimney.name = "Chimney"

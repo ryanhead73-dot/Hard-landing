@@ -408,7 +408,23 @@
    "source": "blender_scripts"
   },
   {
-   "path": "assets/textures/shatterlands/*/*.png",
+   "path": "assets/textures/shatterlands/shatterlands_ground/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/fungus_stem/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/fungus_cap_underside/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/hauler_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/basalt_hex_columns/*.png",
    "source": "jake_pbr"
   },
   {

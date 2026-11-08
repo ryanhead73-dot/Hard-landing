@@ -80,9 +80,9 @@ func build() -> void:
 	_rng.seed = SEED
 	_ground()
 	_canyon_mouth()
-	# The shelves are rock under the same spore grit as the floor, a shade darker.
+	# The shelves are the tops of basalt columns, the joints showing.
 	for s in SHELVES:
-		_box(s[0], s[1], _tex("shatterlands_ground", 3.0, true, Color(0.72, 0.7, 0.78), _mat(BASALT)), true)
+		_box(s[0], s[1], _basalt(6.0), true)
 	_ramp(Vector3(-15.0, 0.0, -2.0), Vector3(-19.0, 3.0, -8.0), 5.0)
 	_ramp(Vector3(-30.0, 3.0, -12.0), Vector3(-30.0, 6.0, -16.0), 5.0)
 	_ramp(Vector3(-24.0, 6.0, -26.0), Vector3(-17.0, 9.0, -34.0), 5.0)
@@ -166,9 +166,9 @@ func _ground() -> void:
 
 ## Two tall basalt slabs either side of the canyon Juno came through, with the way back between.
 func _canyon_mouth() -> void:
-	_box(Vector3(-5.5, 9.0, 50.0), Vector3(5.0, 18.0, 16.0), _mat(BASALT), true)
-	_box(Vector3(5.5, 9.0, 50.0), Vector3(5.0, 18.0, 16.0), _mat(BASALT), true)
-	_box(Vector3(0.0, 9.0, 58.0), Vector3(8.0, 18.0, 2.0), _mat(BASALT), true)
+	_box(Vector3(-5.5, 9.0, 50.0), Vector3(5.0, 18.0, 16.0), _basalt(8.0), true)
+	_box(Vector3(5.5, 9.0, 50.0), Vector3(5.0, 18.0, 16.0), _basalt(8.0), true)
+	_box(Vector3(0.0, 9.0, 58.0), Vector3(8.0, 18.0, 2.0), _basalt(8.0), true)
 
 
 func _fungus(base: Vector3, height: float, radius: float) -> void:
@@ -293,7 +293,7 @@ func _wreck() -> void:
 	_box(Vector3(0.0, 2.6, 0.0), Vector3(7.0, 5.0, 26.0), _tex("hauler_hull", 6.0, false, Color.WHITE, _mat(HULL, 0.55)), true, hull)
 	for z in [-9.0, 0.0, 9.0]:
 		_box(Vector3(0.0, 2.6, z), Vector3(7.2, 5.2, 1.0), _mat(OXIDE, 0.6), false, hull)
-	_box(Vector3(0.0, 1.0, -14.5), Vector3(5.0, 3.0, 4.0), _mat(BASALT), true, hull)
+	_box(Vector3(0.0, 1.0, -14.5), Vector3(5.0, 3.0, 4.0), _basalt(6.0), true, hull)
 	for i in 5:
 		_box(Vector3(-3.6, 4.0, 14.0 + i * 1.6), Vector3(0.4, 4.0, 0.4), _mat(Color("6c6a66"), 0.5), false, hull)
 		_box(Vector3(3.6, 4.0, 14.0 + i * 1.6), Vector3(0.4, 4.0, 0.4), _mat(Color("6c6a66"), 0.5), false, hull)
@@ -421,7 +421,7 @@ func _columns(xforms: Array[Transform3D]) -> void:
 		mm.set_instance_transform(i, xforms[i])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
-	mmi.material_override = _mat(BASALT, 0.8)
+	mmi.material_override = _basalt(8.0)
 	add_child(mmi)
 
 
@@ -433,7 +433,7 @@ func _ramp(from: Vector3, to: Vector3, width: float, mat: Material = null) -> vo
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(width, 0.6, length + 1.0)
 	mi.mesh = mesh
-	mi.material_override = mat if mat else _mat(BASALT)
+	mi.material_override = mat if mat else _basalt(6.0)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = mesh.size
@@ -483,6 +483,11 @@ func _tex(set_name: String, metres: float, world: bool, tint: Color, fallback: M
 	if not PbrSet.exists("shatterlands", set_name):
 		return fallback
 	return PbrSet.material("shatterlands", set_name, metres, world, tint, emission, energy)
+
+
+## Jake's hex-column basalt, for the rim, canyon, shelves and ramps; `metres` per repeat.
+func _basalt(metres: float) -> Material:
+	return _tex("basalt_hex_columns", metres, true, Color.WHITE, _mat(BASALT, 0.8))
 
 
 func _glow(color: Color, energy: float) -> StandardMaterial3D:

@@ -435,7 +435,7 @@ func _wait_travel(rm: RegionManager) -> void:
 ## Every map in the Shatterlands sets imports VRAM-compressed with mipmaps (their .import files
 ## are checked in; without them Godot would import them raw), and the ground uses them.
 func _pbr_ok() -> bool:
-	for set_name in ["shatterlands_ground", "fungus_cap_underside", "fungus_stem", "hauler_hull"]:
+	for set_name in ["shatterlands_ground", "fungus_cap_underside", "fungus_stem", "hauler_hull", "basalt_hex_columns"]:
 		for map in ["albedo", "normal", "roughness"]:
 			var t := load("res://assets/textures/shatterlands/%s/%s.png" % [set_name, map]) as Texture2D
 			if t == null:
