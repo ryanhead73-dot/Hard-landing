@@ -327,7 +327,7 @@ const LOGS: Array[Dictionary] = [
 	{
 		"id": "ferro_1", "site": "gillwood", "source": "ferro_cockpit",
 		"title": "Ferro-9, flight recorder", "author": "Pilot Brandt, Ferro-9",
-		"text": "Ferro-9, descent. Locked on the Long Patience beacon. At four hundred metres the pulse hit and every board went dark, same as the old reports said. I put her into the softest thing I could see, which was a forest of mushrooms. Seven aboard, seven walking. The canopy held. Reyes says we walk south toward the light. Recorder off.",
+		"text": "Ferro-9, descent. Locked on the Long Patience beacon. At four hundred metres the pulse hit and every board went dark, same as the old reports said. I put her into the softest thing I could see, which was a forest of mushrooms. Seven aboard, seven walking. The canopy held. The jettison locker blew clear on the way down, somewhere west in the trees; there's kit in it if anyone comes back for her. Reyes says we walk south toward the light. Recorder off.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

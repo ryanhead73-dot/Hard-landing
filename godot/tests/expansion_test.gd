@@ -473,6 +473,15 @@ func _regions() -> void:
 	await get_tree().create_timer(1.5).timeout
 	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0)
 	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
+	# The recorder pointed west, to the crew's jettison locker in the trees.
+	_check("the recorder starts the hunt for the jettison locker", main.quests.state_of("ferro_locker") == QuestLog.ACTIVE)
+	_place(gw.locker_pos + Vector3(0.0, 0.5, 0.0), PI)
+	await _frames(3)
+	_check("the locker can be opened", _label().contains("jettison locker"), _label())
+	var stims_before := Game.stims
+	await _press("interact")
+	await _frames(2)
+	_check("it holds the crew's kit", main.quests.is_done("ferro_locker") and Game.stims == mini(stims_before + 2, Game.max_stims()))
 	# Back south: at the split in the pocket, not at its canyon.
 	_place(gw.exit_global() + Vector3(0.0, 0.5, -1.0), 0.0)
 	await _frames(3)

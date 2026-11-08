@@ -71,6 +71,12 @@ const EXTRA: Array[Dictionary] = [
 		],
 	},
 	{
+		"id": "ferro_locker", "title": "Ferro-9's jettison locker", "act": 2, "kind": "discovery", "region": "gillwood",
+		"summary": "Brandt's recorder says Ferro-9's jettison locker blew clear on the way down, somewhere west in the trees.",
+		"requires": [{"type": "logs", "ids": ["ferro_1"]}],
+		"steps": [{"text": "Find the jettison locker in the trees west of Ferro-9", "done": {"type": "flag", "id": "ferro_locker"}}],
+	},
+	{
 		"id": "dark_house", "title": "The dark house", "act": 2, "kind": "side", "region": "shatterlands",
 		"summary": "The east glasshouse went dark in the last pulse. Teo says Voss kept spare lamp cells up on the high shelf.",
 		"requires": [{"type": "flag", "id": "lamp_cell_asked"}],

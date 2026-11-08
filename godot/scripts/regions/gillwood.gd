@@ -7,7 +7,7 @@ extends ShatterScene
 ## in the campaign later).
 ##
 ## Local space: Juno comes in from the greenhouses through the south mouth (+Z) and looks north.
-## State in Game.flags: reached_gillwood, found_ferro9, ferro_canopy, ferro_gear.
+## State in Game.flags: reached_gillwood, found_ferro9, ferro_canopy, ferro_gear, ferro_locker.
 
 const SEED := 71
 ## The forest's own gill-tree palette: shorter, bluer caps than the pocket's giants.
@@ -20,6 +20,8 @@ const WRECK := Vector3(4.0, 0.0, -28.0)
 const WRECK_YAW := 0.45
 ## Where the gear strut hangs under the aft section, and where the scuttlers den below it.
 const AFT_OFFSET := Vector3(9.0, 0.0, 9.0)
+## Ferro-9's jettison locker, blown clear on the way down and lost in the trees to the west.
+const LOCKER := Vector3(-34.0, 0.0, -14.0)
 ## The outcrop the spitter holds, over the clearing.
 const OUTCROP := Vector3(-16.0, 0.0, -42.0)
 ## Giant fungi: [base, stem height, cap radius].
@@ -36,6 +38,8 @@ var strut: Node3D
 var cockpit_pos := Vector3.INF
 var canopy_pos := Vector3.INF
 var strut_pos := Vector3.INF
+var locker_pos := Vector3.INF
+var _locker_tell: MeshInstance3D
 var _beacon: OmniLight3D
 var _t := 0.0
 
@@ -76,6 +80,7 @@ func build() -> void:
 	_trees()
 	_outcrop()
 	_ferro()
+	_locker()
 	_undergrowth()
 	_sync_parts()
 
@@ -107,7 +112,21 @@ func interaction(pos: Vector3) -> Dictionary:
 		return {"label": "[E] Unbolt Ferro-9's canopy", "action": free_canopy}
 	if pos.distance_to(strut_pos) < USE_RANGE and not salvaged("ferro_gear"):
 		return {"label": "[E] Cut the landing-gear strut free", "action": free_strut}
+	if pos.distance_to(locker_pos) < USE_RANGE and not salvaged("ferro_locker"):
+		return {"label": "[E] Open Ferro-9's jettison locker", "action": open_locker}
 	return {}
+
+
+## The crew's kit: stims and scrap, for whoever finds it (Brandt's log says it went west).
+func open_locker() -> void:
+	if salvaged("ferro_locker"):
+		return
+	Game.set_flag("ferro_locker")
+	Game.add_stims(2)
+	Game.add_scrap(20)
+	if _locker_tell:
+		_locker_tell.visible = false
+	Sfx.play("scrap_pickup", locker_pos, 0.0)
 
 
 func salvaged(flag: String) -> bool:
@@ -203,7 +222,7 @@ func _trees() -> void:
 			continue
 		if absf(p.x) < 7.0 and p.z > 30.0:
 			continue
-		if Vector2(p.x - OUTCROP.x, p.z - OUTCROP.z).length() < 9.0:
+		if Vector2(p.x - OUTCROP.x, p.z - OUTCROP.z).length() < 9.0 or Vector2(p.x - LOCKER.x, p.z - LOCKER.z).length() < 5.0:
 			continue
 		var clear := true
 		for g in GIANTS:
@@ -287,8 +306,26 @@ func _ferro() -> void:
 	fore.rotation = Vector3(deg_to_rad(4.0), WRECK_YAW, deg_to_rad(-7.0))
 	add_child(fore)
 	_box(Vector3(0.0, 1.6, 0.0), Vector3(5.0, 3.2, 9.0), hull_mat, true, fore)
-	_box(Vector3(0.0, 1.3, -5.6), Vector3(4.2, 2.4, 2.4), hull_mat, true, fore)
-	_box(Vector3(0.0, 1.0, -7.1), Vector3(3.0, 1.6, 1.0), hull_mat, false, fore)
+	# The nose: a six-sided taper from the hull to a blunt point, with a box collider round it.
+	var nose := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.7
+	cone.bottom_radius = 2.6
+	cone.height = 4.0
+	cone.radial_segments = 6
+	cone.rings = 1
+	nose.mesh = cone
+	nose.material_override = hull_mat
+	nose.rotation.x = -PI * 0.5
+	nose.scale = Vector3(1.0, 1.0, 0.62)
+	nose.position = Vector3(0.0, 1.5, -6.5)
+	fore.add_child(nose)
+	_collider(fore, Vector3(0.0, 1.3, -6.2), Vector3(3.6, 2.4, 3.6))
+	# Stub wings, one crumpled into the ground, and the skids she slid in on.
+	_box(Vector3(-3.6, 1.0, 1.2), Vector3(2.6, 0.3, 3.2), hull_mat, true, fore)
+	_box(Vector3(3.4, 0.5, 1.6), Vector3(2.4, 0.3, 3.0), hull_mat, false, fore)
+	for x in [-1.6, 1.6]:
+		_box(Vector3(x, 0.12, -1.0), Vector3(0.35, 0.24, 9.0), _mat(Color("4a4f52"), 0.5), false, fore)
 	for z in [-2.0, 2.5]:
 		_box(Vector3(0.0, 1.6, z), Vector3(5.1, 0.35, 0.5), trim, false, fore)
 	# Torn edge where she broke: ribs standing out of the back.
@@ -398,6 +435,33 @@ func _ferro() -> void:
 	strut.add_child(wheel)
 	strut_pos = aft.to_global(Vector3(-3.6, 0.0, 1.0))
 	strut_pos.y = global_position.y
+
+
+## The jettison locker: an amber-striped crate half sunk in the moss, a tell-tale still lit.
+func _locker() -> void:
+	_box(LOCKER + Vector3(0.0, 0.45, 0.0), Vector3(1.6, 0.9, 1.0), _mat(FERRO_HULL, 0.55), true)
+	_box(LOCKER + Vector3(0.0, 0.62, 0.0), Vector3(1.65, 0.2, 1.05), _mat(FERRO_TRIM, 0.5), false)
+	_locker_tell = MeshInstance3D.new()
+	var tm := BoxMesh.new()
+	tm.size = Vector3(0.22, 0.12, 0.22)
+	_locker_tell.mesh = tm
+	_locker_tell.material_override = _glow(AMBER, 3.0)
+	_locker_tell.position = LOCKER + Vector3(0.5, 0.96, 0.0)
+	_locker_tell.visible = not salvaged("ferro_locker")
+	add_child(_locker_tell)
+	locker_pos = to_global(LOCKER + Vector3(0.0, 0.0, 1.3))
+
+
+## A collider with no mesh, in `parent`'s space.
+func _collider(parent: Node3D, pos: Vector3, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var b := BoxShape3D.new()
+	b.size = size
+	shape.shape = b
+	body.position = pos
+	body.add_child(shape)
+	parent.add_child(body)
 
 
 func _undergrowth() -> void:

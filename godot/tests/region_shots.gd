@@ -168,6 +168,7 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	await _shot(out, "gillwood_ferro", wreck + Vector3(-6.0, 0.3, 18.0), wreck + Vector3(4.0, 2.0, 2.0))
 	await _shot(out, "gillwood_canopy", gw.canopy_pos + Vector3(-3.0, 0.3, 2.0), gw.canopy.global_position)
 	await _shot(out, "gillwood_strut", gw.strut_pos + Vector3(-4.0, 0.3, 1.0), gw.strut.global_position)
+	await _shot(out, "gillwood_locker", gw.locker_pos + Vector3(2.5, 0.3, 3.0), gw.to_global(Gillwood.LOCKER + Vector3(0.0, 0.6, 0.0)))
 	gw.free_canopy()
 	gw.free_strut()
 	await get_tree().create_timer(1.5).timeout
