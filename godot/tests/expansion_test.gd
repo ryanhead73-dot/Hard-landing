@@ -427,6 +427,62 @@ func _regions() -> void:
 	_check("the east house lights up, and the favour pays", gh.east_lit() and gh._east_glass.emission_enabled and main.quests.is_done("dark_house") and Game.scrap == scrap_before + 25 and Game.charges == mini(charges_before + 2, Game.max_charges()), "scrap %d -> %d" % [scrap_before, Game.scrap])
 	_check("after that Teo has other things to say", _label().contains("Talk to Teo"), _label())
 
+	# The way north: Reyes had the barricade on the north split pulled back when Juno talked to her.
+	var split: Vector3 = sh.to_global(RegionDB.get_region("gillwood")["gate_pos"])
+	_check("talking to Reyes opens the north split and points the waypoint there", sh.way_north_open() and not sh._barricade.visible and rm.waypoint().distance_to(sh.to_global(ShatterlandsThreshold.NORTH_SPLIT)) < 2.0)
+	_check("Ferro-9's quest starts", main.quests.state_of("ferro_9") == QuestLog.ACTIVE)
+	# Walked in from the pocket floor, not placed: nothing in the split may block the way.
+	_place(split + Vector3(0.0, 0.5, 12.0), 0.0)
+	await _frames(5)
+	t = 0.0
+	Input.action_press("move_forward")
+	while t < 8.0 and _flat_distance(player.global_position, split) > 1.5:
+		var d: Vector3 = split - player.global_position
+		player.face(atan2(-d.x, -d.z))
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+	Input.action_release("move_forward")
+	await _frames(3)
+	_check("Juno walks up the split and it offers the Gillwood", _label().contains("Gillwood"), "%s at %s" % [_label(), player.global_position - split])
+	await _press("interact")
+	await _wait_travel(rm)
+	var gw := rm.scene as Gillwood
+	_check("through it is the Gillwood", rm.current == "gillwood" and gw != null and Game.region == "gillwood")
+	_check("the Kettle stays asleep", not main.site.visible and main.site.process_mode == Node.PROCESS_MODE_DISABLED)
+	_check("arriving moves the quest on", Game.flags.get("reached_gillwood") == true and main.quests.step_of("ferro_9") == 1)
+	_check("the Gillwood keeps to the budget", _region_budget(gw))
+	_check("its waypoint leads to the wreck", rm.waypoint().distance_to(gw.to_global(Gillwood.WRECK)) < 3.0)
+	_place(gw.to_global(Gillwood.WRECK + Vector3(0.0, 0.5, 14.0)), 0.0)
+	await _frames(3)
+	_check("coming near finds Ferro-9", Game.flags.get("found_ferro9") == true and main.quests.step_of("ferro_9") == 2)
+	_place(gw.cockpit_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("her flight recorder can be pulled", _label().contains("flight recorder"), _label())
+	await _press("interact")
+	await _frames(2)
+	_check("it's Brandt's log", Game.has_log("ferro_1"))
+	_place(gw.canopy_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("the canopy can be unbolted", _label().contains("canopy"), _label())
+	await _press("interact")
+	await _frames(2)
+	_place(gw.strut_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("the gear strut can be cut free", _label().contains("strut"), _label())
+	await _press("interact")
+	await get_tree().create_timer(1.5).timeout
+	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0)
+	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
+	# Back south: at the split in the pocket, not at its canyon.
+	_place(gw.exit_global() + Vector3(0.0, 0.5, -1.0), 0.0)
+	await _frames(3)
+	_check("the way back south is offered", _label().contains("greenhouses"), _label())
+	await _press("interact")
+	await _wait_travel(rm)
+	sh = rm.scene as ShatterlandsThreshold
+	_check("back in the pocket, at the north split", rm.current == "shatterlands" and sh != null and _flat_distance(player.global_position, sh.to_global(ShatterlandsThreshold.NORTH_SPLIT)) < 6.0, str(player.global_position - (sh.global_position if sh else Vector3.ZERO)))
+	gh = sh.greenhouses
+
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)
 	await get_tree().create_timer(main.RESPAWN_DELAY + 0.5).timeout

@@ -14,6 +14,8 @@ extends RefCounted
 ##                  faces back toward the middle of that region).
 ##   unlock_flag    Game flag that opens the gate (the quest that opens it sets it).
 ##   locked_text    the gate's prompt while it is shut.
+##   gate_in        for a region beyond the Kettle's ring: which way is back into the nearer
+##                  region from its gate_pos (Juno comes back facing that way).
 ##   planned        named in the design but not built yet (no gate is placed).
 
 const REGIONS := {
@@ -28,6 +30,15 @@ const REGIONS := {
 		"unlock_flag": "shatterlands_open",
 		"locked_text": "A canyon to the Shatterlands, choked with fresh rockfall",
 		"enter_text": "Go through the canyon to the Shatterlands",
+	},
+	"gillwood": {
+		"name": "The Gillwood", "act": 2,
+		"scene": "res://scripts/regions/gillwood.gd",
+		"origin": Vector3(8000.0, 0.0, 0.0),
+		"from": "shatterlands", "gate_pos": Vector3(-45.0, 0.0, -63.0), "gate_in": Vector3(0.0, 0.0, 1.0),
+		"unlock_flag": "reyes_talked",
+		"locked_text": "A scrap barricade across a split in the rim. Reyes's people put it there",
+		"enter_text": "Go north into the Gillwood",
 	},
 	"loom_expanse": {
 		"name": "The Loom Expanse", "act": 3, "planned": true,

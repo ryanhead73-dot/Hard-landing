@@ -4,7 +4,10 @@ extends Node
 ## loaded; while Juno is elsewhere it is hidden and paused (creatures, missions, weather, the day
 ## cycle) and the other region is built at its own origin, far from the basin. Travel goes
 ## through a gate in the world and a short fade with the region's name, and Game.region records
-## where she is, so a save made away from the Kettle loads back there.
+## where she is, so a save made away from the Kettle loads back there. A region can also open
+## onto a further one (`from` names it in RegionDB): the way through is a spot in the nearer
+## region's scene (`gate_pos`, which the scene dresses itself), and the far region's exit leads
+## back to that spot. The Kettle stays paused all the way out.
 
 signal travelled(from: String, to: String)
 
@@ -84,7 +87,14 @@ func interaction(pos: Vector3) -> Dictionary:
 		return {}
 	if scene:
 		if pos.distance_to(scene.exit_global()) < 3.0:
-			return {"label": "[E] " + scene.exit_label, "action": travel.bind("kettle")}
+			return {"label": "[E] " + scene.exit_label, "action": travel.bind(parent_of(current))}
+		for id in RegionDB.travel_regions():
+			var r := RegionDB.get_region(id)
+			if r["from"] != current or pos.distance_to(scene.to_global(r["gate_pos"])) >= 3.0:
+				continue
+			if not is_open(id):
+				return {"label": String(r["locked_text"])}
+			return {"label": "[E] " + String(r["enter_text"]), "action": travel.bind(id)}
 		return scene.interaction(pos)
 	for id in gates:
 		var gate: Node3D = gates[id]
@@ -97,6 +107,18 @@ func interaction(pos: Vector3) -> Dictionary:
 			return {"label": "Not now: Kestrel needs you"}
 		return {"label": "[E] " + String(r["enter_text"]), "action": travel.bind(id)}
 	return {}
+
+
+## The region a region opens from (the Kettle for the first ring).
+func parent_of(id: String) -> String:
+	return String(RegionDB.get_region(id).get("from", "kettle"))
+
+
+## The region next to the Kettle that `id` is reached through (itself for the first ring).
+func _first_ring(id: String) -> String:
+	while id != "kettle" and parent_of(id) != "kettle":
+		id = parent_of(id)
+	return id
 
 
 func _busy() -> bool:
@@ -115,14 +137,14 @@ func travel(to: String, instant := false) -> void:
 		_leave_scene()
 	if to == "kettle":
 		_resume_kettle()
-		var gate: Node3D = gates.get(from)
+		var gate: Node3D = gates.get(_first_ring(from))
 		main.player.revive(gate.to_global(Vector3(0.0, 0.5, 4.0)) if gate else main.SPAWN, false)
 		if gate:
 			main.player.face(gate.global_rotation.y)
 	else:
 		if from == "kettle":
 			_suspend_kettle()
-		_enter_scene(to)
+		_enter_scene(to, from)
 	current = to
 	Game.region = to
 	travelled.emit(from, to)
@@ -132,7 +154,7 @@ func travel(to: String, instant := false) -> void:
 	travelling = false
 
 
-func _enter_scene(id: String) -> void:
+func _enter_scene(id: String, from := "") -> void:
 	var r := RegionDB.get_region(id)
 	scene = load(String(r["scene"])).new()
 	scene.name = "Region_" + id
@@ -141,6 +163,12 @@ func _enter_scene(id: String) -> void:
 	_old_look = scene.apply_environment(main._env, main._sun)
 	main.player.revive(scene.entry_global(), false)
 	main.player.face(scene.entry_yaw)
+	# Back from a further region: at the way through to it, facing into this one.
+	if from != "" and from != "kettle" and parent_of(from) == id:
+		var at: Vector3 = RegionDB.get_region(from)["gate_pos"]
+		var inward: Vector3 = RegionDB.get_region(from).get("gate_in", Vector3(-at.x, 0.0, -at.z).normalized())
+		main.player.revive(scene.to_global(at + inward * 3.0 + Vector3(0.0, 0.5, 0.0)), false)
+		main.player.face(atan2(-inward.x, -inward.z))
 	if main.spawn_packs:
 		scene.spawn_residents(main)
 

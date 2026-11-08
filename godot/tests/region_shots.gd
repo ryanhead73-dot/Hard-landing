@@ -23,7 +23,19 @@ func _ready() -> void:
 	main.day_cycle = false
 	main.set_daylight(0.0)
 	# `-- <out_dir> greenhouses` renders only Voss's greenhouses; `shatterlands`, the whole pocket;
-	# `nest`, only the wreck's nested pack; `darkhouse`, only Teo's favour.
+	# `nest`, only the wreck's nested pack; `darkhouse`, only Teo's favour; `gillwood`, the
+	# north split and the Gillwood beyond it.
+	if args.size() > 1 and args[1] == "gillwood":
+		Game.set_flag("shatterlands_open")
+		Game.set_flag("reyes_talked")
+		await main.regions.travel("shatterlands", true)
+		var sh := main.regions.scene as ShatterlandsThreshold
+		await _shot(out, "shatter_north_split", sh.to_global(ShatterlandsThreshold.NORTH_SPLIT + Vector3(3.0, 0.3, 10.0)), sh.to_global(ShatterlandsThreshold.NORTH_SPLIT + Vector3(0.0, 3.0, -10.0)))
+		await main.regions.travel("gillwood", true)
+		await _gillwood(out, main.regions.scene)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] in ["greenhouses", "shatterlands", "nest", "darkhouse"]:
 		Game.set_flag("shatterlands_open")
 		await main.regions.travel("shatterlands", true)
@@ -145,6 +157,21 @@ func _dark_house(out: String, r: RegionScene) -> void:
 	Game.set_flag("lamp_cell_fitted")
 	gh._sync_east(false)
 	await _shot(out, "greenhouses_east_lit", from, east)
+
+
+## The Gillwood: the way in, the forest, Ferro-9's two halves, and the salvage before and after.
+func _gillwood(out: String, r: RegionScene) -> void:
+	var gw := r as Gillwood
+	var wreck := gw.to_global(Gillwood.WRECK)
+	await _shot(out, "gillwood_arrival", gw.entry_global(), gw.to_global(Vector3(0.0, 6.0, 20.0)))
+	await _shot(out, "gillwood_forest", gw.to_global(Vector3(-24.0, 0.3, 4.0)), gw.to_global(Vector3(-40.0, 4.0, -20.0)))
+	await _shot(out, "gillwood_ferro", wreck + Vector3(-6.0, 0.3, 18.0), wreck + Vector3(4.0, 2.0, 2.0))
+	await _shot(out, "gillwood_canopy", gw.canopy_pos + Vector3(-3.0, 0.3, 2.0), gw.canopy.global_position)
+	await _shot(out, "gillwood_strut", gw.strut_pos + Vector3(-4.0, 0.3, 1.0), gw.strut.global_position)
+	gw.free_canopy()
+	gw.free_strut()
+	await get_tree().create_timer(1.5).timeout
+	await _shot(out, "gillwood_salvaged", wreck + Vector3(-9.0, 0.3, 6.0), wreck + Vector3(2.0, 1.0, 2.0))
 
 
 func _shot(out: String, name: String, at: Vector3, look: Vector3) -> void:

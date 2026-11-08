@@ -98,6 +98,8 @@ const REYES_TALK := [
 	[JUNO, "Mostly?"],
 	[REYES, "Some nights it gets through. Then we sit very still and wait for morning."],
 	[REYES, "You've got a ship with a frame. We've got hands and a greenhouse full of salvage. Let's talk about getting both of us off this rock."],
+	[REYES, "Start with Ferro-9. Brandt put her down in the Gillwood, north through the rim. Her canopy held, and so did her gear."],
+	[REYES, "I'll have the north barricade pulled back. Whatever's moved into her since is yours to argue with."],
 ]
 ## Some of Reyes's eleven, a word each when Juno stops by (Claude's draft names and lines).
 const SURVIVORS := {
@@ -108,6 +110,23 @@ const SURVIVORS := {
 }
 const REYES_AGAIN := [
 	[REYES, "Look around, Vale. Middle house is ours to eat from. Mind the beds."],
+]
+## The Gillwood: Ferro-9's crash site, north through the rim from the greenhouses.
+const GILLWOOD_ARRIVE := [
+	[HOB, "Spore count's climbing. Those gills are lit up like a runway."],
+	[JUNO, "Somebody's runway. Past the stems there: slate hull, amber trim. That's Ferro-9."],
+]
+const FERRO_FOUND := [
+	[JUNO, "She broke her back coming down, but the nose is whole. That canopy's the size of ours."],
+	[HOB, "Kestrel's frame takes a Ferro-pattern canopy with an adapter ring. I can print the ring."],
+]
+const FERRO_CANOPY := [
+	[JUNO, "Canopy's off. Seals look good."],
+	[HOB, "Leave it on the skids. Reyes says her people can sled it back through the canyon."],
+]
+const FERRO_GEAR := [
+	[JUNO, "Gear strut's free. Bent at the knee, but the actuator's sound."],
+	[HOB, "Kestrel's starboard leg will take it. That's the canopy and the gear, Vale."],
 ]
 ## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
 const TEO_ASK := [
@@ -303,6 +322,12 @@ const LOGS: Array[Dictionary] = [
 		"id": "voss_1", "site": "shatterlands", "source": "marigold_locker",
 		"title": "Marigold, dorsal locker", "author": "Hester Voss, hauler Marigold",
 		"text": "Last glass run, and the Marigold's done flying. Doesn't matter. The houses are up, under the big cap, and the big cap is the point: the pulse comes through the rock and the caps drink it. Under there the instruments stop twitching and the seedlings stop dying. Two charges in here for whoever needs them more than a dead hauler does. Plant something.",
+	},
+	# Gillwood logs ("gillwood", a place in that region).
+	{
+		"id": "ferro_1", "site": "gillwood", "source": "ferro_cockpit",
+		"title": "Ferro-9, flight recorder", "author": "Pilot Brandt, Ferro-9",
+		"text": "Ferro-9, descent. Locked on the Long Patience beacon. At four hundred metres the pulse hit and every board went dark, same as the old reports said. I put her into the softest thing I could see, which was a forest of mushrooms. Seven aboard, seven walking. The canopy held. Reyes says we walk south toward the light. Recorder off.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

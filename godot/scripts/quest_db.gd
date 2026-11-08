@@ -60,6 +60,17 @@ const EXTRA: Array[Dictionary] = [
 		],
 	},
 	{
+		"id": "ferro_9", "title": "What Ferro-9 left", "act": 2, "kind": "main", "region": "gillwood",
+		"summary": "Reyes's rescue ship came down in the Gillwood, north of the greenhouses. Her canopy and landing gear might fit Kestrel.",
+		"requires": [{"type": "flag", "id": "reyes_talked"}],
+		"steps": [
+			{"text": "Go north through the rim into the Gillwood", "done": {"type": "flag", "id": "reached_gillwood"}},
+			{"text": "Find Ferro-9", "done": {"type": "flag", "id": "found_ferro9"}},
+			{"text": "Free Ferro-9's canopy", "done": {"type": "flag", "id": "ferro_canopy"}},
+			{"text": "Cut her landing-gear strut free", "done": {"type": "flag", "id": "ferro_gear"}},
+		],
+	},
+	{
 		"id": "dark_house", "title": "The dark house", "act": 2, "kind": "side", "region": "shatterlands",
 		"summary": "The east glasshouse went dark in the last pulse. Teo says Voss kept spare lamp cells up on the high shelf.",
 		"requires": [{"type": "flag", "id": "lamp_cell_asked"}],
