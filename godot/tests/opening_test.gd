@@ -29,6 +29,7 @@ func _ready() -> void:
 func _run() -> void:
 	op = main.opening
 	await _frames(10)
+	await _walk_to_seat()
 	await _approach()
 	await _wreck()
 	await _outside()
@@ -45,6 +46,15 @@ func _hold(seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout
 	Input.action_release("interact")
 	await _frames(3)
+
+
+## From the bunk where she wakes, out of the cabin, round through the workshop, up the stairs
+## to the copilot's seat, on foot (the cabin locker once blocked the door).
+func _walk_to_seat() -> void:
+	var a: Approach = main.regions.scene
+	var route := [Vector3(10.0, 0.1, 10.9), Vector3(11.9, 0.1, 10.9), Vector3(12.3, 0.1, 13.0), Vector3(10.6, 0.1, 13.0), Vector3(8.4, 1.3, 13.0), Vector3(6.4, 1.3, 13.4)]
+	var ok := await _walk_path(route.map(func(p): return a._at(p)), 4.0)
+	_check("she can walk from the bunk to the copilot's seat", ok and _label().contains("copilot"), _label())
 
 
 func _approach() -> void:
