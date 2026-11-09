@@ -89,6 +89,14 @@ func _run() -> void:
 	scrap = Game.scrap
 	await _use_at("pocket_weather", "rain")
 	_check("the pocket weather gives a Loom clue and spore fibre", Game.flags.get("clue_loom_threes", false) and Game.scrap == scrap + 20)
+	Game.set_flag("loom_open", true)
+	rm.travel("loom_expanse", true)
+	await _wait_travel(rm)
+	_check("the signal flag is built in the Loom Expanse", finds._live("signal_flag") != null)
+	var loom := rm.scene as LoomExpanse
+	_check("the bypass is laced shut before the flag", loom != null and not loom.bypass_open())
+	await _use_at("signal_flag", "flag")
+	_check("the flag opens the bypass lane", loom.bypass_open() and not (loom.bypass.get_child(loom.bypass.get_child_count() - 1) as StaticBody3D).collision_layer)
 	_check("every find is done", WalkFinds.all_ids().all(func(id): return WalkFinds.found(id)))
 	finished = true
 

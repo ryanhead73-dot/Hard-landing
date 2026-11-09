@@ -183,6 +183,54 @@
    "source": "synth_sfx",
    "tier": "foreground"
   },
+  "ridge_thrum": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "ridge_heave": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "diver_grind": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "diver_erupt": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "pinweaver_click": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
+  "thread_spool": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "thread_snap": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_drone": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_inhale": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_chord": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_pull": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_call": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
   "lurker_bite": {
    "source": "synth_sfx",
    "tier": "foreground"

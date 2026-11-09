@@ -48,6 +48,9 @@ var _barricade: Node3D
 var wing: WingChase
 ## The pale fibres laced across the west cleft, until the Loom opens.
 var _cleft_fibres: Node3D
+var _cleft_mesh: MeshInstance3D
+var _cleft_shut_mesh: ArrayMesh
+var _cleft_open_mesh: ArrayMesh
 
 
 func _init() -> void:
@@ -223,27 +226,40 @@ func _on_flag_changed(_flag: String, _value: Variant) -> void:
 
 
 ## The west cleft: a narrow way between basalt slabs, a rosy light from the Loom at its far end,
-## and pale fibres laced across it (one mesh) until the Loom opens.
+## and pale fibres laced across it until the Loom opens. The light and the lace are one mesh
+## instance (two surfaces), which drops the lace surface when the cleft opens: one draw item
+## inside the pocket's budget either way.
 func _west_cleft() -> void:
 	var at := WEST_CLEFT
 	for side in [-1.0, 1.0]:
 		_box(at + Vector3(-8.0, 9.0, side * 6.0), Vector3(16.0, 18.0, 4.0), _basalt(8.0), true)
 	_box(at + Vector3(-17.0, 9.0, 0.0), Vector3(2.0, 18.0, 8.0), _basalt(8.0), false)
-	_box(at + Vector3(-15.8, 6.0, 0.0), Vector3(0.3, 12.0, 6.0), _glow(Color("f0a0e0"), 1.4), false)
+	var light := SurfaceTool.new()
+	light.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var card := BoxMesh.new()
+	card.size = Vector3(0.3, 12.0, 6.0)
+	light.append_from(card, 0, Transform3D(Basis(), at + Vector3(-15.8, 6.0, 0.0)))
+	var lace := SurfaceTool.new()
+	lace.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 7:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.06, 0.06, 8.0)
+		lace.append_from(bm, 0, Transform3D(Basis(Vector3.RIGHT, (i % 3 - 1) * 0.06), at + Vector3(-3.0, 0.5 + i * 0.6, 0.0)))
+	var glow := _glow(Color("f0a0e0"), 1.4)
+	var lace_mat := _glow(Color("e6dcff"), 0.8)
+	_cleft_open_mesh = light.commit()
+	_cleft_open_mesh.surface_set_material(0, glow)
+	_cleft_shut_mesh = light.commit()
+	_cleft_shut_mesh.surface_set_material(0, glow)
+	lace.commit(_cleft_shut_mesh)
+	_cleft_shut_mesh.surface_set_material(1, lace_mat)
+	_cleft_mesh = MeshInstance3D.new()
+	_cleft_mesh.name = "CleftLight"
+	add_child(_cleft_mesh)
 	_cleft_fibres = Node3D.new()
 	_cleft_fibres.name = "CleftFibres"
 	_cleft_fibres.set_meta("no_batch", true)
 	add_child(_cleft_fibres)
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in 7:
-		var bm := BoxMesh.new()
-		bm.size = Vector3(0.06, 0.06, 8.0)
-		st.append_from(bm, 0, Transform3D(Basis(Vector3.RIGHT, (i % 3 - 1) * 0.06), at + Vector3(-3.0, 0.5 + i * 0.6, 0.0)))
-	var mi := MeshInstance3D.new()
-	mi.mesh = st.commit()
-	mi.material_override = _glow(Color("e6dcff"), 0.8)
-	_cleft_fibres.add_child(mi)
 	var body := StaticBody3D.new()
 	body.collision_layer = Game.LAYER_WORLD
 	var cs := CollisionShape3D.new()
@@ -260,7 +276,7 @@ func _sync_cleft() -> void:
 	if not is_instance_valid(_cleft_fibres):
 		return
 	var open: bool = Game.flags.get("loom_open", false)
-	_cleft_fibres.visible = not open
+	_cleft_mesh.mesh = _cleft_open_mesh if open else _cleft_shut_mesh
 	for c in _cleft_fibres.get_children():
 		if c is CollisionObject3D:
 			(c as CollisionObject3D).collision_layer = 0 if open else Game.LAYER_WORLD

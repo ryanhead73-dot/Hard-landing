@@ -6,7 +6,7 @@ extends "res://tests/test_base.gd"
 
 
 ## Where each region's logs are found (checked again in expansion_test, where the region loads).
-const REGION_SOURCES := {"shatterlands": ["marigold_locker"], "gillwood": ["ferro_cockpit"]}
+const REGION_SOURCES := {"shatterlands": ["marigold_locker"], "gillwood": ["ferro_cockpit"], "loom_expanse": ["survey_marker"]}
 
 func _name() -> String:
 	return "STORY TEST"

@@ -223,7 +223,7 @@ func _regions() -> void:
 		for o in origins:
 			_check("%s sits well clear of other regions" % id, (r["origin"] as Vector3).distance_to(o) > 1000.0)
 		origins.append(r["origin"])
-	_check("the Loom Expanse is named but not built yet", RegionDB.get_region("loom_expanse").get("planned", false) and not "loom_expanse" in RegionDB.travel_regions())
+	_check("the Loom Expanse opens from the Shatterlands once the wing is in", "loom_expanse" in RegionDB.travel_regions() and RegionDB.get_region("loom_expanse")["from"] == "shatterlands" and RegionDB.get_region("loom_expanse")["unlock_flag"] == "loom_open")
 
 	# The gate in the Kettle, shut.
 	var gate: Node3D = rm.gates.get("shatterlands")

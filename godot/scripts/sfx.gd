@@ -37,6 +37,9 @@ const SOUNDS: Array[String] = [
 	# Jake's second batch (2026-11-09): HOB's reboot, the aux sting, and the walk finds.
 	"hob_boot_sequence", "aux_install_sting", "glass_wind_low", "glass_wind_mid", "glass_wind_high",
 	"helmet_humming", "rain_cup_drip", "seedpod_flash", "dish_restart", "crawlspace_hatch",
+	# The Loom Expanse (milestone C): ridges, ridge divers, pinweavers, the chord singer.
+	"ridge_thrum", "ridge_heave", "diver_grind", "diver_erupt", "pinweaver_click", "thread_spool", "thread_snap",
+	"singer_drone", "singer_inhale", "singer_chord", "singer_pull", "singer_call",
 ]
 const MAX_VARIANTS := 8
 
