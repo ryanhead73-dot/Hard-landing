@@ -30,6 +30,9 @@ const NEST := Vector3(24.0, 0.0, 5.0)
 const CELL_CACHE := Vector3(-22.0, 9.0, -43.0)
 ## The split in the north rim that leads on to the Gillwood (RegionDB gate_pos is just inside it).
 const NORTH_SPLIT := Vector3(-45.0, 0.0, -62.0)
+## The cleft in the west rim that leads on to the Loom Expanse (milestone C), laced shut with
+## fibre until the wing is fitted.
+const WEST_CLEFT := Vector3(-64.0, 0.0, 18.0)
 
 ## Voss's greenhouses, the Act 2 hub (greybox).
 var greenhouses: Greenhouses
@@ -43,6 +46,8 @@ var _cache_tell: MeshInstance3D
 var _barricade: Node3D
 ## The wing-tip chase (milestone B3).
 var wing: WingChase
+## The pale fibres laced across the west cleft, until the Loom opens.
+var _cleft_fibres: Node3D
 
 
 func _init() -> void:
@@ -81,6 +86,7 @@ func build() -> void:
 	_ground()
 	_canyon_mouth()
 	_north_split()
+	_west_cleft()
 	# The shelves are the tops of basalt columns, the joints showing.
 	for s in SHELVES:
 		_box(s[0], s[1], _basalt(6.0), true)
@@ -172,7 +178,8 @@ func _ground() -> void:
 	add_child(body)
 	# Rim walls so the pocket reads as a valley and nobody walks off the edge.
 	# The north wall has a split in it at NORTH_SPLIT, the way on to the Gillwood.
-	_rim([[Vector3(-60.0, 10.0, -66.0), Vector3(20.0, 20.0, 8.0)], [Vector3(15.0, 10.0, -66.0), Vector3(110.0, 20.0, 8.0)], [Vector3(-66.0, 10.0, 0.0), Vector3(8.0, 20.0, 140.0)], [Vector3(66.0, 10.0, 0.0), Vector3(8.0, 20.0, 140.0)], [Vector3(-38.0, 10.0, 62.0), Vector3(64.0, 20.0, 8.0)], [Vector3(38.0, 10.0, 62.0), Vector3(64.0, 20.0, 8.0)]])
+	# The west wall has the cleft to the Loom Expanse in it, at WEST_CLEFT.
+	_rim([[Vector3(-60.0, 10.0, -66.0), Vector3(20.0, 20.0, 8.0)], [Vector3(15.0, 10.0, -66.0), Vector3(110.0, 20.0, 8.0)], [Vector3(-66.0, 10.0, -28.0), Vector3(8.0, 20.0, 84.0)], [Vector3(-66.0, 10.0, 46.0), Vector3(8.0, 20.0, 48.0)], [Vector3(66.0, 10.0, 0.0), Vector3(8.0, 20.0, 140.0)], [Vector3(-38.0, 10.0, 62.0), Vector3(64.0, 20.0, 8.0)], [Vector3(38.0, 10.0, 62.0), Vector3(64.0, 20.0, 8.0)]])
 
 
 ## The north split: a passage through the rim between basalt slabs, teal light from the Gillwood
@@ -212,6 +219,51 @@ func _north_split() -> void:
 
 func _on_flag_changed(_flag: String, _value: Variant) -> void:
 	_sync_way_north()
+	_sync_cleft()
+
+
+## The west cleft: a narrow way between basalt slabs, a rosy light from the Loom at its far end,
+## and pale fibres laced across it (one mesh) until the Loom opens.
+func _west_cleft() -> void:
+	var at := WEST_CLEFT
+	for side in [-1.0, 1.0]:
+		_box(at + Vector3(-8.0, 9.0, side * 6.0), Vector3(16.0, 18.0, 4.0), _basalt(8.0), true)
+	_box(at + Vector3(-17.0, 9.0, 0.0), Vector3(2.0, 18.0, 8.0), _basalt(8.0), false)
+	_box(at + Vector3(-15.8, 6.0, 0.0), Vector3(0.3, 12.0, 6.0), _glow(Color("f0a0e0"), 1.4), false)
+	_cleft_fibres = Node3D.new()
+	_cleft_fibres.name = "CleftFibres"
+	_cleft_fibres.set_meta("no_batch", true)
+	add_child(_cleft_fibres)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 7:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.06, 0.06, 8.0)
+		st.append_from(bm, 0, Transform3D(Basis(Vector3.RIGHT, (i % 3 - 1) * 0.06), at + Vector3(-3.0, 0.5 + i * 0.6, 0.0)))
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _glow(Color("e6dcff"), 0.8)
+	_cleft_fibres.add_child(mi)
+	var body := StaticBody3D.new()
+	body.collision_layer = Game.LAYER_WORLD
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.4, 5.0, 8.0)
+	cs.shape = bs
+	body.add_child(cs)
+	body.position = at + Vector3(-3.0, 2.5, 0.0)
+	_cleft_fibres.add_child(body)
+	_sync_cleft()
+
+
+func _sync_cleft() -> void:
+	if not is_instance_valid(_cleft_fibres):
+		return
+	var open: bool = Game.flags.get("loom_open", false)
+	_cleft_fibres.visible = not open
+	for c in _cleft_fibres.get_children():
+		if c is CollisionObject3D:
+			(c as CollisionObject3D).collision_layer = 0 if open else Game.LAYER_WORLD
 
 
 func way_north_open() -> bool:

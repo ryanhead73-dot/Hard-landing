@@ -88,6 +88,7 @@ const FIND_BOLT_RETURNED: Array = [[HOB, "Bolt fourteen-C. I'd been wondering wh
 const FIND_HELMET: Array = [[JUNO, "Someone's suit recorder. They were humming."], [JUNO, "The same three clicks. Before they crashed, or after?"]]
 const FIND_BOOT: Array = [[JUNO, "One boot. Inside: a ration, never opened, and coordinates in pencil. The greenhouse."], [JUNO, "Whoever left this wanted the next one to find their way. Thanks."]]
 const FIND_ORCHARD: Array = [[JUNO, "Seed pods that keep a charge. Slow feet, no flash. I'll take one."]]
+const FIND_SIGNAL_FLAG: Array = [[JUNO, "A fibre flag knotting itself, and not a breath of wind. It's pulling west."], [JUNO, "The lace across that gap in the wall just went slack. A way round the Weave."]]
 const FIND_POCKET_WEATHER: Array = [[JUNO, "Rain from nowhere, and it falls in threes. Same beat as the Loom pulse."], [JUNO, "Spore fibre in the puddle, too. Into the pouch."]]
 
 ## New game: Juno, alone, Kestrel dark.
@@ -285,6 +286,38 @@ const WING_CAUGHT := [
 const WING_TAKEN := [
 	[JUNO, "It's too busy feeding to notice. Panel's off."],
 	[HOB, "Reyes's runners are on it. Marigold's tip, Kestrel's wing. Mismatched, but it'll fly."],
+]
+## The Loom Expanse's first pocket (milestone C), west through the Shatterlands' rim.
+const LOOM_ARRIVE := [
+	[HOB, "There's no pulse in the rock here. It's in the fibre. Everything you're looking at is one structure, Juno."],
+	[JUNO, "Ridges like ship's cable, and they're breathing. Keep me off anything soft."],
+]
+const LOOM_CROWN := [
+	[JUNO, "There. North, through the gap. Arches the height of a tower, and light down the middle."],
+	[HOB, "Every pulse I've logged since the crash runs back to that. The survey teams called it the Tuning Crown."],
+]
+const LOOM_SHORTCUT := [
+	[JUNO, "Knot's cut. The whole tunnel just sighed."],
+	[HOB, "The far end's gone slack. That's your way back to the mouth."],
+]
+const WEAVE_GRIPS := [
+	[JUNO, "Survey kit. Overboots with soft woven soles. The tag says 'for the weave'."],
+	[HOB, "Soft soles don't carry through the fibre. The divers won't hear you run, and those trip-threads should slide off."],
+]
+const DIVER_SEEN := [
+	[HOB, "Something's moving under the weave. That bulge. It hunts by footfall, not by sight."],
+	[JUNO, "And stone doesn't carry. Slabs, then, and no running."],
+]
+const PINWEAVER_SEEN := [
+	[JUNO, "Legs like a surveyor's calipers. It's stringing lines between the pillars."],
+	[HOB, "Pale thread at shin height: crouch through it or shoot it. The amber valve on its back only opens while it anchors."],
+]
+const SINGER_SEEN := [
+	[HOB, "The tall one is a resonator. When it plants its feet and draws breath, get rock between you and it."],
+	[JUNO, "Or put a round through the membrane in its throat while it's breathing in."],
+]
+const LOOM_OPEN := [
+	[HOB, "Juno, the fibres across the Shatterlands' west cleft just went slack. Whatever was holding that door has let go."],
 ]
 ## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
 const TEO_ASK := [
@@ -486,6 +519,12 @@ const LOGS: Array[Dictionary] = [
 		"id": "ferro_1", "site": "gillwood", "source": "ferro_cockpit",
 		"title": "Ferro-9, flight recorder", "author": "Pilot Brandt, Ferro-9",
 		"text": "Ferro-9, descent. Locked on the Long Patience beacon. At four hundred metres the pulse hit and every board went dark, same as the old reports said. I put her into the softest thing I could see, which was a forest of mushrooms. Seven aboard, seven walking. The canopy held. The jettison locker blew clear on the way down, somewhere west in the trees; there's kit in it if anyone comes back for her. Reyes says we walk south toward the light. Recorder off.",
+	},
+	# The Loom Expanse ("loom_expanse").
+	{
+		"id": "loom_survey", "site": "loom_expanse", "source": "survey_marker",
+		"title": "Tension memory", "author": "Resonance survey marker",
+		"text": "A severed Loom fibre does not go slack. Under a microscope it curls into smaller rings and holds a pattern of bends made before it was cut. The rings seem to anticipate the next pulse, as though strain could remember its own future. A field scanner calls it an error. The researchers called it a material with history. After the third experiment, the test table began vibrating without power. The team buried the samples in basalt, sealed the results and left the table behind.",
 	},
 	# Drift caches out on the open basin ("basin", "cache:N"): cargo from every ship the Loom pulled down.
 	{

@@ -457,6 +457,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		var gate: Node3D = regions.gates["shatterlands"]
 		player.revive(gate.to_global(Vector3(0.0, 0.5, 5.0)), false)
 		player.face(gate.global_rotation.y)
+	elif key == KEY_O and not regions.travelling:
+		# Expansion preview: open the cleft to the Loom Expanse and go straight there.
+		Game.set_flag("shatterlands_open")
+		Game.set_flag("loom_open")
+		regions.travel("loom_expanse")
 
 
 func spawn_scuttler(at: Vector3) -> Scuttler:
@@ -509,7 +514,7 @@ func spawn_roamers() -> void:
 		spawn_scuttler(p)
 
 
-## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer", "drifter", "veilwing" or "warden". A name makes it an elite.
+## Spawns a hostile: "scuttler", "spitter", "ram", "lurker", "skimmer", "drifter", "veilwing", the Loom's "ridge_diver", "pinweaver" and "chord_singer", or "warden". A name makes it an elite.
 ## `parent`, when given, owns it instead of main (a region scene, so it goes when the region does).
 func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = null) -> Enemy:
 	var e: Enemy
@@ -526,6 +531,12 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = nul
 			e = Drifter.new()
 		"veilwing":
 			e = Veilwing.new()
+		"ridge_diver":
+			e = RidgeDiver.new()
+		"pinweaver":
+			e = Pinweaver.new()
+		"chord_singer":
+			e = ChordSinger.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)
@@ -788,6 +799,10 @@ func _install(id: String) -> void:
 	# Cooling clears the canyon's rockfall: the Shatterlands open (Jake, 2026-11-07).
 	if id == "cooling":
 		Game.set_flag("shatterlands_open")
+	# The wing's in: the fibres across the Shatterlands' west cleft let go (milestone C).
+	if id == "wing":
+		Game.set_flag("loom_open")
+		get_tree().create_timer(12.0).timeout.connect(func(): voice.say(Story.LOOM_OPEN))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -1084,7 +1099,7 @@ func _on_player_died() -> void:
 # --- Setup --------------------------------------------------------------------------------
 
 func _dev_text() -> String:
-	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home · M skip stage · U Shatterlands gate"]
+	var lines: PackedStringArray = ["DEV  1-7 repairs · N dusk · K +50 scrap · T current site · H home · M skip stage · U Shatterlands gate · O Loom Expanse"]
 	for i in Kestrel.REPAIR_ORDER.size():
 		var id := Kestrel.REPAIR_ORDER[i]
 		lines.append("%d %s %s" % [i + 1, Kestrel.REPAIR_NAMES[id], "■" if kestrel.is_repaired(id) else "□"])

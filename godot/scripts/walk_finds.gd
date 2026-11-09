@@ -15,6 +15,8 @@ extends Node
 ##   boot            Shatterlands  a boot with greenhouse coordinates and a ration: a med-seal
 ##   static_orchard  Gillwood  seed pods that flash if you run past: scan one for an arc charge
 ##   pocket_weather  Gillwood  rain from a clear sky, in threes: a Loom clue and spore fibre
+##   signal_flag     Loom Expanse  a fibre flag that knots itself in still air, pulling west: it
+##                   opens the bypass lane behind the Weave (LoomExpanse.bypass_open)
 
 const USE := 2.2
 const CUE_RANGE := 22.0
@@ -32,6 +34,7 @@ const MARKS_FROM := Vector2(-36.0, 29.0)
 const REGIONAL := {
 	"shatterlands": {"boot": Vector2(2.0, -24.0)},
 	"gillwood": {"static_orchard": Vector2(-20.0, -6.0), "pocket_weather": Vector2(-30.0, -36.0)},
+	"loom_expanse": {"signal_flag": Vector2(-40.0, 38.0)},
 }
 ## Plan point (Kestrel.plan) on the fabricator bench where the bolt goes back.
 const BOLT_HOME := Vector3(14.2, 0.97, 9.6)
@@ -155,6 +158,9 @@ func _cue(id: String, root: Node3D) -> float:
 		"hob_bolt":
 			Sfx.play("ui_click", root.global_position, -20.0, 0.3)
 			return 5.0
+		"signal_flag":
+			Sfx.play("thread_spool", root.global_position + Vector3.UP * 2.0, -14.0, 0.3)
+			return 6.0
 	return 999.0
 
 
@@ -405,6 +411,23 @@ func _use_boot(root: Node3D, pos: Vector3) -> Dictionary:
 		Game.set_flag("greenhouse_coords", true)
 		main.hud.show_message("An unopened ration (a med-seal's worth of patching) and coordinates to Reyes's greenhouse.")
 		_finish("boot", Story.FIND_BOOT)}
+
+
+## A survey pole with a pale fibre flag that pulls taut toward the west wall with no wind.
+func _build_signal_flag(root: Node3D) -> void:
+	_mesh(root, Vector3(0.0, 1.2, 0.0), _cyl(0.04, 2.4), _metal(Color("c9c4b8")))
+	var flag := _mesh(root, Vector3(-0.45, 2.15, 0.0), _box(Vector3(0.9, 0.35, 0.02)), _glow(Color("e6dcff"), 0.6))
+	flag.name = "Flag"
+	flag.rotation.z = 0.12
+	_mesh(root, Vector3(-0.95, 2.1, 0.0), _cyl(0.07, 0.12), _glow(TEAL, 1.2)).rotation.z = PI * 0.5
+
+
+func _use_signal_flag(root: Node3D, pos: Vector3) -> Dictionary:
+	if found("signal_flag") or not _near(root, pos):
+		return {}
+	return {"label": "[E] Feel which way the flag pulls", "action": func():
+		main.hud.show_message("The flag's knot points west, at the laced gap in the wall. The lacing goes slack: a lane round the Weave.")
+		_finish("signal_flag", Story.FIND_SIGNAL_FLAG)}
 
 
 func _build_static_orchard(root: Node3D) -> void:

@@ -77,6 +77,18 @@ const EXTRA: Array[Dictionary] = [
 		"steps": [{"text": "Find the jettison locker in the trees west of Ferro-9", "done": {"type": "flag", "id": "ferro_locker"}}],
 	},
 	{
+		"id": "the_loom", "title": "Under the ridges", "act": 3, "kind": "discovery", "region": "loom_expanse",
+		"summary": "The cleft in the Shatterlands' west rim has opened onto the Loom Expanse. A survey team went in before you.",
+		"requires": [{"type": "flag", "id": "loom_open"}],
+		"steps": [
+			{"text": "Go west through the cleft into the Loom Expanse", "done": {"type": "flag", "id": "reached_loom"}},
+			{"text": "Find a clear view of whatever the pulses run back to", "done": {"type": "flag", "id": "loom_crown_seen"}},
+			{"text": "Find the survey team's camp in the north hollow", "done": {"type": "flag", "id": "weave_grips"}},
+			{"text": "Open a way back through the central ridge", "done": {"type": "flag", "id": "loom_shortcut"}},
+		],
+		"rewards": {"scrap": 30},
+	},
+	{
 		"id": "dark_house", "title": "The dark house", "act": 2, "kind": "side", "region": "shatterlands",
 		"summary": "The east glasshouse went dark in the last pulse. Teo says Voss kept spare lamp cells up on the high shelf.",
 		"requires": [{"type": "flag", "id": "lamp_cell_asked"}],

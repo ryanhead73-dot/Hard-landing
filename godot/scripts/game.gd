@@ -19,6 +19,8 @@ signal flag_changed(id: String, value: Variant)
 const LAYER_WORLD := 1
 const LAYER_PLAYER := 2
 const LAYER_ENEMY := 4
+## Things only shots touch (a pinweaver's thread): nothing walks into them.
+const LAYER_SHOT := 8
 
 const UPGRADE_ORDER: Array[String] = [
 	"extended_mag", "stim_pouch", "plating", "heavy_rounds", "regen_servo", "scatter_choke",
@@ -623,6 +625,8 @@ func apply_session(data: Dictionary) -> void:
 func _open_by_repairs() -> void:
 	if is_repaired("cooling") and not flags.get("shatterlands_open", false):
 		set_flag("shatterlands_open")
+	if is_repaired("wing") and not flags.get("loom_open", false):
+		set_flag("loom_open")
 
 
 ## Writes the save safely: the new file goes to a temp file first and only replaces the save once

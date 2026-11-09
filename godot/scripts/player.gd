@@ -113,6 +113,8 @@ var _boom_smooth := 3.1
 var _boom: Node3D
 var _since_floor := 0.0
 var _jump_buffer := 0.0
+## Snagged (a Loom trip-thread, a loose pocket of weave): a slow walk and no sprint until it runs out.
+var snag_t := 0.0
 
 
 func _ready() -> void:
@@ -254,6 +256,15 @@ func take_damage(amount: float, from: Vector3 = Vector3.ZERO) -> bool:
 func add_trauma(amount: float) -> void:
 	trauma = minf(trauma + amount, 1.0)
 	Game.rumble(amount * 0.5, amount * 1.2, 0.1 + amount * 0.3)
+
+
+## Snags her for `secs` (see snag_t).
+func snag(secs: float) -> void:
+	snag_t = maxf(snag_t, secs)
+
+
+func is_sprinting() -> bool:
+	return _sprinting
 
 
 func is_rolling() -> bool:
@@ -502,6 +513,10 @@ func _physics_process(delta: float) -> void:
 		_sprinting = dir.length() > 0.3
 	if aiming:
 		speed = minf(speed, walk_speed * 0.7)
+	if snag_t > 0.0:
+		snag_t = maxf(snag_t - delta, 0.0)
+		speed = minf(speed, walk_speed * 0.4)
+		_sprinting = false
 	if Game.carrying != "" and not Campaign.PACKS_LIGHT.has(Game.carrying):
 		speed *= carry_speed_factor
 	# Quick to get going, quicker to stop, and only a little steering in the air.

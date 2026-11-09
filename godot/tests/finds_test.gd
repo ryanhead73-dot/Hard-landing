@@ -16,7 +16,7 @@ func _run() -> void:
 	_clear_enemies()
 	var finds: WalkFinds = main.finds
 	_check("every Kettle find is built", WalkFinds.KETTLE.keys().all(func(id): return finds.nodes.has(id)))
-	_check("nine finds now, the tenth waits for the Loom", WalkFinds.all_ids().size() == 9)
+	_check("all ten finds, the tenth in the Loom", WalkFinds.all_ids().size() == 10)
 	_check("none found on a new game", WalkFinds.all_ids().all(func(id): return not WalkFinds.found(id)))
 
 	# Rain cup: the first time it upgrades the scanner.

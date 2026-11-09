@@ -47,8 +47,16 @@ const REGIONS := {
 		"scene": "res://scripts/regions/approach.gd",
 		"origin": Vector3(-8000.0, 0.0, 0.0),
 	},
+	# The first pocket of the Loom Expanse (milestone C), west through the Shatterlands' rim. It
+	# opens once the wing is fitted.
 	"loom_expanse": {
-		"name": "The Loom Expanse", "act": 3, "planned": true,
+		"name": "The Loom Expanse", "act": 3,
+		"scene": "res://scripts/regions/loom_expanse.gd",
+		"origin": Vector3(12000.0, 0.0, 0.0),
+		"from": "shatterlands", "gate_pos": Vector3(-63.0, 0.0, 18.0), "gate_in": Vector3(1.0, 0.0, 0.0),
+		"unlock_flag": "loom_open",
+		"locked_text": "A cleft in the west rim, laced shut with pale fibres that hum when you touch them",
+		"enter_text": "Go west through the cleft into the Loom Expanse",
 	},
 }
 

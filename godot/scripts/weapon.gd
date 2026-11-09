@@ -67,6 +67,9 @@ var _since_shot := 9.0
 var _shots := 0
 ## Seconds left in a weapon switch, and the gun being put away.
 var _swap_left := 0.0
+## Detuned by a chord singer's dissonance: reloads drag until this runs out.
+var detuned := 0.0
+const DETUNE_DRAG := 1.2
 var _swap_from := ""
 
 
@@ -98,6 +101,7 @@ func _process(delta: float) -> void:
 		_show_model()
 	if _since_shot > 0.12:
 		bloom = move_toward(bloom, 0.0, BLOOM_SETTLE * delta)
+	detuned = maxf(detuned - delta, 0.0)
 	if reloading:
 		_reload_left -= delta
 		if _reload_left <= 0.0:
@@ -133,7 +137,17 @@ func reload_time() -> float:
 	var t: float = spec()["reload"]
 	if current == "arc_lance" and Game.has_upgrade("arc_capacitor"):
 		t *= 0.7
+	if detuned > 0.0:
+		t += DETUNE_DRAG
 	return t
+
+
+## A chord singer's dissonance: a reload under way drags, and so does one started in the next
+## `secs`.
+func detune(secs: float) -> void:
+	if reloading and detuned <= 0.0:
+		_reload_left += DETUNE_DRAG
+	detuned = maxf(detuned, secs)
 
 
 ## The spread a shot fired now would have: the weapon's base, widened by moving, plus bloom.
@@ -265,7 +279,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 	var armored := true
 	var damage := shot_damage()
 	for i in pierce:
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * max_range, Game.LAYER_WORLD | Game.LAYER_ENEMY)
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * max_range, Game.LAYER_WORLD | Game.LAYER_ENEMY | Game.LAYER_SHOT)
 		query.exclude = exclude
 		var result := space.intersect_ray(query)
 		if result.is_empty():
