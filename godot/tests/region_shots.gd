@@ -44,6 +44,11 @@ func _ready() -> void:
 		Game.delete_save()
 		get_tree().quit()
 		return
+	if args.size() > 1 and args[1] == "milestone_d":
+		await _milestone_d(out)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] == "rewards":
 		await _rewards(out)
 		Game.delete_save()
@@ -401,6 +406,39 @@ func _opening(out: String) -> void:
 
 
 ## A frame without moving Juno (she's seated, or posed already).
+## Milestone D: the Long Patience's hall and its guardian, the Tuning Crown's resonator bay and the
+## Cantor, and the departure crisis's tethers on Kestrel.
+func _milestone_d(out: String) -> void:
+	for id in Kestrel.REPAIR_ORDER:
+		main.kestrel.set_repaired(id, true)
+	main.siege.pending = -1
+	main.finale.start()
+	main.finale.spool = Finale.SPOOL_TIME * 0.31
+	await _frames(5)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.queue_free()
+	var k: Kestrel = main.kestrel
+	for v in [["d_tethers", Vector3(12.0, 0.0, -8.0), Vector3(19.0, 1.0, 5.0)], ["d_tether_nose", Vector3(-7.0, 0.0, 19.0), Vector3(2.4, 1.0, 13.0)]]:
+		var at: Vector3 = k.to_global(k.plan(v[1].x, v[1].y, v[1].z))
+		at.y = main.site.height_at(at.x, at.z) + 0.3
+		await _shot(out, v[0], at, k.to_global(k.plan(v[2].x, v[2].y, v[2].z)))
+	main.siege.damage_hull(ShipSiege.MAX_HULL)
+	await _frames(5)
+	for f in ["shatterlands_open", "loom_open", "patience_open", "crown_open"]:
+		Game.set_flag(f)
+	await main.regions.travel("long_patience", true)
+	var lp := main.regions.scene as LongPatience
+	lp.adopt_guardian(main.spawn_enemy("guardian", lp.to_global(Vector3(0.0, 0.3, -14.0)), "", lp) as PatienceGuardian)
+	await _shot(out, "d_patience_hall", lp.to_global(Vector3(2.0, 0.3, 24.0)), lp.to_global(Vector3(-1.0, 4.0, -20.0)))
+	await _shot(out, "d_patience_guardian", lp.to_global(Vector3(3.0, 0.3, -4.0)), lp.to_global(Vector3(0.0, 2.0, -14.0)))
+	await main.regions.travel("tuning_crown", true)
+	var tc := main.regions.scene as TuningCrown
+	await _shot(out, "d_crown_bay", tc.to_global(Vector3(-30.0, 0.3, 36.0)), tc.to_global(TuningCrown.RESONATORS[0] + Vector3(0.0, 3.0, 0.0)))
+	Game.set_flag("crown_arena")
+	tc.wake_cantor(main)
+	await _shot(out, "d_cantor", tc.to_global(Vector3(4.0, 0.3, -30.0)), tc.to_global(TuningCrown.ARENA + Vector3(0.0, 6.0, 0.0)))
+
+
 func _still(out: String, name: String) -> void:
 	await _frames(30)
 	await RenderingServer.frame_post_draw
