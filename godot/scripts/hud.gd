@@ -435,6 +435,10 @@ func armor_marker() -> void:
 
 
 ## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
+## The planted field beacon (Vector3) in this region, or null; shown on the compass.
+var beacon_target = null
+
+
 func set_scan(marks: Array) -> void:
 	_scan_marks = marks
 
@@ -556,7 +560,13 @@ func _draw_scan() -> void:
 		if cam.is_position_behind(pos):
 			continue
 		var p := cam.unproject_position(pos)
-		if m["kind"] == "crate":
+		if m["kind"] == "beacon":
+			var bc := Color(FieldBeacon.COLOR, 0.9)
+			_scan.draw_line(p + Vector2(0, -10), p + Vector2(0, 8), bc, 2.0)
+			_scan.draw_circle(p + Vector2(0, -12), 3.5, bc)
+			var dist := cam.global_position.distance_to(m["pos"])
+			_scan.draw_string(UiStyle.font("heading"), p + Vector2(7, -6), "%d m" % roundi(dist), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bc)
+		elif m["kind"] == "crate":
 			var col := Color(1.0, 0.7, 0.3, 0.8)
 			_scan.draw_polyline(PackedVector2Array([p + Vector2(0, -6), p + Vector2(6, 0), p + Vector2(0, 6), p + Vector2(-6, 0), p + Vector2(0, -6)]), col, 1.5)
 		else:
@@ -622,6 +632,13 @@ func _draw_compass() -> void:
 			_compass.draw_string(font, Vector2(x - lw * 0.5, 20), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(UiStyle.CREAM, fade))
 		else:
 			_compass.draw_line(Vector2(x, 14 if deg % 45 else 10), Vector2(x, 22), Color("e9e1cc", 0.6 * fade), 1.0)
+	if beacon_target is Vector3:
+		var bd: Vector3 = beacon_target - cam.global_position
+		var bb := fposmod(rad_to_deg(atan2(bd.x, -bd.z)), 360.0)
+		var boff := clampf(wrapf(bb - heading, -180.0, 180.0), -COMPASS_SPAN, COMPASS_SPAN)
+		var bx := w + boff / COMPASS_SPAN * w
+		_compass.draw_line(Vector2(bx, 3), Vector2(bx, 14), FieldBeacon.COLOR, 2.0)
+		_compass.draw_circle(Vector2(bx, 3), 2.5, FieldBeacon.COLOR)
 	if _waypoint_target is Vector3:
 		var d: Vector3 = _waypoint_target - cam.global_position
 		var bearing := fposmod(rad_to_deg(atan2(d.x, -d.z)), 360.0)

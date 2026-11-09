@@ -110,6 +110,7 @@ func build() -> void:
 	gear.gw = self
 	add_child(gear)
 	_locker()
+	_rescue_trail()
 	_undergrowth()
 	_sync_parts()
 	_end_batch()
@@ -171,6 +172,9 @@ func interaction(pos: Vector3) -> Dictionary:
 			return {"label": "[E] Cut the landing-gear strut free", "action": free_strut}
 		if not salvaged("ferro_canopy"):
 			return {"label": "Ferro-9's gear strut: it'll keep. The canopy first, while her nose holds"}
+	for i in TRAIL_STASHES.size():
+		if trail_open() and not salvaged("trail_stash_%d" % i) and pos.distance_to(to_global(stash_points[i])) < USE_RANGE:
+			return {"label": "[E] Open Brandt's stash tin", "action": open_stash.bind(i)}
 	if pos.distance_to(locker_pos) < USE_RANGE and not salvaged("ferro_locker"):
 		return {"label": "[E] Open Ferro-9's jettison locker", "action": open_locker}
 	return {}
@@ -187,6 +191,92 @@ func open_locker() -> void:
 		_locker_tell.visible = false
 	Sfx.play("crawlspace_hatch", locker_pos, 0.0)
 	Sfx.play("scrap_pickup", locker_pos, -4.0)
+
+
+## The canopy's reward (production pack, repair 3): Brandt's flight recorder held the route the
+## Ferro-9 survivors walked out to the greenhouses. With Kestrel's canopy sealed the cockpit plots
+## it: amber waymarks from the wreck to the south mouth (on the map's region inset too), and two
+## stash tins the survivors left along it. Flags trail_stash_0 and trail_stash_1.
+const TRAIL := [Vector3(2.0, 0.0, -12.0), Vector3(-4.0, 0.0, 8.0), Vector3(2.0, 0.0, 26.0), Vector3(-2.0, 0.0, 44.0), Vector3(3.0, 0.0, 58.0)]
+## Which waymarks have a stash tin beside them.
+const TRAIL_STASHES := [1, 3]
+var trail_points: Array[Vector3] = []
+## Where the stash tins sit (beside their waymarks).
+var stash_points: Array[Vector3] = []
+
+
+func trail_open() -> bool:
+	return Game.is_repaired("canopy")
+
+
+func stashes_left() -> int:
+	return TRAIL_STASHES.size() - range(TRAIL_STASHES.size()).filter(func(i): return salvaged("trail_stash_%d" % i)).size()
+
+
+func open_stash(i: int) -> void:
+	var flag := "trail_stash_%d" % i
+	if salvaged(flag):
+		return
+	Game.set_flag(flag)
+	Game.add_scrap(15)
+	if i == 0:
+		Game.add_stims(1)
+	else:
+		Game.add_charges(1)
+	var at := to_global(stash_points[i])
+	Sfx.play("crawlspace_hatch", at, -2.0)
+	Sfx.play("scrap_pickup", at, -4.0)
+	var main := get_parent()
+	if main and main.get("hud"):
+		main.hud.show_message("A survivors' stash tin: %s and 15 scrap. %s" % ["a med-seal" if i == 0 else "an arc charge", "One more down the trail." if stashes_left() > 0 else "That's the last of Brandt's trail."])
+
+
+## Waymarks: a short post with an amber band and a painted arrow plate pointing on down the
+## trail, nudged clear of any gill-tree; batched, nothing to walk into.
+func _rescue_trail() -> void:
+	trail_points.clear()
+	for p in TRAIL:
+		var at: Vector3 = p
+		for tr in _tree_list:
+			var d := Vector2(at.x - tr[0].x, at.z - tr[0].z)
+			if d.length() < 2.6:
+				at += Vector3(d.x, 0.0, d.y).normalized() * (2.6 - d.length()) if d.length() > 0.01 else Vector3(2.6, 0.0, 0.0)
+		trail_points.append(at)
+	stash_points.clear()
+	for i in TRAIL_STASHES:
+		stash_points.append(trail_points[i] + Vector3(1.4, 0.0, 0.0))
+	# Where a tree stands on the line between two waymarks, add a waymark stepping round it.
+	for _pass in 3:
+		var out: Array[Vector3] = [trail_points[0]]
+		for i in range(1, trail_points.size()):
+			var a := trail_points[i - 1]
+			var b := trail_points[i]
+			for tr in _tree_list:
+				var t2 := Vector2(tr[0].x, tr[0].z)
+				var c := Geometry2D.get_closest_point_to_segment(t2, Vector2(a.x, a.z), Vector2(b.x, b.z))
+				var gap := c.distance_to(t2)
+				if gap < 2.4 and c.distance_to(Vector2(a.x, a.z)) > 0.5 and c.distance_to(Vector2(b.x, b.z)) > 0.5:
+					var side := (c - t2).normalized() if gap > 0.01 else Vector2(b.z - a.z, a.x - b.x).normalized()
+					var around := t2 + side * 2.8
+					out.append(Vector3(around.x, 0.0, around.y))
+					break
+			out.append(b)
+		trail_points = out
+	if not trail_open():
+		return
+	var post := _mat(Color("8a7f6e"), 0.8)
+	var band := _glow(AMBER, 1.6)
+	for i in trail_points.size():
+		var at := trail_points[i]
+		var next: Vector3 = trail_points[i + 1] if i + 1 < trail_points.size() else at + Vector3(0.0, 0.0, 6.0)
+		var dir := (next - at).normalized()
+		_box(at + Vector3(0.0, 0.7, 0.0), Vector3(0.12, 1.4, 0.12), post, false)
+		_box(at + Vector3(0.0, 1.15, 0.0), Vector3(0.14, 0.12, 0.14), band, false)
+		_box(at + Vector3(0.0, 1.32, 0.0) + dir * 0.18, Vector3(0.06, 0.12, 0.42), band, false, self, Basis(Vector3.UP, atan2(dir.x, dir.z)))
+	for i in TRAIL_STASHES.size():
+		var at: Vector3 = stash_points[i]
+		_box(at + Vector3(0.0, 0.2, 0.0), Vector3(0.6, 0.4, 0.4), _mat(FERRO_HULL, 0.55), false)
+		_box(at + Vector3(0.0, 0.41, 0.0), Vector3(0.62, 0.04, 0.42), _mat(FERRO_TRIM, 0.5), false)
 
 
 func salvaged(flag: String) -> bool:

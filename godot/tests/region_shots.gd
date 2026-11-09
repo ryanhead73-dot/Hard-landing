@@ -36,6 +36,32 @@ func _ready() -> void:
 		Game.delete_save()
 		get_tree().quit()
 		return
+	if args.size() > 1 and args[1] == "loom2":
+		Game.set_flag("shatterlands_open")
+		Game.set_flag("loom_open")
+		await main.regions.travel("loom_expanse", true)
+		await _loom(out, main.regions.scene, true)
+		Game.delete_save()
+		get_tree().quit()
+		return
+	if args.size() > 1 and args[1] == "rewards":
+		await _rewards(out)
+		Game.delete_save()
+		get_tree().quit()
+		return
+	if args.size() > 1 and args[1] == "loom":
+		Game.set_flag("shatterlands_open")
+		await main.regions.travel("shatterlands", true)
+		var shl := main.regions.scene as ShatterlandsThreshold
+		var cleft := ShatterlandsThreshold.WEST_CLEFT
+		await _shot(out, "loom_cleft_shut", shl.to_global(cleft + Vector3(12.0, 0.3, 4.0)), shl.to_global(cleft + Vector3(-6.0, 3.0, 0.0)))
+		Game.set_flag("loom_open")
+		await _shot(out, "loom_cleft_open", shl.to_global(cleft + Vector3(12.0, 0.3, 4.0)), shl.to_global(cleft + Vector3(-6.0, 3.0, 0.0)))
+		await main.regions.travel("loom_expanse", true)
+		await _loom(out, main.regions.scene)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] == "gillwood":
 		Game.set_flag("shatterlands_open")
 		Game.set_flag("reyes_talked")
@@ -196,6 +222,96 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	gw.free_strut()
 	await get_tree().create_timer(1.5).timeout
 	await _shot(out, "gillwood_salvaged", wreck + Vector3(-9.0, 0.3, 6.0), wreck + Vector3(2.0, 1.0, 2.0))
+
+
+## Milestone C: the first pocket of the Loom Expanse and its three creatures, held still.
+func _loom(out: String, r: RegionScene, creatures_only := false) -> void:
+	var lx := r as LoomExpanse
+	var at := func(p: Vector3) -> Vector3: return lx.to_global(p)
+	await _shot(out, "loom_arrival", lx.entry_global(), at.call(Vector3(0.0, 8.0, 20.0)))
+	if creatures_only:
+		await _loom_creatures(out, lx)
+		return
+	await _shot(out, "loom_weave", at.call(Vector3(-20.0, 0.3, 30.0)), at.call(Vector3(-32.0, 1.0, 8.0)))
+	# A ridge mid-swell.
+	var ridge: LoomRidge = lx.ridges[0]
+	ridge.front = ridge.length() * 0.55
+	ridge._heave()
+	ridge.set_physics_process(false)
+	await _shot(out, "loom_ridge_swell", at.call(Vector3(-22.0, 0.3, 20.0)), at.call(Vector3(-28.0, 0.5, 12.0)))
+	ridge.set_physics_process(true)
+	await _shot(out, "loom_spindles", at.call(Vector3(23.0, 0.3, 32.0)), at.call(Vector3(28.0, 3.0, 0.0)))
+	await _shot(out, "loom_crown", at.call(LoomExpanse.OVERLOOK + Vector3(0.0, 0.3, 6.0)), at.call(LoomExpanse.CROWN + Vector3(0.0, 60.0, 0.0)))
+	await _shot(out, "loom_bowl", at.call(Vector3(18.0, 0.3, -38.0)), at.call(Vector3(-8.0, 1.0, -58.0)))
+	await _shot(out, "loom_locker", at.call(LoomExpanse.LOCKER + Vector3(3.0, 0.3, 4.0)), at.call(LoomExpanse.LOCKER + Vector3(0.0, 0.6, 0.0)))
+	await _shot(out, "loom_marker", at.call(LoomExpanse.MARKER + Vector3(-4.0, 0.3, 4.0)), at.call(LoomExpanse.MARKER + Vector3(0.0, 1.2, 0.0)))
+	await _shot(out, "loom_tunnel", at.call(Vector3(0.0, 0.3, 32.0)), at.call(Vector3(0.0, 2.0, 20.0)))
+	await _loom_creatures(out, lx)
+
+
+func _loom_creatures(out: String, lx: LoomExpanse) -> void:
+	var at := func(p: Vector3) -> Vector3: return lx.to_global(p)
+	# The creatures: a diver surfaced with its gills open, a pinweaver anchored with a thread
+	# strung, a chord singer drawing breath.
+	var d := main.spawn_enemy("ridge_diver", at.call(Vector3(-22.0, 0.0, 2.0)), "", lx) as RidgeDiver
+	await _frames(3)
+	d._erupt()
+	await _frames(15)
+	d.set_physics_process(false)
+	await _shot(out, "loom_diver", at.call(Vector3(-22.0, 0.3, 7.5)), d.global_position + Vector3(0.0, 1.4, 0.0))
+	d.queue_free()
+	var pw := main.spawn_enemy("pinweaver", at.call(Vector3(23.0, 0.0, 10.0)), "", lx) as Pinweaver
+	await _frames(3)
+	pw._pair = [at.call(Vector3(19.0, 0.45, 8.0)), at.call(Vector3(27.0, 0.45, 15.0))]
+	pw._start_spool()
+	pw._pending.grown = 1.0
+	pw._pending.live = true
+	pw._pending.layout()
+	pw.state = Pinweaver.State.ANCHOR
+	pw.set_physics_process(false)
+	await _shot(out, "loom_pinweaver", at.call(Vector3(21.0, 0.3, 18.0)), pw.global_position + Vector3(0.0, 0.8, 0.0))
+	pw.queue_free()
+	var s := main.spawn_enemy("chord_singer", at.call(LoomExpanse.PATCHES[1]), "", lx) as ChordSinger
+	await _frames(3)
+	s.state = ChordSinger.State.INHALE
+	s._membrane_mat.emission_energy_multiplier = 4.0
+	s.set_physics_process(false)
+	await _shot(out, "loom_singer", at.call(LoomExpanse.PATCHES[1] + Vector3(4.0, 0.3, 9.0)), s.global_position + Vector3(0.0, 2.6, 0.0))
+	s.queue_free()
+
+
+## The pack rewards: the field beacon planted on the basin, the drone station and drone, Brandt's
+## trail in the Gillwood.
+func _rewards(out: String) -> void:
+	var k: Kestrel = main.kestrel
+	for id in ["aux_power", "cooling", "canopy", "landing_gear", "wing"]:
+		Game.set_repaired(id, true)
+		k.set_repaired(id, true)
+	await _frames(30)
+	var spot: Vector3 = main.SPAWN + Vector3(22.0, 0.0, 30.0)
+	spot.y = main.site.height_at(spot.x, spot.z) + 0.3
+	main.player.revive(spot, false)
+	await _frames(20)
+	main.beacon.place()
+	await _shot(out, "reward_beacon", spot + Vector3(-4.0, 0.0, 6.0), spot + Vector3(0.0, 2.0, 0.0))
+	var station: Vector3 = k.to_global(k.plan(main.DRONE_STATION.x, 0.0, main.DRONE_STATION.z))
+	await _shot(out, "reward_station", k.to_global(k.plan(25.5, 0.3, 13.6)), station + Vector3(0.0, 1.0, 0.0))
+	Game.set_flag("drone_out", true)
+	main.player.revive(spot + Vector3(3.0, 0.0, -3.0), false)
+	await _frames(60)
+	await _shot(out, "reward_drone", spot + Vector3(3.0, 0.0, 1.0), spot + Vector3(3.0, 1.6, -4.0))
+	Game.set_flag("shatterlands_open")
+	Game.set_flag("reyes_talked")
+	Game.set_flag("reached_gillwood")
+	await main.regions.travel("gillwood", true)
+	var gw := main.regions.scene as Gillwood
+	await _shot(out, "reward_trail", gw.to_global(gw.trail_points[1] + Vector3(-3.0, 0.3, 6.0)), gw.to_global(gw.stash_points[0] + Vector3(0.0, 0.6, 0.0)))
+	main.map_panel.main = main
+	main.map_panel.open()
+	await _frames(10)
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/reward_map.png" % out)
+	main.map_panel.close()
 
 
 ## Milestone B: the canopy rescue and the gear escort in the Gillwood, the wing chase in the pocket.

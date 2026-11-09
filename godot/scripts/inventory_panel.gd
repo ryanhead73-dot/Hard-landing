@@ -22,6 +22,18 @@ func _refresh() -> void:
 		_row("%s%s  ·  %d in the magazine, %s in reserve  [%d]" % [mark, Weapon.SPECS[id]["name"], Game.ammo_in_mag(id), "unlimited" if reserve < 0 else str(reserve), Weapon.ORDER.find(id) + 1])
 	_row("SUPPLIES", Color("ffd08a"), 14)
 	_row("Stims %d / %d  [Q]   ·   Arc charges %d / %d  [G]   ·   Scrap %d" % [Game.stims, Game.max_stims(), Game.charges, Game.max_charges(), Game.scrap])
+	var main: Node = player.get_parent() if player else null
+	var beacon: FieldBeacon = main.get("beacon") if main else null
+	if beacon and beacon.unlocked():
+		var where: String = Game.flags.get("beacon_region", "")
+		_row("Field beacon: %s  [B]" % ("planted in " + RegionDB.display_name(where) if where != "" else "not planted"))
+		var b := Button.new()
+		b.text = "Plant the beacon here"
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func():
+			close()
+			beacon.place())
+		_content.add_child(b)
 	if Game.carrying != "":
 		_row("On your back: %s" % Campaign.by_component(Game.carrying)["component_name"])
 	var built: Array = Game.UPGRADE_ORDER.filter(func(id): return Game.has_upgrade(id))

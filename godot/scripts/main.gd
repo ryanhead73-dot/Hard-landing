@@ -50,6 +50,7 @@ const KEYS := {
 	"logs": [KEY_L],
 	"map": [KEY_M],
 	"journal": [KEY_J],
+	"beacon": [KEY_B],
 }
 ## The launch cinematic: lift, climb out, then the ending card.
 const LIFT_TIME := 3.0
@@ -77,6 +78,8 @@ const PAD_BUTTONS := {
 	"flashlight": [JOY_BUTTON_DPAD_UP],
 	"map": [JOY_BUTTON_DPAD_DOWN],
 	"inventory": [JOY_BUTTON_BACK],
+	# The share / create button; the inventory has a Plant the beacon button too.
+	"beacon": [JOY_BUTTON_MISC1],
 }
 ## [axis, direction]: sticks move, triggers aim and fire.
 const PAD_AXES := {
@@ -134,6 +137,13 @@ var opening: Opening
 ## Optional places off the repair routes (Discoveries).
 var discoveries: Discoveries
 var finds: WalkFinds
+## The wing's reward: a beacon Juno can plant out on the ground (B).
+var beacon: FieldBeacon
+## The landing gear's reward: the utility drone and its station in the cargo bay.
+var drone: UtilityDrone
+var _drone_station: Node3D
+## Plan point (Kestrel.plan) of the drone station, on the cargo bay's port wall by the ramp.
+const DRONE_STATION := Vector3(28.7, 0.0, 10.5)
 ## The Kettle's big shapes: the Split round the canyon gate and the Chimney geyser.
 var landmarks: Landmarks
 var onboarding: Onboarding
@@ -314,6 +324,14 @@ func _ready() -> void:
 	finds.name = "WalkFinds"
 	add_child(finds)
 	finds.setup(self)
+	beacon = FieldBeacon.new()
+	beacon.name = "FieldBeacon"
+	add_child(beacon)
+	beacon.setup(self)
+	_build_drone_station()
+	Game.flag_changed.connect(func(id: String, _v: Variant):
+		if id == "drone_out":
+			_sync_drone())
 	landmarks = Landmarks.new()
 	add_child(landmarks)
 	landmarks.setup(self)
@@ -390,7 +408,10 @@ func _process(_delta: float) -> void:
 		map_panel.open()
 	elif Input.is_action_just_pressed("journal") and not player.dead and not Game.launched:
 		journal.open()
+	elif Input.is_action_just_pressed("beacon") and not player.dead and beacon.unlocked():
+		beacon.place()
 	hud.set_waypoint(_waypoint())
+	hud.beacon_target = beacon.here()
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta
 	if _pack_check <= 0.0:
@@ -569,6 +590,9 @@ func scanner_marks() -> Array:
 	# The suit's own scanner (HOB back on aux power, or the opening's battery) sees wildlife
 	# close by; the cockpit's, once the canopy is sealed, sees salvage and further.
 	var suit: bool = Game.is_repaired("aux_power") or Game.flags.get("scanner_battery", false)
+	var planted = beacon.here() if beacon else null
+	if planted is Vector3:
+		marks.append({"pos": planted, "kind": "beacon"})
 	if not (cockpit or suit) or player == null:
 		return marks
 	var pos := player.global_position
@@ -651,6 +675,8 @@ func load_state(data: Dictionary) -> void:
 	hud.show_message("Back aboard Kestrel. %s." % Game.objective_text())
 	_settle_spawn()
 	regions.restore()
+	_sync_drone()
+	beacon._rebuild()
 
 
 ## The repaired parts move Kestrel's colliders, and the physics server only catches up on the
@@ -740,6 +766,13 @@ func _find_interaction() -> Dictionary:
 		if siege.is_active():
 			return {"label": "Bunk: no time to rest with them on the hull"}
 		return {"label": "[E] Rest in the bunk and save", "action": rest}
+	var station := kestrel.to_global(kestrel.plan(DRONE_STATION.x, DRONE_STATION.y, DRONE_STATION.z + 0.8))
+	if pos.distance_to(station) < INTERACT_RANGE:
+		if not Game.is_repaired("landing_gear"):
+			return {"label": "Drone station: no power to the cargo bay while the hull is twisted"}
+		if Game.flags.get("drone_out", false):
+			return {"label": "[E] Dock the utility drone", "action": func(): Game.set_flag("drone_out", false)}
+		return {"label": "[E] Launch the utility drone", "action": func(): Game.set_flag("drone_out", true)}
 	if _near_install("armoury"):
 		if not Game.is_repaired("landing_gear"):
 			return {"label": "Armoury locker: jammed shut while the hull is twisted"}
@@ -752,6 +785,51 @@ func _find_interaction() -> Dictionary:
 			return {"label": "Fabricator offline: no power"}
 		return {"label": "[E] Use the fabricator (%d scrap)" % Game.scrap, "action": fabricator.open}
 	return {}
+
+
+## The drone station: a charging cradle on the cargo bay's port wall and a landing pad marked on
+## the deck in front of it (nothing to walk into). Lit once the landing gear is fixed.
+func _build_drone_station() -> void:
+	_drone_station = Node3D.new()
+	_drone_station.name = "DroneStation"
+	kestrel.add_child(_drone_station)
+	var at := kestrel.plan(DRONE_STATION.x, DRONE_STATION.y, DRONE_STATION.z)
+	var metal := StandardMaterial3D.new()
+	metal.albedo_color = Color("5c6066")
+	metal.metallic = 0.5
+	metal.roughness = 0.5
+	var lit := StandardMaterial3D.new()
+	lit.albedo_color = Color("ffb24d").darkened(0.4)
+	lit.emission_enabled = true
+	lit.emission = Color("ffb24d")
+	lit.emission_energy_multiplier = 1.5
+	lit.resource_name = "StationLit"
+	for part in [[Vector3(0.0, 1.3, -0.15), Vector3(1.0, 0.6, 0.2), metal], [Vector3(0.0, 1.05, -0.03), Vector3(0.8, 0.04, 0.06), lit],
+			[Vector3(0.0, 0.012, 0.6), Vector3(0.9, 0.02, 0.9), metal], [Vector3(0.0, 0.025, 0.6), Vector3(0.6, 0.01, 0.6), lit]]:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = part[1]
+		mi.mesh = bm
+		mi.material_override = part[2]
+		mi.position = at + part[0]
+		_drone_station.add_child(mi)
+	_sync_drone()
+
+
+## Launches or docks the drone to match Game.flags.drone_out (and the gear being fixed).
+func _sync_drone() -> void:
+	var out: bool = Game.flags.get("drone_out", false) and Game.is_repaired("landing_gear")
+	if out and not (drone and is_instance_valid(drone)):
+		drone = UtilityDrone.new()
+		drone.player = player
+		# On Juno, so it travels with her; it flies free of her (top_level).
+		player.add_child(drone)
+		drone.global_position = kestrel.to_global(kestrel.plan(DRONE_STATION.x, 1.3, DRONE_STATION.z + 0.6))
+		Sfx.play("power_up", drone.global_position, -10.0, 0.0)
+		hud.show_message("The utility drone lifts off its cradle. It'll fetch what you leave lying around and patch you up when you're hurt.")
+	elif not out and drone and is_instance_valid(drone):
+		drone.queue_free()
+		drone = null
 
 
 func _take_component(id: String) -> void:
@@ -803,6 +881,9 @@ func _install(id: String) -> void:
 	if id == "wing":
 		Game.set_flag("loom_open")
 		get_tree().create_timer(12.0).timeout.connect(func(): voice.say(Story.LOOM_OPEN))
+		get_tree().create_timer(5.0).timeout.connect(func(): voice.say(Story.BEACON_READY))
+	if id == "landing_gear":
+		get_tree().create_timer(6.0).timeout.connect(func(): voice.say(Story.DRONE_READY))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -1092,6 +1173,8 @@ func _on_player_died() -> void:
 		s.calm()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	var back = opening.respawn()
+	if not back is Vector3:
+		back = beacon.respawn_point()
 	player.revive(back if back is Vector3 else regions.respawn_point())
 	hud.set_dead(false)
 

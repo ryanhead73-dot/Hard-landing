@@ -319,6 +319,14 @@ const SINGER_SEEN := [
 const LOOM_OPEN := [
 	[HOB, "Juno, the fibres across the Shatterlands' west cleft just went slack. Whatever was holding that door has let go."],
 ]
+## The landing gear's reward: the utility drone (UtilityDrone) on its cradle in the cargo bay.
+const DRONE_READY := [
+	[HOB, "With the ramp down the cargo bay has power again. There's a utility drone in the cradle by the ramp. Launch it and it'll ride with you: it fetches what you leave lying about, and it carries a med-seal for when you're in trouble."],
+]
+## The wing's reward: the field beacon (FieldBeacon).
+const BEACON_READY := [
+	[HOB, "The wing-tip had a survey beacon in its housing. It's on your scanner now. Plant it with B anywhere outside, and if you go down, I'll bring you up beside it."],
+]
 ## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
 const TEO_ASK := [
 	["Teo", "You're the pilot? Good, you can wire. The east house went dark in the last pulse. Its cell cooked."],

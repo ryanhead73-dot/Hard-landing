@@ -654,17 +654,11 @@ func _blooms() -> void:
 			continue
 		if on_weave_local(p) and _rng.randf() < 0.7:
 			continue
-		var s := _rng.randf_range(0.25, 0.6)
-		xforms.append(Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s * 1.8, s)), p + Vector3(0.0, s * 0.6, 0.0)))
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.7
-	mesh.bottom_radius = 0.0
-	mesh.height = 1.0
-	mesh.radial_segments = 6
-	mesh.rings = 1
+		var s := _rng.randf_range(0.35, 0.8)
+		xforms.append(Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s * _rng.randf_range(0.8, 1.3), s)), p))
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = mesh
+	mm.mesh = _bloom_mesh()
 	mm.instance_count = xforms.size()
 	for i in xforms.size():
 		mm.set_instance_transform(i, xforms[i])
@@ -673,6 +667,28 @@ func _blooms() -> void:
 	mmi.multimesh = mm
 	mmi.material_override = _glow(BLOOM, 1.4)
 	add_child(mmi)
+
+
+## A Loom bloom: a burst of narrow pointed petals fanning up and out from the ground, like the
+## spiky magenta growth in the concept art (one mesh, shared by the multimesh).
+func _bloom_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var count := 9
+	for i in count:
+		var a := i * TAU / count + (0.2 if i % 2 else 0.0)
+		var out := Vector3(cos(a), 0.0, sin(a))
+		var lean := 0.35 + 0.45 * float(i % 3) / 2.0
+		var tip := out * lean + Vector3.UP * (1.0 - lean * 0.4)
+		var side := out.cross(Vector3.UP).normalized() * 0.09
+		var base := out * 0.05
+		var mid := base + tip * 0.45
+		# Two faces, so a petal shows from either side.
+		for v in [base - side, mid - side * 1.4, tip, base + side, tip, mid + side * 1.4, base - side, tip, base + side,
+				base - side, tip, mid - side * 1.4, base + side, mid + side * 1.4, tip, base - side, base + side, tip]:
+			st.set_normal((out + Vector3.UP * 0.6).normalized())
+			st.add_vertex(v)
+	return st.commit()
 
 
 func on_weave_local(p: Vector3) -> bool:
