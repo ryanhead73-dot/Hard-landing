@@ -310,7 +310,8 @@ func open_locker() -> void:
 	Game.add_scrap(20)
 	if _locker_tell:
 		_locker_tell.visible = false
-	Sfx.play("scrap_pickup", locker_pos, 0.0)
+	Sfx.play("crawlspace_hatch", locker_pos, 0.0)
+	Sfx.play("scrap_pickup", locker_pos, -4.0)
 
 
 ## Voss's cache at the back of the high shelf: an oxide box with an amber tell-tale, where she kept

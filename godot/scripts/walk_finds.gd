@@ -37,7 +37,8 @@ const REGIONAL := {
 const BOLT_HOME := Vector3(14.2, 0.97, 9.6)
 const BOLT_RETURN_AT := Vector3(14.2, 0.0, 10.7)
 ## The glass wind's notes, low to high, and the order the wind plays them in.
-const TONES := [0.75, 1.0, 1.33]
+## The three glass tones (Jake's recordings, low to high).
+const TONES := ["glass_wind_low", "glass_wind_mid", "glass_wind_high"]
 const TONE_ORDER := [0, 2, 1]
 const AMBER := Color("e8a44e")
 const TEAL := Color("3fd1b5")
@@ -137,7 +138,7 @@ func _cue(id: String, root: Node3D) -> float:
 		return 999.0
 	match id:
 		"rain_cup":
-			Sfx.play("splash_1", root.global_position, -16.0, 0.2)
+			Sfx.play("rain_cup_drip", root.global_position, -10.0, 0.05)
 			return 2.6
 		"silent_beacon":
 			if found(id):
@@ -149,8 +150,8 @@ func _cue(id: String, root: Node3D) -> float:
 			_play_tones(root)
 			return 8.0
 		"helmet":
-			Sfx.play("triple_click", root.global_position, -12.0, 0.0)
-			return 7.0
+			Sfx.play("helmet_humming", root.global_position, -14.0, 0.0)
+			return 9.0
 		"hob_bolt":
 			Sfx.play("ui_click", root.global_position, -20.0, 0.3)
 			return 5.0
@@ -159,15 +160,14 @@ func _cue(id: String, root: Node3D) -> float:
 
 func _play_tones(root: Node3D) -> void:
 	for i in TONE_ORDER.size():
-		get_tree().create_timer(i * 0.7).timeout.connect(_tone.bind(root, TONE_ORDER[i], -8.0))
+		get_tree().create_timer(i * 1.1).timeout.connect(_tone.bind(root, TONE_ORDER[i], -8.0))
 
 
 func _tone(root: Node3D, which: int, volume_db: float) -> void:
-	if not is_instance_valid(root) or not Sfx.has_sound("log_chime"):
+	if not is_instance_valid(root) or not Sfx.has_sound(TONES[which]):
 		return
 	var p := AudioStreamPlayer3D.new()
-	p.stream = Sfx.stream("log_chime")
-	p.pitch_scale = TONES[which]
+	p.stream = Sfx.stream(TONES[which])
 	p.volume_db = volume_db
 	p.bus = "SFX"
 	p.position = Vector3(0.0, 1.6, 0.0)
@@ -298,7 +298,7 @@ func _use_silent_beacon(root: Node3D, pos: Vector3) -> Dictionary:
 	return {"label": "[Hold E] Turn the dish back to the sky", "hold": 1.5, "action": func():
 		Game.add_scrap(15)
 		Game.set_flag("find_beacon_bearing", true)
-		Sfx.play("beacon_ping", root.global_position + Vector3.UP * 5.0, -2.0, 0.0)
+		Sfx.play("dish_restart", root.global_position + Vector3.UP * 3.0, 0.0, 0.0)
 		main.hud.show_message("The beacon has a bearing on the canyon east: marked on your map.")
 		_finish("silent_beacon", Story.FIND_BEACON)}
 
@@ -385,7 +385,7 @@ func _use_helmet(root: Node3D, pos: Vector3) -> Dictionary:
 	if found("helmet") or not _near(root, pos):
 		return {}
 	return {"label": "[E] Play the helmet's recorder", "action": func():
-		Sfx.play("triple_click", root.global_position, 0.0, 0.0)
+		Sfx.play("helmet_humming", root.global_position, 0.0, 0.0)
 		Game.add_scrap(12)
 		_finish("helmet", Story.FIND_HELMET)}
 
@@ -436,7 +436,7 @@ func _orchard_tick(root: Node3D, at: Vector3) -> void:
 	var t := create_tween()
 	t.tween_property(flash, "light_energy", 8.0, 0.05)
 	t.tween_property(flash, "light_energy", 0.0, 0.5)
-	Sfx.play("arc_zap", root.global_position, -6.0, 0.1)
+	Sfx.play("seedpod_flash", root.global_position, -2.0, 0.1)
 	main.player.add_trauma(0.25)
 
 

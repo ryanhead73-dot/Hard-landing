@@ -367,7 +367,7 @@ func _build() -> void:
 	shape.position.y = 0.6
 	body.add_child(shape)
 	body.set_meta("on_hit", trip_siren)
-	scene._box(Vector3(0.0, 0.6, 0.0), Vector3(1.2, 0.7, 1.6), scene._mat(Color("5c5f63"), 0.5), false, robot)
+	scene._box(Vector3(0.0, 0.6, 0.0), Vector3(1.2, 0.7, 1.6), scene._mat(ShatterScene.HULL.darkened(0.15), 0.5), false, robot)
 	scene._box(Vector3(0.0, 0.22, 0.0), Vector3(1.6, 0.44, 1.8), scene._mat(Color("2a2b2d"), 0.9), false, robot)
 	_panel = Node3D.new()
 	robot.add_child(_panel)

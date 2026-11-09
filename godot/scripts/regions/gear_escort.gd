@@ -332,6 +332,8 @@ func _wake_brood() -> void:
 			var ang := TAU * k / BROOD
 			var e: Enemy = main.spawn_enemy("scuttler", hoist + Vector3(cos(ang) * 3.0, 0.5, sin(ang) * 3.0), "", gw)
 			e.add_to_group("gear_brood")
+			# They hold the clearing: they don't chase Juno across the wood.
+			e.leash_range = BROOD_WAKE
 			brood.append(e)
 		gw._say(Story.GEAR_BROOD)
 		return

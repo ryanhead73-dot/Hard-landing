@@ -185,7 +185,8 @@ func open_locker() -> void:
 	Game.add_scrap(20)
 	if _locker_tell:
 		_locker_tell.visible = false
-	Sfx.play("scrap_pickup", locker_pos, 0.0)
+	Sfx.play("crawlspace_hatch", locker_pos, 0.0)
+	Sfx.play("scrap_pickup", locker_pos, -4.0)
 
 
 func salvaged(flag: String) -> bool:

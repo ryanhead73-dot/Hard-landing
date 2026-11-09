@@ -34,6 +34,9 @@ const SOUNDS: Array[String] = [
 	"relay_two_note", "breaker_clunk", "fence_snap", "relay_surge", "rifle_cell_seat", "rifle_rail_align",
 	"rifle_first_shot", "scuttler_hiss", "scuttler_chitter", "scuttler_attack", "scuttler_step",
 	"music_ship_theme", "music_sighting", "music_first_fight", "amb_basin_loop", "amb_gully_loop", "amb_cold_ship_loop",
+	# Jake's second batch (2026-11-09): HOB's reboot, the aux sting, and the walk finds.
+	"hob_boot_sequence", "aux_install_sting", "glass_wind_low", "glass_wind_mid", "glass_wind_high",
+	"helmet_humming", "rain_cup_drip", "seedpod_flash", "dish_restart", "crawlspace_hatch",
 ]
 const MAX_VARIANTS := 8
 

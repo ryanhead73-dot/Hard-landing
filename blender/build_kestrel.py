@@ -355,6 +355,13 @@ ATLAS = {
     "warning": (0.69, 0.44, 0.8, 0.535), "streaks": (0.53, 0.57, 0.99, 0.68),
     "rivets": (0.03, 0.825, 0.965, 0.855),
 }
+# Jake's markings atlas (assets/textures/kestrel/markings_atlas.png, 2048 square): 24 cells of
+# 480 x 288 px, rows of four, from the pack manifest's pixel rects.
+MARK_CELLS = ["kestrel", "hl33k", "no_step", "rescue", "n01", "n02", "n03", "n04", "n05", "n06", "n07", "n08",
+              "n09", "n10", "n11", "n12", "chevron", "drip_a", "drip_b", "drip_c", "dent_a", "dent_b", "dent_c", "dent_d"]
+for i, name in enumerate(MARK_CELLS):
+    px, py = 16 + 512 * (i % 4), 80 + 320 * (i // 4)
+    ATLAS["m_" + name] = (px / 2048, py / 2048, (px + 480) / 2048, (py + 288) / 2048)
 UPWARD = {0, 1, 2, 3}   # faces whose u runs up the hull; 5..8 run down, 4 and 9 run across
 
 
@@ -415,6 +422,29 @@ SCORCH = [
 ]
 
 
+# Faces: 1/7 the lower flanks (2 m tall amidships), 2/6 the upper flanks, 4 the roof.
+MARKINGS = [
+    # Her name and hull number on both flanks, readable from outside.
+    # Forward of the wings and engine pods, on the upper flanks, so nothing hides them.
+    ("m_kestrel", 8.5, 11.3, 2, 0.08, 0.92, 0.03), ("m_kestrel", 8.5, 11.3, 6, 0.08, 0.92, 0.03),
+    ("m_hl33k", 14.4, 16.1, 2, 0.2, 0.85, 0.03), ("m_hl33k", 14.4, 16.1, 6, 0.2, 0.85, 0.03),
+    ("m_rescue", 4.6, 6.8, 1, 0.2, 0.72, 0.03), ("m_rescue", 4.6, 6.8, 7, 0.2, 0.72, 0.03),
+    ("m_no_step", 19.6, 21.0, 4, 0.36, 0.64, 0.03),
+    # Panel numbers by the seams.
+    ("m_n01", 2.4, 2.9, 1, 0.62, 0.78, 0.03), ("m_n02", 10.0, 10.5, 1, 0.62, 0.78, 0.03),
+    ("m_n03", 20.0, 20.5, 2, 0.15, 0.4, 0.03), ("m_n04", 26.0, 26.5, 1, 0.62, 0.78, 0.03),
+    ("m_n07", 2.4, 2.9, 7, 0.62, 0.78, 0.03), ("m_n08", 10.0, 10.5, 7, 0.62, 0.78, 0.03),
+    ("m_n09", 20.0, 20.5, 6, 0.15, 0.4, 0.03), ("m_n10", 26.0, 26.5, 7, 0.62, 0.78, 0.03),
+    # Hazard chevrons either side of the cargo ramp.
+    ("m_chevron", 27.4, 29.4, 1, 0.02, 0.32, 0.03), ("m_chevron", 27.4, 29.4, 7, 0.02, 0.32, 0.03),
+    # Rust weeping from under the rivet line and the vents, and old dents.
+    ("m_drip_a", 14.6, 15.3, 1, 0.4, 0.88, 0.03), ("m_drip_b", 16.8, 17.6, 7, 0.35, 0.88, 0.03),
+    ("m_drip_c", 24.4, 25.0, 1, 0.3, 0.86, 0.03), ("m_drip_a", 11.0, 11.6, 7, 0.4, 0.88, 0.03),
+    ("m_dent_a", 3.6, 4.6, 1, 0.1, 0.4, 0.03), ("m_dent_b", 25.6, 26.3, 7, 0.3, 0.55, 0.03),
+    ("m_dent_c", 22.0, 23.4, 2, 0.2, 0.55, 0.03), ("m_dent_d", 8.6, 9.3, 7, 0.08, 0.36, 0.03),
+]
+
+
 def export(name):
     os.makedirs(OUT, exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), export_format="GLB",
@@ -447,6 +477,7 @@ def main():
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         make("frame_sill_%d_%d" % (k, int(u)), bm, DARK)
     decals("decal_wear", WEAR)
+    decals("markings", MARKINGS)
     export("kestrel_hull")
     reset()
     decals("decal_scorch", SCORCH)

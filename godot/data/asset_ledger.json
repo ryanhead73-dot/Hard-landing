@@ -44,6 +44,11 @@
    "origin": "Made for Hard Landing by Jake, 2026-11-08 (Kestrel opening asset batches 01-04): original synthesised sound design and music loops, converted to the project's formats. No third-party recordings.",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "jake_gpt_assets": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Original_Assets.zip): original procedural synthesis and textures generated for this brief, no third-party samples or stock; converted to the project's formats.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -493,6 +498,46 @@
   "amb_cold_ship_loop": {
    "source": "jake_audio",
    "tier": "bed"
+  },
+  "hob_boot_sequence": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "aux_install_sting": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_low": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_mid": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_high": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "helmet_humming": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "seedpod_flash": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "dish_restart": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "crawlspace_hatch": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "rain_cup_drip": {
+   "source": "jake_gpt_assets",
+   "tier": "detail"
   }
  },
  "files": [
@@ -567,6 +612,14 @@
   {
    "path": "assets/textures/shatterlands/gillwood_floor/*.png",
    "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/kestrel/canopy_cracks.png",
+   "source": "jake_gpt_assets"
+  },
+  {
+   "path": "assets/textures/kestrel/markings_atlas.png",
+   "source": "jake_gpt_assets"
   }
  ]
 }

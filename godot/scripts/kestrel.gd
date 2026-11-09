@@ -425,7 +425,11 @@ func power_up() -> void:
 	_apply_aux(false)
 	powering_up = true
 	var bay: Vector3 = (repairs["aux_power"] as Node3D).global_position if repairs.has("aux_power") else global_position
-	Sfx.play("aux_restart", bay, 0.0, 0.0)
+	Sfx.play("aux_restart", bay, -4.0, 0.0)
+	# HOB reboots under the lamps, and the sting lands as the cabin warms.
+	Sfx.play("hob_boot_sequence", bay, 0.0, 0.0)
+	if is_inside_tree():
+		get_tree().create_timer(POWER_UP_TIME + 0.6).timeout.connect(func(): if powering_up or is_repaired("aux_power"): Sfx.play("aux_install_sting", null, -4.0, 0.0))
 	Sfx.duck(-12.0, POWER_UP_TIME)
 	var tw := create_tween().set_parallel(true)
 	_power_tween = tw
@@ -860,6 +864,9 @@ func _skin(parent: Node, part: String, mat_id := "hull") -> Node3D:
 			id = "metal_dark"
 		elif n.begins_with("frame"):
 			id = "frame"
+		elif n.begins_with("marking"):
+			id = "markings"
+			(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		elif n.begins_with("decal"):
 			id = "decal"
 			(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -951,6 +958,26 @@ func _mat(id: String) -> StandardMaterial3D:
 			m.roughness = 0.55
 			m.metallic = 0.2
 			Surfaces.apply_grime(m, 1.5, false)
+			# Jake's fracture overlay (2026-11-09): white cracks over the tinted glass, one web per
+			# pane or so, mapped in the canopy's own space.
+			if ResourceLoader.exists("res://assets/textures/kestrel/canopy_cracks.png"):
+				var cracks := StandardMaterial3D.new()
+				cracks.albedo_texture = load("res://assets/textures/kestrel/canopy_cracks.png")
+				cracks.albedo_color = Color(0.92, 0.95, 0.95, 0.9)
+				cracks.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				cracks.cull_mode = BaseMaterial3D.CULL_DISABLED
+				cracks.roughness = 0.4
+				cracks.uv1_triplanar = true
+				cracks.uv1_scale = Vector3.ONE / 2.4
+				cracks.render_priority = 1
+				m.next_pass = cracks
+		"markings":
+			# Jake's stencils, chevrons, rust drips and dents (2026-11-09), on overlays like the decals.
+			m.albedo_texture = load("res://assets/textures/kestrel/markings_atlas.png")
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m.roughness = 0.75
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		"decal":
 			m.albedo_texture = load("res://assets/textures/kestrel/decal_atlas.png")
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
