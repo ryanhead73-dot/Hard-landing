@@ -141,6 +141,8 @@ var mission_stage: Dictionary = {}
 var mission_done: Array = []
 ## The current mission stage's objective line (set by MissionRunner), or "".
 var mission_objective := ""
+## A region mission's own line while Juno is there for a sourced repair (FerroCanopy), or "".
+var region_objective := ""
 ## The opening's own objective line (see Opening); wins over the campaign's while it is set.
 var opening_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
@@ -509,11 +511,13 @@ func reset() -> void:
 	mission_stage.clear()
 	mission_done.clear()
 	mission_objective = ""
+	region_objective = ""
 	region = SaveMigrations.DEFAULT_REGION
 	act = 1
 	flags.clear()
 	quests.clear()
 	inventory_changed.emit()
+	flag_changed.emit("", null)
 	repairs_changed.emit()
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
@@ -605,10 +609,20 @@ func apply_session(data: Dictionary) -> void:
 	act = clampi(int(data.get("act", 1)), 1, 4)
 	flags = (data.get("flags", {}) as Dictionary).duplicate(true)
 	quests = (data.get("quests", {}) as Dictionary).duplicate(true)
+	_open_by_repairs()
+	# Whatever listens for flags (gates, quests) looks again: the whole set just changed.
+	flag_changed.emit("", null)
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
 	inventory_changed.emit()
+
+
+## Cooling clears the canyon's rockfall (Jake, 2026-11-07). Saves made before that rule have
+## cooling in and the canyon shut, and the canopy is salvaged beyond it now: open it for them.
+func _open_by_repairs() -> void:
+	if is_repaired("cooling") and not flags.get("shatterlands_open", false):
+		set_flag("shatterlands_open")
 
 
 ## Writes the save safely: the new file goes to a temp file first and only replaces the save once
@@ -806,6 +820,7 @@ func set_repaired(id: String, value: bool) -> void:
 	if is_repaired(id) == value:
 		return
 	repaired[id] = value
+	_open_by_repairs()
 	# A dev toggle can fix the part you're carrying: drop it rather than strand it.
 	if value and carrying != "" and Campaign.by_component(carrying).get("id", "") == id:
 		carrying = ""
@@ -834,7 +849,24 @@ func phase() -> String:
 	var id := current_repair()
 	if id == "":
 		return "launch"
-	return "return" if carrying == Campaign.get_repair(id)["component"] else "find"
+	var component: String = Campaign.get_repair(id)["component"]
+	return "return" if carrying == component or delivered(component) else "find"
+
+
+## A component salvaged in another region and sent to Kestrel: waiting at the install bay.
+func delivered(component: String) -> bool:
+	return bool(flags.get("delivered_" + component, false))
+
+
+func set_region_objective(text: String) -> void:
+	if text != region_objective:
+		region_objective = text
+		objective_changed.emit(objective_text())
+
+
+func deliver_component(component: String) -> void:
+	set_flag("delivered_" + component, true)
+	objective_changed.emit(objective_text())
 
 
 ## True when the fabricator can run this build at all, scrap aside.
@@ -870,7 +902,12 @@ func take_component(component: String) -> void:
 
 ## Fits the carried component. The caller repairs Kestrel, which mirrors back via set_repaired().
 func install_component() -> void:
-	var r := Campaign.by_component(carrying)
+	var component := carrying
+	if component == "":
+		component = String(Campaign.get_repair(current_repair()).get("component", ""))
+	var r := Campaign.by_component(component)
+	if flags.has("delivered_" + component):
+		set_flag("delivered_" + component, false)
 	carrying = ""
 	carrying_changed.emit(carrying)
 	message.emit(r.get("done", ""))
@@ -906,11 +943,17 @@ func launch() -> void:
 func objective_text() -> String:
 	if opening_objective != "":
 		return opening_objective
+	# A region mission running where Juno stands (Ferro-9's canopy or gear) has the line.
+	if region_objective != "" and phase() != "launch":
+		return region_objective
 	match phase():
 		"find":
 			if mission_objective != "":
 				return mission_objective
-			return Campaign.get_repair(current_repair())["find"]
+			var r := Campaign.get_repair(current_repair())
+			if Campaign.sourced(r["id"]) and region == Campaign.SOURCED[r["id"]]["region"]:
+				return r.get("find_there", r["find"])
+			return r["find"]
 		"return":
 			return Campaign.get_repair(current_repair())["return"]
 		"launch":

@@ -107,6 +107,14 @@ func _play_mission(r: Dictionary) -> void:
 	_check("%s: mission is current" % id, Game.current_repair() == id, Game.current_repair())
 	player.revive(site.component_point() + Vector3.UP * 0.2)
 	await _frames(8)
+	if Campaign.sourced(id):
+		# Salvaged by its own mission in another region (expansion_test plays those): the old
+		# Kettle site is scenery now, its devices dark and its component not offered.
+		_check("%s: the old Kettle site stays dark" % id, not _label().contains(r["component_name"]) and runner.objective() == "" and not site.active, _label())
+		Game.deliver_component(r["component"])
+		kestrel.set_repaired(id, true)
+		await _frames(5)
+		return
 	_check("%s: component won't come free before the mission" % id, _label().contains("won't come free") or _label().begins_with("[Hold E]"), _label())
 	await _press("interact")
 	_check("%s: component stays put" % id, site.has_component() and Game.carrying == "")

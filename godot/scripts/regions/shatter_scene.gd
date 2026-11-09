@@ -205,9 +205,58 @@ func _ramp(from: Vector3, to: Vector3, width: float, mat: Material = null) -> vo
 	body.look_at(body.global_position + Vector3(run.x, to.y - from.y, run.z), Vector3.UP)
 
 
-func _box(pos: Vector3, size: Vector3, mat: Material, solid: bool, parent: Node3D = self) -> void:
+## Static boxes made between _begin_batch() and _end_batch() share one mesh per material (their
+## colliders stay separate), keeping a region under its draw budget. Anything under a node with
+## the "no_batch" meta (a drone, a robot, a hook that moves) is left as its own mesh.
+var _batch_on := false
+var _batches := {}
+
+
+func _begin_batch() -> void:
+	_batch_on = true
+
+
+func _end_batch() -> void:
+	_batch_on = false
+	for mat in _batches:
+		var mi := MeshInstance3D.new()
+		mi.name = "Batch"
+		mi.mesh = (_batches[mat] as SurfaceTool).commit()
+		mi.material_override = mat
+		add_child(mi)
+	_batches.clear()
+
+
+func _batchable(parent: Node3D) -> bool:
+	if not _batch_on or not is_inside_tree():
+		return false
+	var n: Node = parent
+	while n != null and n != self:
+		if n.has_meta("no_batch"):
+			return false
+		n = n.get_parent()
+	return n == self
+
+
+func _box(pos: Vector3, size: Vector3, mat: Material, solid: bool, parent: Node3D = self, basis := Basis()) -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = size
+	if _batchable(parent):
+		if not _batches.has(mat):
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			_batches[mat] = st
+		(_batches[mat] as SurfaceTool).append_from(mesh, 0, global_transform.affine_inverse() * parent.global_transform * Transform3D(basis, pos))
+		if solid:
+			var b := StaticBody3D.new()
+			var sh := CollisionShape3D.new()
+			var bx := BoxShape3D.new()
+			bx.size = size
+			sh.shape = bx
+			b.transform = Transform3D(basis, pos)
+			b.add_child(sh)
+			parent.add_child(b)
+		return
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = mat
@@ -217,13 +266,20 @@ func _box(pos: Vector3, size: Vector3, mat: Material, solid: bool, parent: Node3
 		var box := BoxShape3D.new()
 		box.size = size
 		shape.shape = box
-		body.position = pos
+		body.transform = Transform3D(basis, pos)
 		body.add_child(mi)
 		body.add_child(shape)
 		parent.add_child(body)
 	else:
-		mi.position = pos
+		mi.transform = Transform3D(basis, pos)
 		parent.add_child(mi)
+
+
+## A line or two over the radio, through main's voice.
+func _say(lines: Array) -> void:
+	var main := get_parent()
+	if main and main.get("voice"):
+		main.voice.say(lines)
 
 
 func _mat(color: Color, roughness := 0.9) -> StandardMaterial3D:

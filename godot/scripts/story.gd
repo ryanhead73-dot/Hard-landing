@@ -206,9 +206,85 @@ const FERRO_CANOPY := [
 	[JUNO, "Canopy's off. Seals look good."],
 	[HOB, "Leave it on the skids. Reyes says her people can sled it back through the canyon."],
 ]
+## The canopy rescue (milestone B1): the nose hangs in the trees, the canopy on a tilted spar.
+const FERRO_CLIMB := [
+	[HOB, "Careful. Your weight just shifted the nose. The canopy assembly's creeping down the spar."],
+	[HOB, "Three emergency stay-lines on her: lock them before it goes over the edge."],
+]
+const FERRO_SLIPPED := [
+	[JUNO, "It's going... and it's caught. On the lip of the spar. Lines are all sprung."],
+	[HOB, "The spring brakes have pulled it back up. Again, Vale. Quicker."],
+]
+const FERRO_LINES_SET := [
+	[JUNO, "Three lines on. It's not going anywhere now."],
+	[HOB, "Ferro-9's winch is on the console under the nose. It'll lower the canopy onto the receiver pad."],
+]
+const FERRO_WINCH_START := [
+	[HOB, "Winch is running. The power coupler's exposed, and it's singing. Things in these trees like that."],
+]
+const FERRO_SHORTED := [
+	[JUNO, "Something hit the coupler. Winch has stopped."],
+	[HOB, "Those chimes on the frame: Brandt hung them for a reason. Ring one and the veilwings scatter."],
+]
+const FERRO_WINCH_DONE := [
+	[JUNO, "Canopy's on the pad. Seals look good."],
+	[HOB, "Reyes's runners are sledding it home through the canyon. It'll be waiting at the install bay."],
+]
 const FERRO_GEAR := [
 	[JUNO, "Gear strut's free. Bent at the knee, but the actuator's sound."],
 	[HOB, "Kestrel's starboard leg will take it. That's the canopy and the gear, Vale."],
+]
+## The gear escort (milestone B2): the strut, Ferro-9's hauler drone, and Reyes's hoist.
+const GEAR_CUT := [
+	[JUNO, "Strut's free. Bent at the knee, but the actuator's sound. And heavy."],
+	[HOB, "Ferro-9 had a hauler drone. It's under the aft section, half dead but it'll hover."],
+]
+const GEAR_MOUNTED := [
+	[HOB, "It follows its beacon from node to node. Light the route nodes ahead of it and it'll keep moving."],
+	[HOB, "Reyes has a salvage hoist east of here. Two ways there: pick one at the fork."],
+]
+const GEAR_LOW := [
+	[JUNO, "Root tunnel. Nothing hunts down there."],
+	[HOB, "Nothing but the weather. If a squall comes, that channel floods."],
+]
+const GEAR_HIGH := [
+	[JUNO, "Over the ridge. Quicker."],
+	[HOB, "Spore pods up there. If one bursts on the drone it'll jam. Pop them before it gets close."],
+]
+const GEAR_SQUALL := [
+	[JUNO, "Here comes the rain. The tunnel's filling."],
+	[HOB, "The drone's holding till the water drops. It won't drown, it's sulking."],
+]
+const GEAR_SQUALL_PASSED := [[HOB, "Water's down. It's moving again."]]
+const GEAR_JAMMED := [
+	[HOB, "Spores in the lift fans. It's jammed, not dead. There's scrap all over this wood: patch it."],
+]
+const GEAR_BROOD := [
+	[JUNO, "A brood in the hoist clearing. The drone won't go in with them there."],
+	[HOB, "There's a spore pod at the edge of it. Burst that and they'll scatter."],
+]
+const GEAR_HOISTED := [
+	[JUNO, "Strut's on the hook. Reyes's runners can have it."],
+	[HOB, "They'll sled it to Kestrel. That's the canopy and the gear, Vale."],
+]
+## The wing chase (milestone B3): Marigold's wing-tip section and the tether robot that took it.
+const WING_GONE := [
+	[JUNO, "Straps cut, drag marks. Somebody's had the wing-tip section."],
+	[HOB, "Something. A salvage tether robot: there's its beacon, east, in the crags. It runs a circuit."],
+	[HOB, "It bolts if you come at it head-on, and it crawls over cables. Or give it something better to eat."],
+]
+const WING_DECOY := [[HOB, "Decoy relay's live. Next time it rattles past, it'll stop to feed."]]
+const WING_DRIFTERS := [
+	[JUNO, "All that racket's brought drifters down off the wall."],
+	[HOB, "It's got a siren. Hit it and they'll go after the robot instead of you."],
+]
+const WING_CAUGHT := [
+	[JUNO, "Got it. Sorry, little one, I need this more."],
+	[HOB, "Reyes's runners are on it. Marigold's tip, Kestrel's wing. Mismatched, but it'll fly."],
+]
+const WING_TAKEN := [
+	[JUNO, "It's too busy feeding to notice. Panel's off."],
+	[HOB, "Reyes's runners are on it. Marigold's tip, Kestrel's wing. Mismatched, but it'll fly."],
 ]
 ## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
 const TEO_ASK := [

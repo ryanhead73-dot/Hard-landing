@@ -31,6 +31,11 @@ func _ready() -> void:
 		Game.delete_save()
 		get_tree().quit()
 		return
+	if args.size() > 1 and args[1] == "missions":
+		await _missions(out)
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] == "gillwood":
 		Game.set_flag("shatterlands_open")
 		Game.set_flag("reyes_talked")
@@ -191,6 +196,47 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	gw.free_strut()
 	await get_tree().create_timer(1.5).timeout
 	await _shot(out, "gillwood_salvaged", wreck + Vector3(-9.0, 0.3, 6.0), wreck + Vector3(2.0, 1.0, 2.0))
+
+
+## Milestone B: the canopy rescue and the gear escort in the Gillwood, the wing chase in the pocket.
+func _missions(out: String) -> void:
+	Game.set_flag("shatterlands_open")
+	Game.set_flag("reyes_talked")
+	Game.set_flag("found_ferro9")
+	await main.regions.travel("gillwood", true)
+	var gw := main.regions.scene as Gillwood
+	var fc := gw.ferro
+	var wreck := gw.to_global(Gillwood.WRECK)
+	await _shot(out, "b1_ferro_hanging", wreck + Vector3(-14.0, 0.3, 14.0), wreck + Vector3(0.0, 3.5, -2.0))
+	fc.locked = [true, true, false]
+	fc._sync()
+	await _shot(out, "b1_stay_lines", gw.ramp_top + Vector3(0.0, 0.3, 0.0), gw.canopy.global_position)
+	Game.set_flag("ferro_lines")
+	fc.locked = [true, true, true]
+	fc.start_winch()
+	await _shot(out, "b1_winch", fc.console_pos + Vector3(4.0, 0.3, 8.0), (fc.console_pos + fc.pad_pos) * 0.5 + Vector3.UP * 1.5)
+	fc.wound = FerroCanopy.WINCH_TIME
+	await get_tree().create_timer(2.0).timeout
+	var ge := gw.gear
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.queue_free()
+	await _shot(out, "b2_drone", ge.drone.global_position + Vector3(-4.0, 0.3, 5.0), ge.drone.global_position + Vector3.UP * 0.6)
+	await _shot(out, "b2_ridge", gw.to_global(Vector3(18.0, 0.3, 0.0)), gw.to_global(GearEscort.RIDGE + Vector3(0.0, 2.0, 0.0)))
+	await _shot(out, "b2_tunnel", gw.to_global(Vector3(42.0, 0.3, 0.0)), gw.to_global(Vector3(42.0, 1.2, 16.0)))
+	await _shot(out, "b2_hoist", gw.to_global(GearEscort.HOIST + Vector3(-8.0, 0.3, -9.0)), gw.to_global(GearEscort.HOIST + Vector3(0.0, 3.0, 0.0)))
+	Game.set_flag("ferro_gear")
+	await main.regions.travel("shatterlands", true)
+	var sh := main.regions.scene as ShatterlandsThreshold
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.queue_free()
+	var wc := sh.wing
+	wc.start()
+	wc.leg = 1
+	wc.along = 0.3
+	wc._place()
+	wc.set_process(false)
+	await _shot(out, "b3_crags", sh.to_global(Vector3(30.0, 0.3, 0.0)), sh.to_global(Vector3(48.0, 1.0, -16.0)))
+	await _shot(out, "b3_robot", wc.robot.global_position + Vector3(-3.0, 1.0, 4.0), wc.robot.global_position + Vector3.UP * 0.8)
 
 
 ## The opening: aboard in orbit, the drift, the wreck, then the trail to the relay.

@@ -25,7 +25,11 @@ func _run() -> void:
 	player.revive(kestrel.to_global(kestrel.plan(10.1, -1.0, 17.8)) + Vector3.UP * 0.3)
 	await _frames(10)
 	_check("install points don't answer through the hull", not _label().contains("Canopy") and not _label().contains("bay"), _label())
-	_check("only the canopy site's beacon is active", main.sites.keys().all(func(id): return main.sites[id].active == (id == "canopy")))
+	# The canopy is salvaged in the Gillwood now (milestone B1): no Kettle site lights up for it,
+	# and the waypoint points at the canyon to the Shatterlands.
+	_check("no Kettle site's beacon is active for a part salvaged elsewhere", main.sites.keys().all(func(id): return not main.sites[id].active))
+	_check("the waypoint points to the Shatterlands canyon", main._waypoint() != null and main._waypoint().distance_to(main.regions.gates["shatterlands"].global_position) < 3.0)
+	_check("cooling opened the Shatterlands", main.regions.is_open("shatterlands"))
 
 	# Before the canopy only the suit scanner works: wildlife close by, no salvage.
 	player.revive(Vector3(45.0, 0.5, 45.0))
@@ -214,7 +218,7 @@ func _repair_loop(r: Dictionary) -> void:
 	_clear_enemies()
 	# The next site's component can't be taken out of order.
 	var next := Campaign.index_of(id) + 1
-	if next < Campaign.REPAIRS.size():
+	if next < Campaign.REPAIRS.size() and not Campaign.sourced(Campaign.REPAIRS[next]["id"]):
 		var later: ExpeditionSite = main.sites[Campaign.REPAIRS[next]["id"]]
 		player.revive(later.component_point() + Vector3.UP * 0.2)
 		await _frames(10)
@@ -228,17 +232,25 @@ func _repair_loop(r: Dictionary) -> void:
 
 	player.revive(site.component_point() + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("%s: component prompt at the site" % id, _label().contains(r["component_name"]), _label())
-	await _press("interact")
-	_check("%s: component is carried" % id, Game.carrying == r["component"] and not site.has_component() and Game.phase() == "return")
-	_check("%s: taking it springs an ambush" % id, _enemy_count() >= site.ambush_pts.size(), "enemies=%d" % _enemy_count())
+	if Campaign.sourced(id):
+		# Salvaged by its own mission in another region (expansion_test plays those through) and
+		# sent home by Reyes's runners: the old Kettle site no longer offers it.
+		_check("%s: the old Kettle site doesn't offer it" % id, not _label().contains(r["component_name"]), _label())
+		Game.deliver_component(r["component"])
+		await _frames(2)
+		_check("%s: delivered, it waits at the install bay" % id, Game.phase() == "return" and Game.carrying == "" and Game.objective_text() == r["return"], Game.objective_text())
+	else:
+		_check("%s: component prompt at the site" % id, _label().contains(r["component_name"]), _label())
+		await _press("interact")
+		_check("%s: component is carried" % id, Game.carrying == r["component"] and not site.has_component() and Game.phase() == "return")
+		_check("%s: taking it springs an ambush" % id, _enemy_count() >= site.ambush_pts.size(), "enemies=%d" % _enemy_count())
 	_clear_enemies()
 
 	player.revive(main.install_point(id) + Vector3.UP * 0.3)
 	await _frames(10)
 	_check("%s: install point accepts it" % id, _label().contains(r["install_label"]), _label())
 	await _press("interact")
-	_check("%s: installed" % id, kestrel.is_repaired(id) and Game.is_repaired(id) and Game.carrying == "")
+	_check("%s: installed" % id, kestrel.is_repaired(id) and Game.is_repaired(id) and Game.carrying == "" and not Game.delivered(r["component"]))
 	await get_tree().create_timer((Kestrel.POWER_UP_TIME if id == "aux_power" else main.REPAIR_BANNER_DELAY) + 0.3).timeout
 	var banner: Array = r["banner"]
 	_check("%s: a title card names it" % id, main.hud.banner_text() == banner[0], main.hud.banner_text())

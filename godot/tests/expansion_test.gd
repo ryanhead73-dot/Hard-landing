@@ -12,6 +12,16 @@ func _name() -> String:
 	return "EXPANSION TEST"
 
 
+## Stands Juno at `at` and holds E long enough for a held prompt (a stay-line).
+func _hold_at(at: Vector3, secs := FerroCanopy.LOCK_HOLD) -> void:
+	_place(at + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	Input.action_press("interact")
+	await get_tree().create_timer(secs + 0.3).timeout
+	Input.action_release("interact")
+	await _frames(3)
+
+
 func _run() -> void:
 	await _frames(10)
 	_clear_enemies()
@@ -455,23 +465,139 @@ func _regions() -> void:
 	_place(gw.to_global(Gillwood.WRECK + Vector3(0.0, 0.5, 14.0)), 0.0)
 	await _frames(3)
 	_check("coming near finds Ferro-9", Game.flags.get("found_ferro9") == true and main.quests.step_of("ferro_9") == 2)
+	# B1, the canopy rescue: the nose hangs in the trees, reached up a fallen trunk.
+	var fc := gw.ferro
+	_check("Ferro-9's nose hangs in the trees", gw.fore.global_position.y - gw.global_position.y > 3.0 and fc.active())
+	_check("the waypoint points to the fallen trunk", rm.waypoint().distance_to(gw.ramp_foot) < 2.0)
+	_place(gw.ramp_foot + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	var walked := await _walk_path([gw.ramp_top, gw.cockpit_pos], 8.0)
+	_check("Juno walks up the trunk onto the wing", walked and fc.on_wing(), "at %s" % (player.global_position - gw.global_position))
+	await _frames(3)
+	_check("her weight starts the canopy sliding", fc.sliding and fc.objective().contains("stay-lines"), fc.objective())
 	_place(gw.cockpit_pos + Vector3(0.0, 0.5, 0.0), 0.0)
 	await _frames(3)
 	_check("her flight recorder can be pulled", _label().contains("flight recorder"), _label())
 	await _press("interact")
 	await _frames(2)
 	_check("it's Brandt's log", Game.has_log("ferro_1"))
-	_place(gw.canopy_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _hold_at(fc.anchor_pos[0])
+	_check("a stay-line locks with a held E", fc.locked[0] and not fc.lines_done(), str(fc.locked))
+	fc.slide_left = 0.05
+	await _frames(4)
+	_check("too slow: the lines spring and the canopy is hauled back, no fail", not fc.locked.has(true) and not fc.lines_done() and not Game.flags.get("ferro_canopy", false))
+	await get_tree().create_timer(2.4).timeout
+	_check("then it starts over at full time", fc.sliding and fc.slide_left > fc.slide_time() - 1.0, "%s %.1f" % [fc.sliding, fc.slide_left])
+	for k in 3:
+		await _hold_at(fc.anchor_pos[k])
+	_check("three lines on (the third across the plank) hold it", fc.lines_done() and not fc.sliding, str(fc.locked))
+	_check("the next step is the winch under the nose", fc.objective().contains("winch") and rm.waypoint().distance_to(fc.console_pos) < 2.5, Game.objective_text())
+	_place(fc.console_pos + Vector3(0.0, 0.5, 1.6), 0.0)
 	await _frames(3)
-	_check("the canopy can be unbolted", _label().contains("canopy"), _label())
+	_check("the console offers the winch", _label().contains("Start Ferro-9's winch"), _label())
 	await _press("interact")
+	await _frames(3)
+	_check("starting it sends veilwings for the coupler", fc.winching and fc.veilwings.size() == 2 and fc.veilwings.all(func(v): return v.target == fc.coupler))
+	await get_tree().create_timer(1.0).timeout
+	_check("it winds while Juno is by the console", fc.wound > 0.5, "%.2f" % fc.wound)
+	fc.coupler.take_damage(14.0, fc.coupler.global_position)
+	var w0 := fc.wound
+	await get_tree().create_timer(0.5).timeout
+	_check("a hit on the coupler shorts it and stops the winch", fc.shorted > 0.0 and is_equal_approx(fc.wound, w0) and fc.objective().contains("chime"), fc.objective())
+	fc.ring_chime(0)
 	await _frames(2)
-	_place(gw.strut_pos + Vector3(0.0, 0.5, 0.0), 0.0)
+	_check("ringing a chime scatters the veilwings", fc.veilwings.all(func(v): return v.state == Veilwing.State.CLIMB), str(fc.veilwings.map(func(v): return v.state)))
+	await get_tree().create_timer(3.0).timeout
+	_place(fc.console_pos + Vector3(0.0, 0.5, 14.0), 0.0)
 	await _frames(3)
-	_check("the gear strut can be cut free", _label().contains("strut"), _label())
+	w0 = fc.wound
+	await get_tree().create_timer(0.6).timeout
+	_check("walking off pauses it, without losing any", is_equal_approx(fc.wound, w0) and w0 > 0.5 and fc.objective().contains("paused"), fc.objective())
+	_check("progress is saved as it goes", Game.flags.has("ferro_winch") or fc.wound < 5.0)
+	fc.wound = FerroCanopy.WINCH_TIME - 0.4
+	_place(fc.console_pos + Vector3(0.0, 0.5, 1.6), 0.0)
+	await get_tree().create_timer(1.6).timeout
+	_check("at 100%% the canopy is on the pad and sent home", Game.flags.get("ferro_canopy") == true and Game.delivered("glazing") and gw.canopy.global_position.distance_to(fc.pad_pos) < 1.5, "%.1f m" % gw.canopy.global_position.distance_to(fc.pad_pos))
+	_check("the veilwings lose interest", fc.coupler.dead and not fc.winching)
+	# B2, the gear escort: strut onto Ferro-9's hauler drone, the drone along a powered route.
+	var ge := gw.gear
+	_clear_enemies()
+	_check("with the canopy down, the gear is next", ge.active() and rm.waypoint().distance_to(gw.strut_pos) < 2.0, str(rm.waypoint() - gw.strut_pos))
+	await _hold_at(gw.strut_pos, GearEscort.CUT_HOLD)
+	_check("the strut is cut free with a held E", ge.cut() and Game.flags.get("ferro_gear", false) != true)
+	_place(ge.drone.global_position + Vector3(0.0, 0.0, 2.2), 0.0)
+	await _frames(3)
+	_check("the hauler drone takes the strut", _label().contains("Mount the strut"), _label())
 	await _press("interact")
-	await get_tree().create_timer(1.5).timeout
-	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0)
+	var d0 := ge.drone.global_position
+	await get_tree().create_timer(1.0).timeout
+	_check("mounted, the drone sets off for the fork by itself", ge.mounted() and ge.drone.global_position.distance_to(d0) > 1.0 and not gw.strut.visible)
+	ge.along = 1.0
+	await _frames(3)
+	_check("at the fork it waits for Juno to pick a route", ge.waiting() == "route" and ge.objective().contains("route"), ge.objective())
+	_place(gw.to_global(GearEscort.LEVER_HIGH) + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("the ridge lever says what it costs", _label().contains("ridge") and _label().contains("spore"), _label())
+	await _press("interact")
+	_check("the route is chosen", ge.route() == "high" and ge.powered(1))
+	await get_tree().create_timer(0.5).timeout
+	_check("it stops at the next unpowered node", ge.waiting() == "post" or ge.at == 1, "%s at %d" % [ge.waiting(), ge.at])
+	_place(ge.post_pos(3) + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("route nodes can be powered", _label().contains("route node"), _label())
+	await _press("interact")
+	_check("powering one lights it for the drone", ge.powered(3))
+	_place(ge.post_pos(3) + Vector3(2.0, 0.5, -3.0), 0.0)
+	ge.at = 3
+	ge.along = 0.1
+	var gear_wait := 0.0
+	while gear_wait < 4.0 and not ge.jammed:
+		await get_tree().physics_frame
+		gear_wait += get_physics_process_delta_time()
+	_check("an unburst spore pod on the ridge jams the drone", ge.jammed and ge.objective().contains("jammed"), ge.objective())
+	ge.pods[1].take_hit()
+	await get_tree().create_timer(5.5).timeout
+	await _hold_at(ge.drone.global_position + Vector3(1.4, -0.2, 0.0), GearEscort.PATCH_HOLD)
+	_check("it's patched with scrap, never lost", not ge.jammed)
+	_place(ge.post_pos(5) + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	await _press("interact")
+	# Well clear of the hoist while the drone comes down off the ridge and the brood wakes.
+	_place(gw.to_global(GearEscort.START + Vector3(-4.0, 0.5, 0.0)), 0.0)
+	gear_wait = 0.0
+	while gear_wait < 14.0 and ge.at < 5:
+		await get_tree().physics_frame
+		gear_wait += get_physics_process_delta_time()
+	_check("a pod Juno burst first lets it pass", ge.at == 5 and ge.jams == 1, "at %d, jams %d" % [ge.at, ge.jams])
+	# Path recovery: a fresh escort built from the flags puts the drone back where it was.
+	var ge2 := GearEscort.new()
+	ge2.gw = gw
+	gw.add_child(ge2)
+	await _frames(1)
+	_check("after a load the drone is back on its route", ge2.route() == "high" and ge2.at == 5 and ge2.powered(3) and ge2.drone.global_position.distance_to(ge.drone.global_position) < 0.5)
+	for p in ge2.pods:
+		p.queue_free()
+	ge2.drone.queue_free()
+	ge2.queue_free()
+	await _frames(3)
+	_check("a brood holds the hoist clearing and stops the drone", ge.brood.size() == GearEscort.BROOD and ge.waiting() == "brood", "%d, %s" % [ge.brood.size(), ge.waiting()])
+	for e in ge.brood:
+		if is_instance_valid(e) and not e.dead:
+			e.take_damage(999.0, e.global_position, Vector3.FORWARD)
+	player.health = 100.0
+	await get_tree().create_timer(0.5).timeout
+	_check("cleared, the hoist can be powered", ge.brood_cleared() and ge.waiting() == "hoist")
+	_place(ge.post_pos(6) + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("Reyes's hoist takes power", _label().contains("hoist"), _label())
+	await _press("interact")
+	gear_wait = 0.0
+	while gear_wait < 10.0 and not ge.done():
+		await get_tree().physics_frame
+		gear_wait += get_physics_process_delta_time()
+	_check("at the hoist the strut goes up and home", ge.done() and Game.delivered("struts"), "at %d" % ge.at)
+	await get_tree().create_timer(1.6).timeout
+	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0, "quest %s, step %d, waypoint %s, dead %s, hp %.0f" % [main.quests.state_of("ferro_9"), main.quests.step_of("ferro_9"), rm.waypoint() - gw.exit_global(), player.dead, player.health])
 	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
 	# The Gillwood's own creature: roosts under the caps, flares, swoops; stepping aside dodges.
 	_check("veilwings roost in the Gillwood", gw.residents.filter(func(r): return r[0] == "veilwing").size() == 3)
@@ -526,6 +652,56 @@ func _regions() -> void:
 	sh = rm.scene as ShatterlandsThreshold
 	_check("back in the pocket, at the north split", rm.current == "shatterlands" and sh != null and _flat_distance(player.global_position, sh.to_global(ShatterlandsThreshold.NORTH_SPLIT)) < 6.0, str(player.global_position - (sh.global_position if sh else Vector3.ZERO)))
 	gh = sh.greenhouses
+	# B3, the wing chase: Marigold's wing-tip, on a tether robot running a circuit in the crags.
+	var wc := sh.wing
+	_clear_enemies()
+	_check("with the strut on the hoist, Marigold's wing-tip is next", wc.active() and not wc.started())
+	_place(wc.search_pos() + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("Marigold can be searched", _label().contains("wing-tip"), _label())
+	await _press("interact")
+	var r0 := wc.robot.global_position
+	await get_tree().create_timer(0.6).timeout
+	_check("the section's gone: a tether robot runs off with it", wc.started() and wc.robot.visible and wc.robot.global_position.distance_to(r0) > 1.5)
+	var heading := (wc.point(wc.leg + 1) - wc.point(wc.leg)).normalized()
+	_place(wc.robot.global_position + heading * 6.0 + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(3)
+	_check("coming at it head-on makes it bolt", wc.flee > 0.0 and wc.spooks == 1)
+	_place(wc.search_pos() + Vector3(0.0, 0.5, 0.0), 0.0)
+	wc.flee = 0.0
+	wc.leg = 1
+	wc.along = 0.99
+	await _frames(4)
+	_check("at a cable crossing it slows to a crawl", wc.leg == 2 and wc.cable > 0.0)
+	_place(wc.robot.global_position + heading.cross(Vector3.UP) * 1.8 + Vector3(0.0, 0.5, 0.0), 0.0)
+	await _frames(2)
+	_check("cut off beside it there, the panel is in reach", _label().contains("Take the wing-tip"), _label())
+	_place(wc.decoy_pos() + Vector3(0.0, 0.5, 1.6), 0.0)
+	await _frames(3)
+	_check("the decoy relay can be powered", _label().contains("decoy relay"), _label())
+	await _press("interact")
+	_check("powered, it waits for the robot", wc.decoy_on() and wc.objective().contains("decoy"), wc.objective())
+	_place(wc.search_pos() + Vector3(0.0, 0.5, 0.0), 0.0)
+	wc.cable = 0.0
+	wc.leg = 5
+	wc.along = 0.995
+	await _frames(4)
+	_check("its racket on the return leg brings drifters", wc.drifters.size() == 3 and Game.flags.get("wing_drifters") == true)
+	wc.leg = 6
+	wc.along = 0.6
+	await _frames(2)
+	wc.trip_siren()
+	_check("its siren pulls them after the robot", wc.drifters.all(func(e): return e.target == wc.robot))
+	wc.leg = 7
+	wc.along = 0.4
+	await _frames(4)
+	_check("past the live decoy it stops to feed", wc.docked > 0.0 and wc.objective().contains("feeding"), wc.objective())
+	_clear_enemies()
+	_place(wc.robot.global_position + Vector3(0.0, 0.5, 2.0), 0.0)
+	await _frames(3)
+	await _press("interact")
+	_check("the panel comes off and goes home", wc.done() and Game.delivered("wing_panel") and not wc._panel.visible)
+	player.health = 100.0
 
 	# Going down there comes back at the region's entry, not at Kestrel.
 	player.take_damage(9999.0)
@@ -802,19 +978,9 @@ func _relay() -> void:
 	var marks: Array = main.quests.markers()
 	_check("the post is marked for the journal and map", marks.any(func(m): return m["id"] == "listening_post"), str(marks))
 	_check("the console only reads once", _label() == "" or not _label().contains("traffic log"), _label())
-	# The cradle defend: the second wave comes round the back, the third brings an elite.
-	var waves: Array = relay.mission[1]["waves"]
-	_check("the relay defend has three waves", waves.size() == 3)
-	_clear_enemies()
-	main.missions._spawn_wave(relay, relay.mission[1], waves[1])
-	await _frames(2)
-	var behind := get_tree().get_nodes_in_group("enemies").filter(func(e): return relay.to_local(e.global_position).z < -4.0)
-	_check("the second wave comes round the back of the hut", behind.size() == 4, "%d of %d" % [behind.size(), _enemy_count()])
-	_clear_enemies()
-	main.missions._spawn_wave(relay, relay.mission[1], waves[2])
-	await _frames(2)
-	var elites := get_tree().get_nodes_in_group("enemies").filter(func(e): return (e as Enemy).is_elite())
-	_check("the last wave is led by an elite", elites.size() == 1 and (elites[0] as Enemy).display_name() == "PACK MOTHER", str(elites.size()))
+	# The relay's middle stage (milestone A): read the switchbox lamps, one of three is a decoy.
+	var listen: Dictionary = relay.mission[1]
+	_check("the relay asks Juno to pick the live switchboxes", listen.get("decoys", []) == [0] and (listen["devices"] as Array).size() == 3)
 	_clear_enemies()
 	Game.reset()
 

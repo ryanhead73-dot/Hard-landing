@@ -23,35 +23,38 @@ const REPAIRS: Array[Dictionary] = [
 		"return": "Return to Kestrel and fit the manifold at the workshop install bay",
 		"install_label": "Fit the coolant manifold",
 		"bay_label": "Cooling: the manifold is cracked and venting coolant",
-		"done": "Cooling restored. The fabricator can run heavy builds now. Next: the canopy. A survey skiff is perched up on the basalt spires: follow its yellow flare.",
+		"done": "Cooling restored. The fabricator can run heavy builds now. The rockfall in the north-east canyon has shifted: the Shatterlands are open. Reyes's distress call came from there.",
 	},
 	{
 		"id": "canopy", "banner": ["COCKPIT SEALED", "Scanner online: crates and wildlife show on your HUD"],
 		"site": "SpireSkiff",
 		"component": "glazing", "component_name": "canopy glazing panel",
-		"find": "Climb the basalt spires and take the glazing panel from the skiff Lark",
-		"return": "Return to Kestrel and seal the cockpit canopy",
-		"install_label": "Seal the canopy with the glazing panel",
+		"find": "Find Reyes's people in the Shatterlands: their rescue ship Ferro-9 has a canopy",
+		"find_there": "Salvage Ferro-9's canopy in the Gillwood",
+		"return": "Return to Kestrel: Reyes's runners have sledded the canopy home. Seal the cockpit",
+		"install_label": "Seal the canopy with Ferro-9's glazing",
 		"bay_label": "Canopy: cracked and taped, a pane is missing",
-		"done": "Cockpit sealed. The scanner is back: salvage crates and wildlife show on your HUD. Next: landing gear. There's a mining crawler in the quarry: follow its violet work lamp.",
+		"done": "Cockpit sealed. The scanner is back: salvage crates and wildlife show on your HUD. Next: landing gear. Ferro-9's strut is still under her aft section in the Gillwood.",
 	},
 	{
 		"id": "landing_gear", "banner": ["GEAR DOWN AND LOCKED", "Cargo ramp open: the armoury is yours"],
 		"site": "QuarryCrawler",
 		"component": "struts", "component_name": "hydraulic strut pack",
-		"find": "Pull a hydraulic strut pack from the mining crawler in the quarry",
-		"return": "Return to Kestrel and fit the struts under the starboard hull",
-		"install_label": "Fit the hydraulic strut pack",
+		"find": "Ferro-9's landing-gear strut is still under her aft section in the Gillwood",
+		"find_there": "Get Ferro-9's landing-gear strut to Reyes's hoist",
+		"return": "Return to Kestrel: Reyes's runners have brought Ferro-9's strut home. Fit it under the starboard hull",
+		"install_label": "Fit Ferro-9's landing-gear strut",
 		"bay_label": "Landing gear: struts crushed flat",
-		"done": "Gear down and locked. Kestrel is level and the cargo ramp opens onto the armoury. Next: the port wing. A rescue dropship lies in the moss field: follow its green distress light.",
+		"done": "Gear down and locked. Kestrel is level and the cargo ramp opens onto the armoury. Next: the port wing. Voss's hauler Marigold carried a wing-tip section.",
 	},
 	{
 		"id": "wing", "banner": ["PORT WING REPAIRED", "Point-defence turret live"],
 		"site": "MossDropship",
 		"component": "wing_panel", "component_name": "wing-tip panel",
-		"find": "Cut the wing-tip panel off the dropship Ferro-9 in the moss field",
-		"return": "Return to Kestrel and fit the panel to the port wing",
-		"install_label": "Fit the wing-tip panel",
+		"find": "Marigold, Voss's hauler in the Shatterlands, carried a wing-tip section",
+		"find_there": "Search the Marigold for a wing-tip section",
+		"return": "Return to Kestrel: Reyes's runners have brought the wing-tip home. Fit it to the port wing",
+		"install_label": "Fit Marigold's wing-tip section",
 		"bay_label": "Port wing: tip torn off",
 		"done": "Wing whole again. The point-defence turret on the wing root is live. Next: the port engine. A freighter's drive coil is out in the graveyard: follow the white beacon.",
 	},
@@ -88,6 +91,15 @@ const PACKS := {
 	"nav_core": [Vector3(0.4, 0.4, 0.4), Color("3fd1b5"), 3.0],
 }
 
+## Repairs whose part comes from another region, salvaged there by a mission of its own and sent
+## home (Game.deliver_component) rather than carried: region, and the flag its salvage sets. The
+## Kettle site that once held the part keeps its scenery and crates but no longer offers it.
+const SOURCED := {
+	"canopy": {"region": "gillwood", "flag": "ferro_canopy"},
+	"landing_gear": {"region": "gillwood", "flag": "ferro_gear"},
+	"wing": {"region": "shatterlands", "flag": "marigold_wing"},
+}
+
 ## Components small enough to carry at a run (a shoulder pouch, not a two-handed lift).
 const PACKS_LIGHT := ["aux_cell"]
 
@@ -95,6 +107,10 @@ const PACKS_LIGHT := ["aux_cell"]
 ## "aux power cell" -> "Aux power cell".
 static func sentence(text: String) -> String:
 	return text.substr(0, 1).to_upper() + text.substr(1)
+
+
+static func sourced(id: String) -> bool:
+	return SOURCED.has(id)
 
 
 static func index_of(id: String) -> int:

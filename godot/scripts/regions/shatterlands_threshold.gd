@@ -41,6 +41,8 @@ var cache_pos := Vector3.INF
 var _cache_tell: MeshInstance3D
 ## The survivors' barricade across the north split, until Reyes has it pulled back.
 var _barricade: Node3D
+## The wing-tip chase (milestone B3).
+var wing: WingChase
 
 
 func _init() -> void:
@@ -74,6 +76,7 @@ func _init() -> void:
 
 
 func build() -> void:
+	_begin_batch()
 	_rng.seed = SEED
 	_ground()
 	_canyon_mouth()
@@ -95,8 +98,22 @@ func build() -> void:
 	greenhouses = Greenhouses.new()
 	greenhouses.name = "Greenhouses"
 	add_child(greenhouses)
+	wing = WingChase.new()
+	wing.name = "WingChase"
+	wing.scene = self
+	add_child(wing)
 	_undergrowth()
 	_spores()
+	_end_batch()
+
+
+func _process(_delta: float) -> void:
+	if wing and wing.active() and Game.current_repair() == "wing":
+		goal = to_local(wing.goal_point())
+	elif way_north_open():
+		goal = NORTH_SPLIT + Vector3(0.0, 1.0, 0.0)
+	else:
+		goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
 
 
 func spawn_residents(main: Node) -> Array[Enemy]:
@@ -124,6 +141,10 @@ func _on_nest_death(_e: Enemy) -> void:
 
 
 func interaction(pos: Vector3) -> Dictionary:
+	if wing:
+		var w := wing.interaction(pos)
+		if not w.is_empty():
+			return w
 	if not locker_open() and pos.distance_to(locker_pos) < 2.2:
 		return {"label": "[E] Open the hauler's dorsal locker", "action": open_locker}
 	if pos.distance_to(cache_pos) < 2.2:

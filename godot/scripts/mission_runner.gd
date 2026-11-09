@@ -106,7 +106,7 @@ func setup(game_main: Node) -> void:
 
 func stage_index(id: String) -> int:
 	var site: ExpeditionSite = main.sites.get(id)
-	if site == null:
+	if site == null or Campaign.sourced(id):
 		return 0
 	if bypass:
 		return site.mission.size()
@@ -117,6 +117,8 @@ func stage_index(id: String) -> int:
 func stage(id: String) -> Dictionary:
 	var site: ExpeditionSite = main.sites.get(id)
 	var i := stage_index(id)
+	if Campaign.sourced(id):
+		return {"type": "elsewhere"}
 	if site == null or i >= site.mission.size():
 		return {"type": "take"}
 	return site.mission[i]
@@ -137,7 +139,7 @@ func device(id: String, stage_i: int, index: int) -> MissionDevice:
 ## The text for the objective line, or "" when the campaign's own line applies.
 func objective() -> String:
 	var id := Game.current_repair()
-	if id == "" or Game.carrying != "":
+	if id == "" or Game.carrying != "" or Campaign.sourced(id):
 		return ""
 	var s := stage(id)
 	var text: String = s.get("text", "")
@@ -163,7 +165,7 @@ func objective() -> String:
 ## Where the waypoint points during a mission stage, or null to use the component.
 func waypoint():
 	var id := Game.current_repair()
-	if id == "" or Game.carrying != "":
+	if id == "" or Game.carrying != "" or Campaign.sourced(id):
 		return null
 	var site: ExpeditionSite = main.sites[id]
 	var s := stage(id)
@@ -260,8 +262,10 @@ func _process(delta: float) -> void:
 	_update_objective()
 	var id := Game.current_repair()
 	var hud: Hud = main.hud
-	if bypass or id == "" or Game.carrying != "" or main.player.dead:
-		hud.set_task(-1.0)
+	if bypass or id == "" or Game.carrying != "" or main.player.dead or Campaign.sourced(id):
+		# Main's held prompts share the task bar: leave it to them while one is filling.
+		if main._hold_t <= 0.0:
+			hud.set_task(-1.0)
 		return
 	var site: ExpeditionSite = main.sites[id]
 	var s := stage(id)
@@ -730,7 +734,7 @@ func refresh(animate: bool) -> void:
 				var st := MissionDevice.State.DORMANT
 				if done_repair or bypass or i < si or (id == current and i == si and j in Game.mission_done):
 					st = MissionDevice.State.DONE
-				elif id == current and i == si:
+				elif id == current and i == si and not Campaign.sourced(id):
 					st = MissionDevice.State.PENDING
 				d.set_state(st, animate)
 

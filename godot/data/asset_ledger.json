@@ -559,6 +559,14 @@
   {
    "path": "icon.*",
    "source": "icon_script"
+  },
+  {
+   "path": "assets/textures/shatterlands/ferro9_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/gillwood_floor/*.png",
+   "source": "jake_pbr"
   }
  ]
 }

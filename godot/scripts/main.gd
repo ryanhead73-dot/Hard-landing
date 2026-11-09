@@ -484,7 +484,7 @@ func _near_install(id: String) -> bool:
 func _update_active_site() -> void:
 	var current := Game.current_repair()
 	for id in sites:
-		(sites[id] as ExpeditionSite).active = id == current
+		(sites[id] as ExpeditionSite).active = id == current and not Campaign.sourced(id)
 
 
 ## Resident packs wake the first time the player comes within a site's wake radius.
@@ -689,7 +689,7 @@ func _find_interaction() -> Dictionary:
 		return device
 	for id in sites:
 		var site: ExpeditionSite = sites[id]
-		if not site.has_component() or pos.distance_to(site.component_point()) >= INTERACT_RANGE:
+		if Campaign.sourced(id) or not site.has_component() or pos.distance_to(site.component_point()) >= INTERACT_RANGE:
 			continue
 		var r := Campaign.get_repair(id)
 		var label := Campaign.sentence(r["component_name"])
@@ -713,7 +713,7 @@ func _find_interaction() -> Dictionary:
 		return cache
 	if current != "" and _near_install(current):
 		var r := Campaign.get_repair(current)
-		if Game.carrying == r["component"]:
+		if Game.carrying == r["component"] or Game.delivered(r["component"]):
 			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
 		return {"label": r["bay_label"]}
 	if current == "" and _near_install("launch"):
@@ -785,6 +785,9 @@ func _install(id: String) -> void:
 		Sfx.duck(-8.0, 2.2, "repair")
 		# Every repair gets its title card: what came back and what it gives you.
 		get_tree().create_timer(REPAIR_BANNER_DELAY).timeout.connect(_on_repair_landed.bind(id))
+	# Cooling clears the canyon's rockfall: the Shatterlands open (Jake, 2026-11-07).
+	if id == "cooling":
+		Game.set_flag("shatterlands_open")
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -999,6 +1002,11 @@ func _waypoint():
 		return opening.waypoint()
 	match Game.phase():
 		"find":
+			var id := Game.current_repair()
+			if Campaign.sourced(id):
+				# Salvaged in another region: the way there is the canyon.
+				var gate: Node3D = regions.gates.get("shatterlands")
+				return gate.global_position + Vector3.UP * 2.0 if gate else null
 			var stage_point = missions.waypoint()
 			return stage_point if stage_point != null else current_site().component_point()
 		"return":

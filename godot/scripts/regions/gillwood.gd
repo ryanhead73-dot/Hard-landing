@@ -26,6 +26,16 @@ const LOCKER := Vector3(-34.0, 0.0, -14.0)
 const OUTCROP := Vector3(-16.0, 0.0, -42.0)
 ## Giant fungi: [base, stem height, cap radius].
 const GIANTS := [[Vector3(-30.0, 0.0, 20.0), 22.0, 12.0], [Vector3(34.0, 0.0, -56.0), 26.0, 13.0]]
+## The fore section hangs this far up, wedged nose-down between two gill-trees; a fallen trunk
+## runs up to its port wing, which is the walkway to the cockpit (FerroCanopy, milestone B1).
+const LIFT := 3.4
+const FORE_TILT := Vector3(-8.0, 0.0, -5.0)
+## The port wing walkway, in the fore section's space: centre and size.
+const WALK := Vector3(-3.7, 1.0, -1.2)
+const WALK_SIZE := Vector3(2.8, 0.3, 8.4)
+## Top of the walkway (fore space), and the branch platform off its nose end.
+const DECK_Y := 1.15
+const PERCH := Vector3(-8.4, 1.0, -3.8)
 ## Juno counts as having found the wreck within this distance of the fore section.
 const FIND_RANGE := 18.0
 const USE_RANGE := 2.4
@@ -44,6 +54,13 @@ var _beacon: OmniLight3D
 ## The gill-trees as [base, height, cap radius], for roosts.
 var _tree_list: Array = []
 var _t := 0.0
+## The canopy rescue and its winch hold-out.
+var ferro: FerroCanopy
+## The gear strut's escort to Reyes's hoist.
+var gear: GearEscort
+## World-space foot and top of the fallen trunk up to the walkway.
+var ramp_foot := Vector3.INF
+var ramp_top := Vector3.INF
 
 
 func _init() -> void:
@@ -73,6 +90,7 @@ func _init() -> void:
 
 
 func build() -> void:
+	_begin_batch()
 	_rng.seed = SEED
 	_ground()
 	_mouth()
@@ -83,9 +101,18 @@ func build() -> void:
 	_roosts()
 	_outcrop()
 	_ferro()
+	ferro = FerroCanopy.new()
+	ferro.name = "FerroCanopy"
+	ferro.gw = self
+	add_child(ferro)
+	gear = GearEscort.new()
+	gear.name = "GearEscort"
+	gear.gw = self
+	add_child(gear)
 	_locker()
 	_undergrowth()
 	_sync_parts()
+	_end_batch()
 
 
 func _ready() -> void:
@@ -106,15 +133,44 @@ func _process(delta: float) -> void:
 	if not Game.flags.get("found_ferro9", false) and main.player.global_position.distance_to(to_global(WRECK)) < FIND_RANGE:
 		Game.set_flag("found_ferro9")
 		_say(Story.FERRO_FOUND)
+	_update_goal()
+
+
+## The waypoint: the wreck until it's found, then the canopy rescue's next step, then the gear,
+## then home.
+func _update_goal() -> void:
+	if not Game.flags.get("found_ferro9", false):
+		goal = WRECK + Vector3(0.0, 2.0, 0.0)
+	elif ferro and ferro.active():
+		goal = to_local(ferro.goal_point())
+	elif gear and gear.active():
+		goal = to_local(gear.goal_point())
+	elif not salvaged("ferro_gear"):
+		goal = to_local(strut_pos) + Vector3(0.0, 1.0, 0.0)
+	else:
+		goal = exit_point + Vector3(0.0, 1.0, 0.0)
 
 
 func interaction(pos: Vector3) -> Dictionary:
 	if pos.distance_to(cockpit_pos) < USE_RANGE and not Game.has_log("ferro_1"):
 		return {"label": "[E] Pull Ferro-9's flight recorder", "action": read_recorder}
-	if pos.distance_to(canopy_pos) < USE_RANGE and not salvaged("ferro_canopy"):
+	if ferro:
+		var f := ferro.interaction(pos)
+		if not f.is_empty():
+			return f
+	# Old saves: Kestrel's canopy was sealed from the skiff, so Ferro-9's just unbolts.
+	if Game.is_repaired("canopy") and pos.distance_to(canopy_pos) < USE_RANGE and not salvaged("ferro_canopy"):
 		return {"label": "[E] Unbolt Ferro-9's canopy", "action": free_canopy}
+	if gear:
+		var g := gear.interaction(pos)
+		if not g.is_empty():
+			return g
 	if pos.distance_to(strut_pos) < USE_RANGE and not salvaged("ferro_gear"):
-		return {"label": "[E] Cut the landing-gear strut free", "action": free_strut}
+		# Old saves: Kestrel's gear is in, so Ferro-9's strut just comes off.
+		if Game.is_repaired("landing_gear"):
+			return {"label": "[E] Cut the landing-gear strut free", "action": free_strut}
+		if not salvaged("ferro_canopy"):
+			return {"label": "Ferro-9's gear strut: it'll keep. The canopy first, while her nose holds"}
 	if pos.distance_to(locker_pos) < USE_RANGE and not salvaged("ferro_locker"):
 		return {"label": "[E] Open Ferro-9's jettison locker", "action": open_locker}
 	return {}
@@ -159,31 +215,24 @@ func free_strut() -> void:
 	_sync_parts(true)
 
 
-## The canopy sits on the nose until it's unbolted, then on skids beside it; the strut hangs
-## under the aft section until it's cut, then lies on the ground. Once both are off, the
+## The canopy sits on the nose until it's salvaged, then on the receiver pad under it; the strut
+## hangs under the aft section until it's cut, then lies on the ground. Once both are off, the
 ## waypoint points home.
 func _sync_parts(animate := false) -> void:
-	if canopy:
-		var to := Vector3(0.0, 3.35, -3.4) if not salvaged("ferro_canopy") else Vector3(-4.2, 0.9, -3.0)
+	if canopy and ferro:
+		var to := FerroCanopy.CANOPY_ON if not salvaged("ferro_canopy") else fore.to_local(ferro.pad_pos + Vector3(0.0, 0.35, 0.0))
 		if animate and is_inside_tree():
 			create_tween().tween_property(canopy, "position", to, 1.2).set_trans(Tween.TRANS_SINE)
 		else:
 			canopy.position = to
 	if strut:
-		var down := salvaged("ferro_gear")
+		var down := salvaged("ferro_gear") or salvaged("gear_cut")
+		strut.visible = not salvaged("gear_mounted")
 		var xf := Transform3D(Basis(Vector3.RIGHT, PI * 0.5 if down else 0.25), Vector3(1.6, 0.35, 1.0) if down else Vector3(1.6, 0.4, 1.0))
 		if animate and is_inside_tree():
 			create_tween().tween_property(strut, "transform", xf, 0.8).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		else:
 			strut.transform = xf
-	if salvaged("ferro_canopy") and salvaged("ferro_gear"):
-		goal = exit_point + Vector3(0.0, 1.0, 0.0)
-
-
-func _say(lines: Array) -> void:
-	var main := get_parent()
-	if main and main.get("voice"):
-		main.voice.say(lines)
 
 
 func _ground() -> void:
@@ -192,7 +241,8 @@ func _ground() -> void:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	# The pocket's grit, a little bluer under the trees.
-	mi.material_override = _tex("shatterlands_ground", 2.5, true, Color(0.85, 0.92, 1.0), _mat(GROUND, 0.85))
+	# The pack's own Gillwood floor (milestone B4): teal moss and basalt grit, ~3 m a repeat.
+	mi.material_override = _tex("gillwood_floor", 3.0, true, Color.WHITE, _tex("shatterlands_ground", 2.5, true, Color(0.85, 0.92, 1.0), _mat(GROUND, 0.85)))
 	add_child(mi)
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -224,6 +274,8 @@ func _trees() -> void:
 		if Vector2(p.x - WRECK.x - 4.0, p.z - WRECK.z - 4.0).length() < 20.0:
 			continue
 		if absf(p.x) < 7.0 and p.z > 30.0:
+			continue
+		if _on_route(p):
 			continue
 		if Vector2(p.x - OUTCROP.x, p.z - OUTCROP.z).length() < 9.0 or Vector2(p.x - LOCKER.x, p.z - LOCKER.z).length() < 5.0:
 			continue
@@ -291,6 +343,20 @@ func _trees() -> void:
 		i += 1
 
 
+## True near the gear escort's routes, the hoist clearing or the ridge, where no tree may stand.
+func _on_route(p: Vector3) -> bool:
+	var flat := Vector2(p.x, p.z)
+	if flat.distance_to(Vector2(GearEscort.HOIST.x, GearEscort.HOIST.z)) < 9.0:
+		return true
+	for r in GearEscort.ROUTES.values():
+		for i in r.size() - 1:
+			var a := Vector2(r[i][0].x, r[i][0].z)
+			var b := Vector2(r[i + 1][0].x, r[i + 1][0].z)
+			if flat.distance_to(Geometry2D.get_closest_point_to_segment(flat, a, b)) < 5.0:
+				return true
+	return false
+
+
 ## Veilwings roost under the caps of the trees nearest these points: one over the path in, one
 ## on the east side of the clearing, one west toward the locker.
 const ROOST_NEAR := [Vector3(-9.0, 0.0, 22.0), Vector3(20.0, 0.0, -10.0), Vector3(-24.0, 0.0, -8.0)]
@@ -320,12 +386,12 @@ func _outcrop() -> void:
 ## cockpit (the recorder) and the canopy on its nose; the aft lies twisted off to the east with
 ## the landing-gear strut hanging under it, an emergency beacon still blinking on its fin.
 func _ferro() -> void:
-	var hull_mat := _tex("hauler_hull", 6.0, false, Color(0.62, 0.7, 0.76), _mat(FERRO_HULL, 0.55))
+	var hull_mat := ferro_hull()
 	var trim := _mat(FERRO_TRIM, 0.5)
 	fore = Node3D.new()
 	fore.name = "Ferro9Fore"
-	fore.position = WRECK
-	fore.rotation = Vector3(deg_to_rad(4.0), WRECK_YAW, deg_to_rad(-7.0))
+	fore.position = WRECK + Vector3(0.0, LIFT, 0.0)
+	fore.rotation = Vector3(deg_to_rad(FORE_TILT.x), WRECK_YAW, deg_to_rad(FORE_TILT.z))
 	add_child(fore)
 	_box(Vector3(0.0, 1.6, 0.0), Vector3(5.0, 3.2, 9.0), hull_mat, true, fore)
 	# The nose: a six-sided taper from the hull to a blunt point, with a box collider round it.
@@ -343,8 +409,9 @@ func _ferro() -> void:
 	nose.position = Vector3(0.0, 1.5, -6.5)
 	fore.add_child(nose)
 	_collider(fore, Vector3(0.0, 1.3, -6.2), Vector3(3.6, 2.4, 3.6))
-	# Stub wings, one crumpled into the ground, and the skids she slid in on.
-	_box(Vector3(-3.6, 1.0, 1.2), Vector3(2.6, 0.3, 3.2), hull_mat, true, fore)
+	# Stub wings: the port one long enough to walk, the starboard crumpled; the skids hang.
+	_box(WALK, WALK_SIZE, hull_mat, true, fore)
+	_box(WALK + Vector3(-WALK_SIZE.x * 0.5 + 0.08, 0.2, 0.0), Vector3(0.16, 0.12, WALK_SIZE.z), trim, false, fore)
 	_box(Vector3(3.4, 0.5, 1.6), Vector3(2.4, 0.3, 3.0), hull_mat, false, fore)
 	for x in [-1.6, 1.6]:
 		_box(Vector3(x, 0.12, -1.0), Vector3(0.35, 0.24, 9.0), _mat(Color("4a4f52"), 0.5), false, fore)
@@ -393,8 +460,9 @@ func _ferro() -> void:
 	lamp.omni_range = 6.0
 	lamp.position = Vector3(0.0, 2.2, -3.0)
 	fore.add_child(lamp)
-	cockpit_pos = fore.to_global(Vector3(-3.4, 0.0, -3.0))
-	canopy_pos = fore.to_global(Vector3(-3.4, 0.0, -5.6))
+	cockpit_pos = fore.to_global(Vector3(-3.1, DECK_Y, -3.0))
+	canopy_pos = fore.to_global(Vector3(-3.6, DECK_Y, -5.0))
+	_wedge(hull_mat)
 	# The aft section, twisted away, nacelles still on, the strut hanging under its belly.
 	aft = Node3D.new()
 	aft.name = "Ferro9Aft"
@@ -459,6 +527,72 @@ func _ferro() -> void:
 	strut_pos.y = global_position.y
 
 
+## What holds the fore section up: two gill-trees either side of the nose it came down between,
+## a third under the port wingtip with a branch platform level with the walkway (and a plank
+## across), and the fallen trunk Juno walks up from the clearing to the wing's trailing edge.
+func _wedge(hull_mat: Material) -> void:
+	var stem := _tex("fungus_stem", 2.0, true, Color(0.85, 0.9, 1.0), _mat(STEM, 0.7))
+	var gills := _tex("fungus_cap_underside", 2.5, true, Color(0.8, 0.85, 1.0), _glow(GILLS, 1.4), GILLS, 3.5)
+	for at in [Vector3(-3.0, 0.0, -6.6), Vector3(3.2, 0.0, -5.6), PERCH + Vector3(-1.0, 0.0, 0.0)]:
+		var base := to_local(fore.to_global(at))
+		base.y = 0.0
+		var h := 9.5
+		_trunk(base, h, 0.55, stem)
+		var cap := MeshInstance3D.new()
+		var cm := SphereMesh.new()
+		cm.radius = 3.0
+		cm.height = 1.8
+		cap.mesh = cm
+		cap.material_override = _mat(TREE_CAP, 0.6)
+		cap.position = base + Vector3(0.0, h, 0.0)
+		add_child(cap)
+		var gm := CylinderMesh.new()
+		gm.top_radius = 2.8
+		gm.bottom_radius = 1.6
+		gm.height = 0.14
+		var under := MeshInstance3D.new()
+		under.mesh = gm
+		under.material_override = gills
+		under.position = base + Vector3(0.0, h - 0.55, 0.0)
+		add_child(under)
+	# The branch platform and a plank to it from the walkway's nose end.
+	_box(PERCH, Vector3(2.4, 0.3, 2.4), _mat(Color("5b5470"), 0.8), true, fore)
+	var plank_from := WALK + Vector3(-WALK_SIZE.x * 0.5, 0.0, -2.6)
+	var plank_to := PERCH + Vector3(1.2, 0.0, 0.0)
+	_box((plank_from + plank_to) * 0.5, Vector3(absf(plank_to.x - plank_from.x) + 0.6, 0.18, 1.0), _mat(Color("6a5a48"), 0.85), true, fore)
+	# The fallen trunk: from the clearing to the walkway's trailing edge.
+	ramp_top = fore.to_global(WALK + Vector3(0.0, 0.15, WALK_SIZE.z * 0.5 - 0.2))
+	ramp_foot = fore.to_global(WALK + Vector3(-0.4, 0.0, WALK_SIZE.z * 0.5 + 8.0))
+	ramp_foot.y = global_position.y
+	_ramp(to_local(ramp_foot), to_local(ramp_top), 2.2, stem)
+	# Stays the crash left: struts under the belly into the moss, so it reads as wedged.
+	for at in [Vector3(-1.8, 0.0, 2.6), Vector3(1.9, 0.0, 1.4)]:
+		var top := to_local(fore.to_global(at))
+		_trunk(Vector3(top.x, 0.0, top.z), top.y, 0.22, hull_mat)
+
+
+## A vertical cylinder from `base` up `h` metres, with a collider.
+func _trunk(base: Vector3, h: float, r: float, mat: Material) -> void:
+	var body := StaticBody3D.new()
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = r * 0.75
+	cm.bottom_radius = r
+	cm.height = h
+	cm.radial_segments = 10
+	mi.mesh = cm
+	mi.material_override = mat
+	var shape := CollisionShape3D.new()
+	var cyl := CylinderShape3D.new()
+	cyl.radius = r
+	cyl.height = h
+	shape.shape = cyl
+	body.add_child(mi)
+	body.add_child(shape)
+	body.position = base + Vector3(0.0, h * 0.5, 0.0)
+	add_child(body)
+
+
 ## The jettison locker: an amber-striped crate half sunk in the moss, a tell-tale still lit.
 func _locker() -> void:
 	_box(LOCKER + Vector3(0.0, 0.45, 0.0), Vector3(1.6, 0.9, 1.0), _mat(FERRO_HULL, 0.55), true)
@@ -472,6 +606,25 @@ func _locker() -> void:
 	_locker_tell.visible = not salvaged("ferro_locker")
 	add_child(_locker_tell)
 	locker_pos = to_global(LOCKER + Vector3(0.0, 0.0, 1.3))
+
+
+## Ferro-9's slate hull (milestone B4): the pack's ferro9_hull set, mapped in each section's own
+## space (~2 m a repeat, so a panel is about hull-module size), with a modest metalness. Its own
+## material, not the cached one, so the metalness stays on Ferro-9.
+var _ferro_mat: Material
+
+
+func ferro_hull() -> Material:
+	if _ferro_mat == null:
+		var fallback := _tex("hauler_hull", 6.0, false, Color(0.62, 0.7, 0.76), _mat(FERRO_HULL, 0.55))
+		if PbrSet.exists("shatterlands", "ferro9_hull"):
+			var m := (PbrSet.material("shatterlands", "ferro9_hull", 2.0, false) as StandardMaterial3D).duplicate() as StandardMaterial3D
+			m.metallic = 0.3
+			m.normal_scale = 0.8
+			_ferro_mat = m
+		else:
+			_ferro_mat = fallback
+	return _ferro_mat
 
 
 ## A collider with no mesh, in `parent`'s space.

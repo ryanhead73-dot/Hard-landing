@@ -66,8 +66,8 @@ const EXTRA: Array[Dictionary] = [
 		"steps": [
 			{"text": "Go north through the rim into the Gillwood", "done": {"type": "flag", "id": "reached_gillwood"}},
 			{"text": "Find Ferro-9", "done": {"type": "flag", "id": "found_ferro9"}},
-			{"text": "Free Ferro-9's canopy", "done": {"type": "flag", "id": "ferro_canopy"}},
-			{"text": "Cut her landing-gear strut free", "done": {"type": "flag", "id": "ferro_gear"}},
+			{"text": "Lower Ferro-9's canopy to the receiver pad", "done": {"type": "flag", "id": "ferro_canopy"}},
+			{"text": "Get her landing-gear strut to Reyes's hoist", "done": {"type": "flag", "id": "ferro_gear"}},
 		],
 	},
 	{

@@ -234,6 +234,18 @@ func _start_climb() -> void:
 		_circle_at -= off.normalized() * (off.length() - 20.0)
 
 
+## Startled (a chime rung near it): it breaks off and climbs away from `from` for `secs`
+## before it looks for its target again.
+func scare(from: Vector3, secs := 4.0) -> void:
+	if state == State.DEAD:
+		return
+	var away := Vector3(global_position.x - from.x, 0.0, global_position.z - from.z)
+	_dir = away.normalized() if away.length() > 0.1 else Vector3.FORWARD
+	_start_climb()
+	_circle_at += _dir * 6.0 + Vector3.UP * 3.0
+	_timer = secs
+
+
 func _weak_open() -> bool:
 	return state == State.FLARE or state == State.CLIMB
 
