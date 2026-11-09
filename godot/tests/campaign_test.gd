@@ -50,8 +50,10 @@ func _run() -> void:
 	_check("pilot's seat offers the engine spool", _label().contains("engine spool"), _label())
 	await _press("interact")
 	# The full finale is covered by story_test; here, skip to a full spool.
+	main.finale.skip_crises()
 	main.finale.spool = Finale.SPOOL_TIME
 	await _frames(3)
+	main.finale.pulse_t = Finale.GAP_FROM + 0.1
 	_check("pilot's seat offers launch", _label().contains("[E] Launch"), _label())
 	await _press("interact")
 	await get_tree().create_timer(main.LIFT_TIME + main.CLIMB_TIME + 2.0).timeout

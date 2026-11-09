@@ -139,6 +139,7 @@ func _finale() -> void:
 	_check("objective says to start the spool", Game.objective_text().contains("spool"), Game.objective_text())
 	await _press("interact")
 	var f: Finale = main.finale
+	f.skip_crises()
 	_check("spool starts the final assault", f.state == Finale.State.SPOOLING and main.siege.active == ShipSiege.FINALE and main.siege.siege_enemies().size() > 0)
 	_check("objective: hold the hull", Game.objective_text().contains("Hold"), Game.objective_text())
 	await _frames(5)
@@ -168,6 +169,7 @@ func _finale() -> void:
 	# Second try, with an ordinary siege still armed: the finale folds it in.
 	main.siege.arm(2, 5.0)
 	await _press("interact")
+	f.skip_crises()
 	_check("starting the spool cancels a waiting siege", main.siege.pending == -1 and main.siege.active == ShipSiege.FINALE)
 	f.spool = Finale.SPOOL_TIME - 0.05
 	await _frames(6)
@@ -179,6 +181,7 @@ func _finale() -> void:
 	_check("the wildlife runs off and is gone", _enemy_count() == 0, "left=%d" % _enemy_count())
 
 	var y0 := kestrel.global_position.y
+	f.pulse_t = Finale.GAP_FROM + 0.1
 	await _press("interact")
 	_check("launch starts the cinematic", Game.launched and f.state == Finale.State.LAUNCHING and main._cine_cam != null and main.get_viewport().get_camera_3d() == main._cine_cam)
 	await _press("inventory")

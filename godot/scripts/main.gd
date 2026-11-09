@@ -2,7 +2,8 @@ extends Node3D
 ## Game flow: sky and sun, player, HUD, enemies, interactions and dev controls.
 ## The campaign (see Campaign) restores Kestrel one repair at a time: follow the active site's
 ## beacon, recover its component, carry it home and install it. Each repair turns on a benefit.
-## When all seven are done, the pilot's seat starts the engine spool (Finale), and then launches.
+## When all seven are done, the pilot's seat starts the engine spool (Finale: tethers, an overheat
+## and a tripped breaker on the way), and then launches in the quiet between Loom pulses.
 
 ## A repair is about to be installed / has been installed and saved (for staging the payoff).
 signal install_started(id: String)
@@ -766,11 +767,19 @@ func _find_interaction() -> Dictionary:
 		if Game.carrying == r["component"] or Game.delivered(r["component"]):
 			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
 		return {"label": r["bay_label"]}
+	if finale.crisis == Finale.Crisis.OVERHEAT and _near_install("cooling"):
+		return {"label": "[E] Vent the drive coolant (%d s)" % ceili(finale.vent_t), "action": finale.vent}
+	if finale.crisis == Finale.Crisis.POWER and _near_install("aux_power"):
+		return {"label": "[E] Reroute aux power to the drive", "action": finale.reroute}
 	if current == "" and _near_install("launch"):
 		match finale.state:
 			Finale.State.READY:
-				return {"label": "[E] Launch Kestrel", "action": launch}
+				if finale.in_gap():
+					return {"label": "[E] Launch Kestrel: it's quiet, go!", "action": launch}
+				return {"label": "[E] Launch Kestrel (wait for the quiet after the pulse: %d s)" % ceili(finale.gap_in()), "action": launch}
 			Finale.State.SPOOLING:
+				if finale.stalled():
+					return {"label": "Pilot's seat: spool stalled at %d%%" % int(finale.progress() * 100.0)}
 				return {"label": "Pilot's seat: engine spooling, %d%%" % int(finale.progress() * 100.0)}
 		if siege.is_active():
 			return {"label": "Pilot's seat: clear them off the hull first"}
@@ -969,6 +978,8 @@ func _resupply() -> void:
 func launch() -> void:
 	if Game.current_repair() != "" or Game.launched or finale.state != Finale.State.READY:
 		return
+	if not finale.try_launch():
+		return
 	finale.begin_launch()
 	Game.launch()
 	voice.interrupt(Story.LAUNCH)
@@ -1135,7 +1146,8 @@ func _waypoint():
 		"return":
 			return install_point(Game.current_repair())
 		"launch":
-			return install_point("launch")
+			var mark = finale.waypoint(player.global_position)
+			return mark if mark != null else install_point("launch")
 		"done":
 			return null
 	if Game.is_repaired("aux_power") and Game.listed_upgrades().any(func(id): return FabricatorMenu.blocker(id) == ""):

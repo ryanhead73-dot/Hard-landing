@@ -436,7 +436,24 @@ const DEPOT_LINES := [
 ]
 const FINALE_HALF := [HOB, "Halfway. The Loom's beat is steady. Hold them off."]
 const FINALE_LATE := [HOB, "Ten seconds left on the spool. Start heading for the cockpit."]
-const FINALE_READY := [HOB, "Spool's full! Get to the pilot's seat. Now, Juno!"]
+const FINALE_READY := [HOB, "Spool's full! Get to the pilot's seat, and go in the quiet after a pulse. Now, Juno!"]
+const FINALE_TETHERS: Array = [
+	[HOB, "Something's got hold of us! Fibre, knotted round the gear, the wing and the nose strut. The spool won't climb against it."],
+	[JUNO, "Mark the knots. I'll cut us loose."],
+]
+const FINALE_TETHERS_CUT := [HOB, "That's the last of them. Spool's climbing again."]
+const FINALE_OVERHEAT: Array = [
+	[HOB, "Drive temperature's running away. The Patience's coil is too hot for my old manifold."],
+	[HOB, "Vent it at the manifold, Juno, or I'll have to bleed the spool."],
+]
+const FINALE_VENTED := [HOB, "Vented. Oh, that's better. Thank you."]
+const FINALE_OVERHEAT_LOST := [HOB, "Too hot. I've had to bleed off a quarter of the spool. Still going."]
+const FINALE_POWER: Array = [
+	[HOB, "The drive's pulling more than the aux cell can give. Breaker's tripped, I'm on emergency lights."],
+	[JUNO, "Aux bay. On it."],
+]
+const FINALE_POWER_BACK := [HOB, "Power's rerouted. Lights back. Spool's moving."]
+const LAUNCH_ABORT := [HOB, "Not on the pulse! Let it roll past, then go."]
 const FINALE_FAILED := [HOB, "Hull breach, spool's dumped. I'm sorry. We'll have to start it again."]
 const LAUNCH: Array = [
 	[HOB, "Waiting on the beat... three... two..."],
