@@ -123,7 +123,7 @@ func marks() -> Array:
 ## stash tins still on it. [{id, label, at (0..1 in the inset), open, here}], plus the trail.
 const INSET := Rect2(Vector2(MapPanel.VIEW - 214.0, 10.0), Vector2(204.0, 150.0))
 const INSET_NODES := {
-	"kettle": Vector2(0.5, 0.86), "shatterlands": Vector2(0.5, 0.56), "gillwood": Vector2(0.5, 0.18), "loom_expanse": Vector2(0.14, 0.56),
+	"kettle": Vector2(0.4, 0.86), "shatterlands": Vector2(0.4, 0.56), "gillwood": Vector2(0.4, 0.18), "loom_expanse": Vector2(0.1, 0.56),
 }
 
 
@@ -173,7 +173,16 @@ class MapView:
 			var at: Vector2 = pos.call(n["at"])
 			var col := Color("ffb347") if n["here"] else Color("e9e1cc")
 			draw_circle(at, 5.0 if n["here"] else 3.5, col)
-			draw_string(font, at + Vector2(-60, -8), n["label"], HORIZONTAL_ALIGNMENT_CENTER, 120, 10, col)
+			# Labels sit clear of the links: right of the hub, below the side and bottom nodes.
+			match String(n["id"]):
+				"shatterlands":
+					draw_string(font, at + Vector2(9, 4), n["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
+				"gillwood":
+					draw_string(font, at + Vector2(-60, -8), n["label"], HORIZONTAL_ALIGNMENT_CENTER, 120, 10, col)
+				"loom_expanse":
+					draw_string(font, at + Vector2(-10, 16), n["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
+				_:
+					draw_string(font, at + Vector2(-60, 16), n["label"], HORIZONTAL_ALIGNMENT_CENTER, 120, 10, col)
 
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, Vector2(MapPanel.VIEW, MapPanel.VIEW))
