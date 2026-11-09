@@ -241,6 +241,8 @@ func _regions() -> void:
 	_check("an open gate offers the way through", _label().contains("Shatterlands"), _label())
 	Game.scrap = 55
 	Game.give_weapon("scattergun")
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var quests_before: Dictionary = Game.quests.duplicate(true)
 	var crash_site: Node3D = main.site
 	var bug: Enemy = main.spawn_enemy("scuttler", gate.to_global(Vector3(6.0, 0.5, 14.0)))

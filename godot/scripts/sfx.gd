@@ -40,6 +40,8 @@ const SOUNDS: Array[String] = [
 	# The Loom Expanse (milestone C): ridges, ridge divers, pinweavers, the chord singer.
 	"ridge_thrum", "ridge_heave", "diver_grind", "diver_erupt", "pinweaver_click", "thread_spool", "thread_snap",
 	"singer_drone", "singer_inhale", "singer_chord", "singer_pull", "singer_call",
+	"boost_thrust", "mirror_alarm", "magnet_clamp", "hoist_winch", "cage_drop",
+	"resonator_tick", "crown_tick", "resonator_lock", "cantor_high", "cantor_mid", "cantor_low", "cantor_wave", "cantor_heart", "cantor_anchor",
 ]
 const MAX_VARIANTS := 8
 

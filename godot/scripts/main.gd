@@ -139,6 +139,8 @@ var discoveries: Discoveries
 var finds: WalkFinds
 ## The wing's reward: a beacon Juno can plant out on the ground (B).
 var beacon: FieldBeacon
+## The engine's reward: ledges the suit thrusters reach, with caches on top.
+var boost_ledges: BoostLedges
 ## The landing gear's reward: the utility drone and its station in the cargo bay.
 var drone: UtilityDrone
 var _drone_station: Node3D
@@ -328,6 +330,10 @@ func _ready() -> void:
 	beacon.name = "FieldBeacon"
 	add_child(beacon)
 	beacon.setup(self)
+	boost_ledges = BoostLedges.new()
+	boost_ledges.name = "BoostLedges"
+	add_child(boost_ledges)
+	boost_ledges.setup(self)
 	_build_drone_station()
 	Game.flag_changed.connect(func(id: String, _v: Variant):
 		if id == "drone_out":
@@ -558,6 +564,10 @@ func spawn_enemy(kind: String, at: Vector3, elite_name := "", parent: Node = nul
 			e = Pinweaver.new()
 		"chord_singer":
 			e = ChordSinger.new()
+		"guardian":
+			e = PatienceGuardian.new()
+		"cantor":
+			e = Cantor.new()
 		"warden":
 			var w := Warden.new()
 			w.summon = func(p: Vector3): spawn_enemy("scuttler", p).alert(false)
@@ -706,6 +716,9 @@ func _find_interaction() -> Dictionary:
 	var gate := regions.interaction(pos)
 	if not gate.is_empty():
 		return gate
+	var thrust := boost_ledges.interaction(pos)
+	if not thrust.is_empty():
+		return thrust
 	var find := finds.interaction(pos)
 	if not find.is_empty() or not regions.in_kettle():
 		return find
@@ -789,6 +802,15 @@ func _find_interaction() -> Dictionary:
 
 ## The drone station: a charging cradle on the cargo bay's port wall and a landing pad marked on
 ## the deck in front of it (nothing to walk into). Lit once the landing gear is fixed.
+## The port engine's first run in years: a surge of exhaust that winds back down.
+func _test_fire() -> void:
+	Sfx.play("launch_roar", kestrel.global_position, -6.0, 0.0)
+	var t := create_tween()
+	t.tween_method(kestrel.set_engine_power, 0.0, 0.7, 0.8)
+	t.tween_interval(2.5)
+	t.tween_method(kestrel.set_engine_power, 0.7, 0.0, 1.5)
+
+
 func _build_drone_station() -> void:
 	_drone_station = Node3D.new()
 	_drone_station.name = "DroneStation"
@@ -884,6 +906,11 @@ func _install(id: String) -> void:
 		get_tree().create_timer(5.0).timeout.connect(func(): voice.say(Story.BEACON_READY))
 	if id == "landing_gear":
 		get_tree().create_timer(6.0).timeout.connect(func(): voice.say(Story.DRONE_READY))
+	# The engine test-fires: a few seconds of exhaust and the roar, then the thrusters are charged.
+	if id == "engine":
+		Game.set_flag("crown_open")
+		_test_fire()
+		get_tree().create_timer(7.0).timeout.connect(func(): voice.say(Story.BOOST_READY))
 	# A working ship runs hot, and the heat draws the wildlife in.
 	if ShipSiege.ARMED_BY.has(id):
 		siege.arm(ShipSiege.ARMED_BY[id])
@@ -1172,6 +1199,9 @@ func _on_player_died() -> void:
 	for s in get_tree().get_nodes_in_group("enemies"):
 		s.calm()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
+	# A region with a fight in it puts the fight back to its checkpoint.
+	if regions.scene and regions.scene.has_method("on_player_down"):
+		regions.scene.on_player_down()
 	var back = opening.respawn()
 	if not back is Vector3:
 		back = beacon.respawn_point()

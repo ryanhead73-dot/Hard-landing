@@ -119,11 +119,11 @@ const INSTALLED: Dictionary = {
 	],
 	"wing": [
 		[HOB, "Wing's whole and the point-defence turret answers. I've named it Gerald. Gerald shoots things."],
-		[HOB, "The port engine needs a drive coil. There's a freighter graveyard to the north. One of them, the Long Patience, has been down sixty years."],
+		[HOB, "The port engine needs a drive coil. The Long Patience, the freighter in the graveyard, broke in two coming down. Her stern's out past the Loom, and Marrow swore the coil still holds charge."],
 	],
 	"engine": [
 		[HOB, "Port engine turns over. Listen to her. Bleed power's on the fabricator's top tier."],
-		[HOB, "Last piece. Ilse Marrow left a nav core at the Loom spire, far to the west. Juno, everything that pulled us down comes from there. Go carefully."],
+		[HOB, "Last piece. Ilse Marrow took her nav core to the Tuning Crown, north through the Loom. Juno, everything that pulled us down comes from there. Go carefully."],
 	],
 	"navigation": [
 		[HOB, "Nav core seated. Oh. Oh, that's clever. It isn't a map, it's a metronome."],
@@ -327,6 +327,77 @@ const DRONE_READY := [
 const BEACON_READY := [
 	[HOB, "The wing-tip had a survey beacon in its housing. It's on your scanner now. Plant it with B anywhere outside, and if you go down, I'll bring you up beside it."],
 ]
+## Repair 6 at the Long Patience's stern (LongPatience): HOB finds it from the Loom's overlook.
+const PATIENCE_FOUND := [
+	[HOB, "Juno, wait. There's a drive signature east of here, through the rim. Cold, steady, and old."],
+	[HOB, "It's the Long Patience. Her bow's the graveyard back in the Kettle. Her stern came down here, engine and all."],
+]
+const PATIENCE_ARRIVE := [
+	[JUNO, "There she is. Sixty years on her side and the stern plating still says her name."],
+	[HOB, "Something in the engine hall is sweeping the dark. Mirrors, timed to the pulse. Watch how they move before you do."],
+]
+const PATIENCE_SPOTTED := [
+	[HOB, "That mirror caught you. And something heavy just shifted at the far end of the hall."],
+]
+const PATIENCE_POWER := [
+	[JUNO, "Cage is down. So are the lights."],
+	[HOB, "The mirrors can't see far in the dark. Neither can you. Go and get our coil."],
+]
+const PATIENCE_AMBUSH := [
+	[HOB, "Juno, the coil's ringing with the pulse. And the thing in the alcove is awake. It's coming for the ringing."],
+	[HOB, "It hunts by vibration. Walk, don't run. Those cargo magnets on the gantry still have charge: shoot one when it's underneath."],
+]
+const PATIENCE_MAGNET := [
+	[JUNO, "Got you! Its back plate's torn open."],
+	[HOB, "Only for a few seconds. Make them count, or make them distance."],
+]
+const PATIENCE_HOIST := [
+	[HOB, "Coil's on the hoist. Twenty seconds to the rim. Keep that thing busy."],
+]
+const PATIENCE_DONE := [
+	[HOB, "It's up. Reyes's runners are at the rim with a sled. They'll have it at Kestrel before you are."],
+	[JUNO, "Then let's not keep the Long Patience waiting any longer."],
+]
+const PATIENCE_DISTRESS := [
+	[JUNO, "A medical emergency, crew trapped... HOB, this is a recording. It's sixty years old."],
+	[HOB, "It's been calling the whole time. Nobody answered. I'm sorry, Long Patience."],
+]
+## The engine's reward: the thrust pack.
+const BOOST_READY := [
+	[HOB, "The engine bleed's charged your suit thrusters. Jump, then jump again in the air for a boost. There are ledges out there you couldn't reach before."],
+]
+## Repair 7 at the Tuning Crown (TuningCrown, Cantor).
+const CROWN_ARRIVE := [
+	[JUNO, "Down. Thrusters held. HOB, those stones in the bays are knocking."],
+	[HOB, "Each on its own beat, and none of them on the Crown's. Retune them until they knock in step and I think the Crown will let us in."],
+]
+const CROWN_LOCKS := [
+	[[HOB, "One in step. Listen, the fibres behind you just pulled tight. The old way's shut, but there's a new one open."]],
+	[[HOB, "Two. The paths keep rearranging themselves around what you tune. Like it's listening back."]],
+	[[HOB, "Three. The door to the Crown is open, Juno. And something inside has stopped singing to itself."]],
+]
+const CANTOR_RISES := [
+	[JUNO, "HOB. It's hanging from the arches. It's the size of a hangar."],
+	[HOB, "High, middle, low, then quiet. It sings the same phrase every time. The anchors at the rim hold it up. Hit one in that quiet."],
+]
+const CANTOR_INTERRUPT := [
+	[HOB, "You broke its phrase! The petals are open: the heart, Juno, now!"],
+]
+const CANTOR_RESPOND := [
+	[HOB, "It's pulling the floor about. Those walls slide on the middle note. Watch the seams, they glow on the high one."],
+]
+const CANTOR_RESOLVE := [
+	[JUNO, "No more anchors to break. It's opening on its own."],
+	[HOB, "One petal in every quiet. When all three are open, the heart's bare in each gap. It's calling for help, too."],
+]
+const CANTOR_DOWN := [
+	[HOB, "It's down. The Crown's still beating, but nothing's singing over it."],
+	[JUNO, "There's something in the heart. Teal, and humming."],
+]
+const CROWN_CORE := [
+	[JUNO, "Marrow's core. It's warm, and it's keeping time."],
+	[HOB, "Bring it home. I know exactly where it goes."],
+]
 ## Teo's favour (the dark house): the east glasshouse went dark in the last pulse.
 const TEO_ASK := [
 	["Teo", "You're the pilot? Good, you can wire. The east house went dark in the last pulse. Its cell cooked."],
@@ -477,12 +548,17 @@ const LOGS: Array[Dictionary] = [
 	{
 		"id": "freighter_3", "site": "engine", "source": "crate:3",
 		"title": "Long Patience, today", "author": "Ilse Marrow",
-		"text": "Reyes's people are safe in the old greenhouses. Voss's crew left them in good order, sixty years ago. The drive coil is intact, as I said it would be. All we need is a ship with a working frame, and nobody here has one. So I'm going to the spire to finish the core. If it works and I don't come back, it'll be in the cradle at the top. Whoever has a ship: take it, and come back for these people.",
+		"text": "Reyes's people are safe in the old greenhouses. Voss's crew left them in good order, sixty years ago. The drive coil is intact in the stern, where she broke away at the edge of the Loom, as I said it would be. All we need is a ship with a working frame, and nobody here has one. So I'm going to the spire to finish the core. If it works and I don't come back, it'll be in the cradle at the top. Whoever has a ship: take it, and come back for these people.",
 	},
 	{
 		"id": "freighter_4", "site": "engine", "source": "component",
 		"title": "Long Patience, year forty", "author": "Captain Mirela Voss",
 		"text": "I am old now, and most of us are buried by the greenhouses. Every spring we still charge the drive coil from the hot pools, the way you'd wind a clock nobody reads. Someone will come down who can fly. The coil is for them. Tell them the Long Patience waited as long as she could.",
+	},
+	{
+		"id": "patience_distress", "site": "long_patience", "source": "distress",
+		"title": "Long Patience, medical channel", "author": "Ship's distress recorder",
+		"text": "Medical emergency, freighter Long Patience. Engine hall breach, two crew trapped behind the cage, one with burns. The cage will not release while the drive is live and the drive will not shut down. We are cutting power by hand. Respond on any channel. Medical emergency, freighter Long Patience. Engine hall breach, two crew trapped behind the cage...",
 	},
 	# The Loom spire: Ilse Marrow.
 	{
@@ -498,7 +574,7 @@ const LOGS: Array[Dictionary] = [
 	{
 		"id": "loom_3", "site": "navigation", "source": "component",
 		"title": "The cradle", "author": "Ilse Marrow",
-		"text": "The core goes in a ship's nav bay. Any ship mind will understand it. Wait for the beat and fly in the gap. I'm not coming down from the spire the way I came up. When the pulse goes through the top, there's a moment where the Loom reaches all the way to orbit. I think I can ride it. If you're reading this and I was wrong, tell Reyes I'm sorry. If I was right, look up.",
+		"text": "The core goes in a ship's nav bay. Any ship mind will understand it. Wait for the beat and fly in the gap. I'm leaving it in the Crown's heart, where the Cantor sings over it; nothing else down here will touch it. I'm not coming down the way I came up. When the pulse goes through the Crown, there's a moment where the Loom reaches all the way to orbit. I think I can ride it. If you're reading this and I was wrong, tell Reyes I'm sorry. If I was right, look up.",
 	},
 	# Discoveries ("discovery", the discovery's id): places off the repair routes.
 	{

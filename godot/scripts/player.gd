@@ -38,6 +38,10 @@ signal died
 ## landing is kept until she lands.
 const COYOTE_TIME := 0.12
 const JUMP_BUFFER := 0.15
+## The engine's reward: the suit thrusters. A second press in the air kicks her up and forward,
+## once per jump, enough for a ledge about three metres up.
+const BOOST_UP := 6.0
+const BOOST_PUSH := 2.5
 ## How fast the camera eases back out after a wall pushed it in (m/s). It always snaps in.
 const BOOM_RECOVER := 3.5
 
@@ -115,6 +119,9 @@ var _since_floor := 0.0
 var _jump_buffer := 0.0
 ## Snagged (a Loom trip-thread, a loose pocket of weave): a slow walk and no sprint until it runs out.
 var snag_t := 0.0
+## Boosts used (tests read it); whether this jump's boost is spent.
+var boosts := 0
+var _boosted := false
 
 
 func _ready() -> void:
@@ -272,6 +279,25 @@ func is_rolling() -> bool:
 
 
 ## In the untouchable opening of a roll.
+func can_boost() -> bool:
+	return Game.is_repaired("engine") and not _boosted and not dead and not seated and not crouching and not is_on_floor() \
+		and (Game.carrying == "" or Campaign.PACKS_LIGHT.has(Game.carrying))
+
+
+## The thrusters fire: up, and a little along the way she's facing.
+func boost() -> void:
+	_boosted = true
+	_jump_buffer = 0.0
+	boosts += 1
+	var fwd := -_body.global_basis.z
+	fwd.y = 0.0
+	velocity.y = maxf(velocity.y, 0.0) + BOOST_UP
+	velocity += fwd.normalized() * BOOST_PUSH
+	Sfx.play("boost_thrust", global_position, -2.0, 0.1)
+	if is_inside_tree():
+		Vfx.burst(get_parent(), global_position + Vector3.UP * 0.9 + _body.global_basis.z * 0.3, Color("ffb04a"), 14, 3.0, 0.05, 0.35, Vector3.DOWN, 30.0, 0.0)
+
+
 func is_dodging() -> bool:
 	return roll_t >= 0.0 and roll_t < ROLL_GUARD
 
@@ -477,11 +503,17 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	_since_floor = 0.0 if is_on_floor() else _since_floor + delta
+	if is_on_floor():
+		_boosted = false
 	_jump_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_jump_buffer - delta, 0.0)
+	var jumped := false
 	if _jump_buffer > 0.0 and _since_floor <= COYOTE_TIME and velocity.y <= 0.5 and not crouching:
 		velocity.y = jump_velocity
 		_jump_buffer = 0.0
 		_since_floor = COYOTE_TIME + 1.0
+		jumped = true
+	if not jumped and Input.is_action_just_pressed("jump") and _since_floor > COYOTE_TIME and can_boost():
+		boost()
 	_update_crouch(Input.is_action_pressed("crouch"))
 	if Game.toggle_aim:
 		if Input.is_action_just_pressed("aim"):

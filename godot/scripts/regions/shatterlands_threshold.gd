@@ -117,8 +117,11 @@ func build() -> void:
 
 
 func _process(_delta: float) -> void:
+	var beyond := _route_on()
 	if wing and wing.active() and Game.current_repair() == "wing":
 		goal = to_local(wing.goal_point())
+	elif beyond != "":
+		goal = RegionDB.get_region(beyond)["gate_pos"] + Vector3(0.0, 1.0, 0.0)
 	elif way_north_open():
 		goal = NORTH_SPLIT + Vector3(0.0, 1.0, 0.0)
 	else:
@@ -280,6 +283,17 @@ func _sync_cleft() -> void:
 	for c in _cleft_fibres.get_children():
 		if c is CollisionObject3D:
 			(c as CollisionObject3D).collision_layer = 0 if open else Game.LAYER_WORLD
+
+
+## The open way on (a gate in this pocket's rim) toward where the current repair's part is, or "".
+func _route_on() -> String:
+	var r := Game.current_repair()
+	if not Campaign.sourced(r) or Game.delivered(String(Campaign.get_repair(r)["component"])):
+		return ""
+	var hop := RegionDB.next_hop("shatterlands", String(Campaign.SOURCED[r]["region"]))
+	if hop == "" or hop == "gillwood" or not Game.flags.get(String(RegionDB.get_region(hop)["unlock_flag"]), false):
+		return ""
+	return hop
 
 
 func way_north_open() -> bool:

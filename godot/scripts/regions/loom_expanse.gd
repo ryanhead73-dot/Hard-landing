@@ -1,5 +1,5 @@
 class_name LoomExpanse
-extends ShatterScene
+extends LoomScene
 ## The first pocket of the Loom Expanse (production pack, milestone C): through a cleft in the
 ## Shatterlands' west rim, a valley roofed by arches of braided fibre, the Loom's ridges where
 ## they break the surface. Far to the north, framed by a gap in the rim, the Tuning Crown.
@@ -28,6 +28,7 @@ const BLOOM := Color("d050d0")
 const STONE := Color("2a2a30")
 const AMBER := Color("e8a44e")
 const CROWN_GLOW := Color("8fd8ff")
+const OXIDE_PLATE := Color("8a4a2a")
 
 ## The massif in the middle of the loop: [centre, size] for each half, and the tunnel between.
 const MASSIF_Z := 24.0
@@ -77,7 +78,6 @@ var curtain: Node3D
 var knot: Node3D
 var bypass: Node3D
 var locker_lid: Node3D
-var _strands: Array[Transform3D] = []
 var _knot_mat: StandardMaterial3D
 var _t := 0.0
 
@@ -117,6 +117,7 @@ func build() -> void:
 	_overhead()
 	_build_strands()
 	_blooms()
+	_patience_cleft()
 	_end_batch()
 	for r in RIDGES:
 		var ridge := LoomRidge.new()
@@ -137,6 +138,11 @@ func _ready() -> void:
 	if not Game.flags.get("reached_loom", false):
 		Game.set_flag("reached_loom")
 		_say(Story.LOOM_ARRIVE)
+	elif Game.flags.get("loom_crown_seen", false):
+		_find_patience()
+	# A save from before the Crown was built: the thrusters are already there to make the drop.
+	if Game.is_repaired("engine") and not Game.flags.get("crown_open", false):
+		Game.set_flag("crown_open")
 
 
 func _on_flag_changed(_flag: String, _value: Variant) -> void:
@@ -154,6 +160,7 @@ func _process(delta: float) -> void:
 	if not Game.flags.get("loom_crown_seen", false) and Vector2(at.x - OVERLOOK.x, at.z - OVERLOOK.z).length() < 9.0:
 		Game.set_flag("loom_crown_seen")
 		_say(Story.LOOM_CROWN)
+		_find_patience()
 	_first_sightings(main.player.global_position)
 	_update_goal()
 
@@ -176,8 +183,44 @@ func _update_goal() -> void:
 		goal = OVERLOOK + Vector3(0.0, 1.5, 0.0)
 	elif not Game.flags.get("weave_grips", false):
 		goal = LOCKER + Vector3(0.0, 1.2, 0.0)
+	elif _route_on() != "":
+		goal = RegionDB.get_region(_route_on())["gate_pos"] + Vector3(0.0, 1.0, 0.0)
 	else:
 		goal = exit_point + Vector3(0.0, 1.0, 0.0)
+
+
+## From the overlook HOB picks up the Long Patience's stern through the east rim: the cleft opens.
+func _find_patience() -> void:
+	if Game.flags.get("patience_open", false):
+		return
+	Game.set_flag("patience_open")
+	_say(Story.PATIENCE_FOUND)
+
+
+## The open way on through this pocket's rim toward the current repair's part, or "".
+func _route_on() -> String:
+	var r := Game.current_repair()
+	if not Campaign.sourced(r) or Game.delivered(String(Campaign.get_repair(r)["component"])):
+		return ""
+	var hop := RegionDB.next_hop("loom_expanse", String(Campaign.SOURCED[r]["region"]))
+	if hop == "" or not Game.flags.get(String(RegionDB.get_region(hop)["unlock_flag"]), false):
+		return ""
+	return hop
+
+
+## The cleft in the east rim to the Long Patience: a dark split in the fibre, metal far back in it.
+func _patience_cleft() -> void:
+	var at: Vector3 = RegionDB.get_region("long_patience")["gate_pos"]
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color("0c0a10")
+	dark.emission_enabled = true
+	dark.emission = Color("2a1e30")
+	dark.emission_energy_multiplier = 0.6
+	_box(Vector3(56.1, 5.0, at.z), Vector3(0.3, 10.0, 4.4), dark, false)
+	_box(Vector3(56.2, 1.6, at.z + 0.6), Vector3(0.2, 1.2, 1.8), _mat(OXIDE_PLATE, 0.6), false)
+	for side in [-1.0, 1.0]:
+		_strand(Vector3(55.0, -0.3, at.z + side * 2.6), Vector3(56.0, 11.0, at.z + side * 1.6), 0.7)
+	_arch(Vector3(55.4, 0.0, at.z - 3.0), Vector3(55.4, 0.0, at.z + 3.0), 10.0, 1.4, 3, 8)
 
 
 ## Where a ridge diver can travel: the Weave's soft floor, not its stone slabs (world space).
@@ -299,57 +342,8 @@ func _fibre_world(metres := 1.5, tint := FIBRE) -> Material:
 	return _tex("fungus_stem", metres, true, tint.lightened(0.35), _mat(tint, 0.85))
 
 
-## One straight fibre strand from a to b, for the shared multimesh.
-func _strand(a: Vector3, b: Vector3, r: float) -> void:
-	var y := b - a
-	if y.length() < 0.01:
-		return
-	var up := y.normalized()
-	var side := up.cross(Vector3.RIGHT if absf(up.x) < 0.9 else Vector3.FORWARD).normalized()
-	var fwd := side.cross(up)
-	_strands.append(Transform3D(Basis(side * r, y, fwd * r), (a + b) * 0.5))
-
-
-## A braided arch from a to b rising `height` over the straight line between them.
-func _arch(a: Vector3, b: Vector3, height: float, thick: float, count := 4, segs := 10) -> void:
-	var tangent := (b - a).normalized()
-	var side := tangent.cross(Vector3.UP).normalized()
-	if side.length() < 0.1:
-		side = Vector3.RIGHT
-	var twist := _rng.randf_range(2.0, 4.0)
-	for k in count:
-		var phase := float(k) / count * TAU
-		var r := thick * _rng.randf_range(0.22, 0.34)
-		var prev := Vector3.INF
-		for i in segs + 1:
-			var s := float(i) / segs
-			var centre := a.lerp(b, s) + Vector3.UP * height * 4.0 * s * (1.0 - s)
-			var normal := side.cross(tangent).normalized()
-			var ang := phase + s * twist
-			var p := centre + (side * cos(ang) + normal * sin(ang)) * thick * 0.4
-			if prev != Vector3.INF:
-				_strand(prev, p, r)
-			prev = p
-
-
 func _build_strands() -> void:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 1.0
-	mesh.bottom_radius = 1.0
-	mesh.height = 1.15
-	mesh.radial_segments = 7
-	mesh.rings = 1
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = mesh
-	mm.instance_count = _strands.size()
-	for i in _strands.size():
-		mm.set_instance_transform(i, _strands[i])
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Strands"
-	mmi.multimesh = mm
-	mmi.material_override = _fibre(0.5)
-	add_child(mmi)
+	_commit_strands(_fibre(0.5))
 
 
 func _ground() -> void:

@@ -58,6 +58,28 @@ const REGIONS := {
 		"locked_text": "A cleft in the west rim, laced shut with pale fibres that hum when you touch them",
 		"enter_text": "Go west through the cleft into the Loom Expanse",
 	},
+	# The Long Patience's stern (milestone D1), through the Loom's east rim. HOB finds it from the
+	# overlook.
+	"long_patience": {
+		"name": "The Long Patience", "act": 3,
+		"scene": "res://scripts/regions/long_patience.gd",
+		"origin": Vector3(16000.0, 0.0, 0.0),
+		"from": "loom_expanse", "gate_pos": Vector3(55.0, 0.0, -46.0), "gate_in": Vector3(-1.0, 0.0, 0.0),
+		"unlock_flag": "patience_open",
+		"locked_text": "A cleft in the east rim, choked with fibre. Something metal glints far back in it",
+		"enter_text": "Go east through the cleft to the Long Patience",
+	},
+	# The Tuning Crown (milestone D2), down the drop beyond the Loom's overlook rail: a drop the
+	# suit thrusters make safe, so it opens with the engine.
+	"tuning_crown": {
+		"name": "The Tuning Crown", "act": 4,
+		"scene": "res://scripts/regions/tuning_crown.gd",
+		"origin": Vector3(20000.0, 0.0, 0.0),
+		"from": "loom_expanse", "gate_pos": Vector3(0.0, 0.0, -75.0), "gate_in": Vector3(0.0, 0.0, 1.0),
+		"unlock_flag": "crown_open",
+		"locked_text": "Beyond the rail the ground drops away toward the Crown. Too far down without thrusters",
+		"enter_text": "Drop over the rail toward the Tuning Crown",
+	},
 }
 
 
@@ -76,3 +98,15 @@ static func display_name(id: String) -> String:
 ## Built regions with a gate (not the Kettle, not planned ones).
 static func travel_regions() -> Array:
 	return ids().filter(func(id): return not REGIONS[id].get("resident", false) and not REGIONS[id].get("planned", false) and not REGIONS[id].get("sequence", false))
+
+
+## The region to go through from `from` to reach `to`: the one that opens off `from` on the way,
+## or "" if `to` isn't beyond `from`.
+static func next_hop(from: String, to: String) -> String:
+	var id := to
+	while id != "" and REGIONS.has(id) and not REGIONS[id].get("resident", false):
+		var parent := String(REGIONS[id].get("from", "kettle"))
+		if parent == from:
+			return id
+		id = parent
+	return ""

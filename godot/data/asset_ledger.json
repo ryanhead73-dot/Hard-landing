@@ -231,6 +231,62 @@
    "source": "synth_sfx",
    "tier": "foreground"
   },
+  "boost_thrust": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "mirror_alarm": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "magnet_clamp": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "hoist_winch": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "cage_drop": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "resonator_tick": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
+  "crown_tick": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "resonator_lock": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "cantor_high": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_mid": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_low": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_wave": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_heart": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_anchor": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
   "lurker_bite": {
    "source": "synth_sfx",
    "tier": "foreground"
