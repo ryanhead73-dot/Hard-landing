@@ -982,13 +982,7 @@ def cantor_wave(v):
     return outdoor(place(d, (0, sat(snap, 1.4)), (0.03, roll)), 0.4)
 
 
-@sound("cantor_heart")
-def cantor_heart(v):
-    """The heart-node opening: petals tearing back and a bright shattering chord."""
-    d = 2.4
-    tear = bp(white(0.6), 300, 3000) * env(0.6, 0.01, 0.5) * 0.6
-    chord = _bell(220, 2.2) + _bell(277, 2.2) * 0.8 + _bell(330, 2.2) * 0.7
-    return outdoor(place(d, (0, tear), (0.15, chord * 0.6)), 0.5)
+# cantor_heart: replaced by Jake's heart-open chord (2026-11-09 asset pack); not synthesised.
 
 
 @sound("cantor_anchor")
@@ -1019,7 +1013,7 @@ PEAKS = {
     "singer_pull": 0.75, "singer_call": 0.75,
     "boost_thrust": 0.7, "mirror_alarm": 0.6, "magnet_clamp": 0.9, "hoist_winch": 0.6, "cage_drop": 0.65,
     "resonator_tick": 0.5, "crown_tick": 0.6, "resonator_lock": 0.7, "cantor_high": 0.75, "cantor_mid": 0.75,
-    "cantor_low": 0.85, "cantor_wave": 0.85, "cantor_heart": 0.9, "cantor_anchor": 0.85,
+    "cantor_low": 0.85, "cantor_wave": 0.85, "cantor_anchor": 0.85,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).

@@ -49,6 +49,11 @@
    "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Original_Assets.zip): original procedural synthesis and textures generated for this brief, no third-party samples or stock; converted to the project's formats.",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "jake_gpt_d": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Engine_Hall_and_Boss_Audio.zip): newly composed procedural synthesis and an engine-hall plating texture generated for this brief, no third-party samples, recordings or stock; audio resampled to 44.1 kHz.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -280,8 +285,8 @@
    "tier": "hero"
   },
   "cantor_heart": {
-   "source": "synth_sfx",
-   "tier": "hero"
+   "source": "jake_gpt_d",
+   "tier": "foreground"
   },
   "cantor_anchor": {
    "source": "synth_sfx",
@@ -642,6 +647,38 @@
   "rain_cup_drip": {
    "source": "jake_gpt_assets",
    "tier": "detail"
+  },
+  "guardian_roar": {
+   "source": "jake_gpt_d",
+   "tier": "hero"
+  },
+  "guardian_step": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "guardian_impact": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "guardian_hurt": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "cantor_drone": {
+   "source": "jake_gpt_d",
+   "tier": "bed"
+  },
+  "cantor_windup": {
+   "source": "jake_gpt_d",
+   "tier": "hero"
+  },
+  "finale_klaxon": {
+   "source": "jake_gpt_d",
+   "tier": "bed"
+  },
+  "launch_liftoff": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
   }
  },
  "files": [
@@ -724,6 +761,10 @@
   {
    "path": "assets/textures/kestrel/markings_atlas.png",
    "source": "jake_gpt_assets"
+  },
+  {
+   "path": "assets/textures/shatterlands/engine_hall_plating/*.png",
+   "source": "jake_gpt_d"
   }
  ]
 }

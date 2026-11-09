@@ -208,6 +208,8 @@ func holds(c: Dictionary) -> bool:
 			return Game.launched
 		"any":
 			return (c["of"] as Array).any(func(sub): return holds(sub))
+		"all":
+			return (c["of"] as Array).all(func(sub): return holds(sub))
 	return false
 
 

@@ -40,6 +40,10 @@ const SHELL := Color("3b3633")
 const RUST := Color("6e3b22")
 const SENSE := Color("ff5a3a")
 
+## Metres between footfalls.
+const STRIDE := 2.6
+var _stride := 0.0
+var _groan := 0.0
 var state := State.DORMANT
 var heard_at := Vector3.INF
 ## The hall it's held to (world-space x/z rectangle, set by the region).
@@ -165,7 +169,7 @@ func wake(at: Vector3) -> void:
 	if state in [State.DORMANT, State.SEARCH]:
 		state = State.HUNT
 		alert(false)
-		Sfx.play("warden_roar", global_position, -2.0, 0.1)
+		Sfx.play("guardian_roar", global_position, -2.0, 0.08)
 
 
 ## A vibration it feels at `at` (the region reports the coil's ring and the mirrors through this).
@@ -231,6 +235,8 @@ func _physics_process(delta: float) -> void:
 		return
 	_gravity_step(delta)
 	_timer -= delta
+	_groan -= delta
+	_footfalls(delta)
 	var felt := _felt()
 	if felt != Vector3.INF:
 		hear(felt)
@@ -269,13 +275,14 @@ func _physics_process(delta: float) -> void:
 				_charge_hit = true
 				hits += 1
 				target.take_damage(CHARGE_DAMAGE, global_position)
+				Sfx.play("guardian_impact", global_position + Vector3.UP, 0.0, 0.05)
 				if "velocity" in target:
 					target.velocity += _charge_dir * 8.0 + Vector3.UP * 4.0
 				if target.has_method("add_trauma"):
 					target.add_trauma(0.5)
 			if _timer <= 0.0 or (is_on_wall() and _timer < CHARGE_TIME - 0.1):
 				if is_on_wall():
-					Sfx.play("hit_armor", global_position + Vector3.UP, 0.0, 0.0)
+					Sfx.play("guardian_impact", global_position + Vector3.UP, -2.0, 0.1)
 				state = State.RECOVER
 				_timer = RECOVER_TIME
 		State.RECOVER:
@@ -319,7 +326,7 @@ func _walk_to(goal: Vector3, delta: float) -> void:
 func _brace() -> void:
 	state = State.BRACE
 	_timer = BRACE_TIME
-	Sfx.play("warden_roar", global_position, 0.0, 0.15)
+	Sfx.play("guardian_roar", global_position, 0.0, 0.12)
 
 
 func _charge() -> void:
@@ -330,6 +337,18 @@ func _charge() -> void:
 	_charge_dir = to.normalized() if to.length() > 0.1 else _forward()
 	_body.position.z = 0.0
 	Sfx.play("ram_charge", global_position, 0.0, 0.1)
+
+
+## Heavy footfalls while it walks or charges: faster with speed, felt across the hall.
+func _footfalls(delta: float) -> void:
+	var speed := Vector2(velocity.x, velocity.z).length()
+	if speed < 0.5 or not is_on_floor():
+		_stride = 0.0
+		return
+	_stride += delta * speed
+	if _stride >= STRIDE:
+		_stride = 0.0
+		Sfx.play("guardian_step", global_position, -4.0 if state != State.CHARGE else 0.0, 0.06)
 
 
 func _keep_in_hall() -> void:
@@ -350,6 +369,10 @@ func _weak_open() -> bool:
 
 
 func _on_hurt(_dir: Vector3) -> void:
+	# Only a hit through the open back really hurts it.
+	if state == State.PINNED and _groan <= 0.0:
+		_groan = 1.2
+		Sfx.play("guardian_hurt", global_position + Vector3.UP * 2.0, 0.0, 0.08)
 	if state == State.DORMANT and _target_alive():
 		wake(target.global_position)
 

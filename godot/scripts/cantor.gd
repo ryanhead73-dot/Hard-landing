@@ -48,6 +48,7 @@ var _heart: MeshInstance3D
 var _heart_mat: StandardMaterial3D
 var _petals: Array[Node3D] = []
 var _cage: Node3D
+var _drone: Node
 
 
 func _init() -> void:
@@ -69,6 +70,11 @@ func _setup() -> void:
 	add_to_group("bosses")
 	add_to_group("cantors")
 	collision_mask = 0
+	_drone = Sfx.loop("cantor_drone", self, -4.0)
+	if _drone is AudioStreamPlayer3D:
+		(_drone as AudioStreamPlayer3D).max_distance = 90.0
+		(_drone as AudioStreamPlayer3D).unit_size = 18.0
+	Sfx.play("cantor_windup", global_position + Vector3.UP * HEART_Y, 0.0, 0.0)
 	var shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
 	sphere.radius = 1.6
@@ -248,6 +254,7 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		var next := Phase.RESOLVE if health <= phase_health(2) else (Phase.RESPOND if health <= phase_health(1) else phase)
 		if next != phase:
 			phase = next
+			Sfx.play("cantor_windup", global_position + Vector3.UP * HEART_Y, 0.0, 0.0)
 			open_t = 0.0
 			petals = 0
 			phase_changed.emit(phase)
@@ -256,6 +263,8 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 
 func _die() -> void:
 	remove_from_group("cantors")
+	if _drone and is_instance_valid(_drone):
+		create_tween().tween_property(_drone, "volume_db", -40.0, 2.0)
 	super._die()
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * HEART_Y, TEAL, 30, 6.0, 0.1, 1.0, Vector3.UP, 180.0, -4.0)

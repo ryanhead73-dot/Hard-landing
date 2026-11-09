@@ -207,6 +207,9 @@ func _cantor() -> void:
 	_check("Marrow's core can be taken from the heart", _label().contains("nav core"), _label())
 	await _press("interact")
 	_check("it goes home with her", Game.delivered("nav_core") and Game.flags.get("crown_core") == true and Game.has_log(Story.log_at("navigation", "component")))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("and the journal's Tuning Crown quest is done", main.quests.is_done("tuning_crown"), main.quests.state_of("tuning_crown"))
 	_check("and the objective is to install it", Game.objective_text() == Campaign.get_repair("navigation")["return"], Game.objective_text())
 
 

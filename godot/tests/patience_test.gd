@@ -241,6 +241,9 @@ func _hoist() -> void:
 	lp.hoist_t = LongPatience.HOIST_TIME - 0.5
 	await get_tree().create_timer(1.0).timeout
 	_check("at the top it's away home", Game.flags.get("patience_coil") == true and Game.delivered("drive_coil") and not lp.hoisting())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("and the journal's Long Patience quest is done", main.quests.is_done("long_patience"), main.quests.state_of("long_patience"))
 	_check("and the objective says it's waiting at Kestrel", Game.objective_text() == Campaign.get_repair("engine")["return"], Game.objective_text())
 	_check("the waypoint leads back out", rm.waypoint().distance_to(lp.exit_global()) < 3.0)
 	# The bridge's distress call.

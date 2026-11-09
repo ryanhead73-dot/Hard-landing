@@ -485,7 +485,7 @@ func _ground() -> void:
 	body.add_child(shape)
 	add_child(body)
 	# The hall's deck plating over it.
-	_box(Vector3(0.0, 0.02, -5.0), Vector3(28.0, 0.04, 66.0), _mat(Color("2c2b2a"), 0.7), false)
+	_box(Vector3(0.0, 0.02, -5.0), Vector3(28.0, 0.04, 66.0), _plating(Color(0.62, 0.6, 0.58), Color("2c2b2a")), false)
 
 
 ## The way in from the Loom: fibre walls closing on the stern, a south wall behind the entry.
@@ -504,11 +504,16 @@ func _ravine() -> void:
 	_wall(Vector3(0.0, 8.0, -41.0), Vector3(36.0, 16.0, 2.0))
 
 
+## Jake's engine-hall plating (a 4 x 4 plate sheet, 4 m to a sheet), for the deck and the walls.
+func _plating(tint: Color, fallback: Color) -> Material:
+	return _tex("engine_hall_plating", 4.0, true, tint, _mat(fallback, 0.75))
+
+
 ## The stern's hull around the engine hall: plated walls with ribs, a roof with the hoist hatch,
 ## and the breach at the south end.
 func _hull() -> void:
 	var plate := _tex("hauler_hull", 6.0, true, Color(0.85, 0.8, 0.74), _mat(HULL, 0.6))
-	var inner := _mat(HULL_IN, 0.75)
+	var inner := _plating(Color(0.8, 0.77, 0.72), HULL_IN)
 	var rib := _mat(Color("3a3532"), 0.6)
 	var oxide := _mat(OXIDE, 0.8)
 	var h := ROOF_Y

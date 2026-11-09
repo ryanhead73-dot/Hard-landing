@@ -1002,7 +1002,8 @@ func launch() -> void:
 	lift.tween_property(kestrel, "rotation:z", -0.3, 1.2).set_trans(Tween.TRANS_SINE)
 	lift.parallel().tween_property(kestrel, "position", kestrel.position + Vector3.UP * 6.0 + nose * 160.0 + Vector3.UP * 90.0, CLIMB_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	lift.tween_callback(_show_ending)
-	Sfx.play("launch_roar", null, 2.0, 0.0)
+	Sfx.play("launch_roar", null, -2.0, 0.0)
+	Sfx.play("launch_liftoff", null, 2.0, 0.0)
 
 
 ## New game: Kestrel comes down. She streaks in trailing smoke along the furrow, hits, throws up

@@ -63,6 +63,7 @@ var _spool_sound: AudioStreamPlayer3D
 var _said_half := false
 var _said_late := false
 var _knots: Array[Node3D] = []
+var _klaxon: Node
 
 
 func _ready() -> void:
@@ -292,6 +293,11 @@ func _begin_crisis(c: Crisis) -> void:
 			siege.kestrel._apply_aux(false)
 			voice.interrupt(Story.FINALE_POWER)
 			Sfx.play("relay_surge", siege.kestrel.to_global(siege.kestrel.interact_points["aux_power"]), 0.0, 0.0)
+	if _klaxon == null:
+		_klaxon = Sfx.loop("finale_klaxon", siege.kestrel, -6.0)
+		if _klaxon is AudioStreamPlayer3D:
+			(_klaxon as AudioStreamPlayer3D).max_distance = 110.0
+			(_klaxon as AudioStreamPlayer3D).unit_size = 12.0
 	Game.launch_objective = _objective()
 	Game.objective_changed.emit(Game.objective_text())
 	crisis_changed.emit(c)
@@ -302,6 +308,9 @@ func _end_crisis() -> void:
 		siege.kestrel._apply_aux(Game.is_repaired("aux_power"))
 	crisis = Crisis.NONE
 	vent_t = 0.0
+	if _klaxon and is_instance_valid(_klaxon):
+		_klaxon.queue_free()
+	_klaxon = null
 	for k in _knots:
 		if is_instance_valid(k):
 			k.queue_free()

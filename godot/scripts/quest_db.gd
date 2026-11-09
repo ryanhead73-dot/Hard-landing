@@ -24,6 +24,7 @@ extends RefCounted
 ##   {"type": "caches", "count"}        that many drift caches opened (-1: every cache).
 ##   {"type": "launched"}               Kestrel has left the Kettle.
 ##   {"type": "any", "of": [...]}       at least one of those conditions holds.
+##   {"type": "all", "of": [...]}       every one of those conditions holds.
 ##
 ## The seven repairs are built from Campaign.REPAIRS so the repair campaign stays the one source
 ## of truth for them: a repair quest is done exactly when Game.is_repaired() says so.
@@ -87,6 +88,43 @@ const EXTRA: Array[Dictionary] = [
 			{"text": "Open a way back through the central ridge", "done": {"type": "flag", "id": "loom_shortcut"}},
 		],
 		"rewards": {"scrap": 30},
+	},
+	{
+		"id": "long_patience", "title": "The Long Patience", "act": 3, "kind": "main", "region": "long_patience",
+		"summary": "A KV-class hauler lies in the Loom's east rim, its drive coil still whole. Something in the hall listens.",
+		"requires": [{"type": "flag", "id": "patience_open"}],
+		"steps": [
+			{"text": "Go through the east-rim cleft to the Long Patience", "done": {"type": "flag", "id": "reached_patience"}},
+			{"text": "Cut the hall's power at the breaker", "done": {"type": "flag", "id": "patience_power_off"}},
+			{"text": "Pull the drive coil from its cage", "done": {"type": "flag", "id": "patience_coil_out"}},
+			{"text": "Load the coil on the hoist and hold the hall until it's up", "done": {"type": "flag", "id": "patience_coil"}},
+		],
+	},
+	{
+		"id": "patience_distress", "title": "Still transmitting", "act": 3, "kind": "discovery", "region": "long_patience",
+		"summary": "The Patience's distress beacon has been calling for sixty years. Someone should answer it.",
+		"requires": [{"type": "flag", "id": "reached_patience"}],
+		"steps": [{"text": "Answer the distress console by the hall's entrance", "done": {"type": "flag", "id": "patience_distress"}}],
+	},
+	{
+		"id": "thrust_caches", "title": "Higher ground", "act": 3, "kind": "discovery", "region": "kettle",
+		"summary": "With thrusters you can reach ledges marked with an amber chevron. Somebody else had thrusters once.",
+		"requires": [{"type": "repair", "id": "engine"}],
+		"steps": [{"text": "Open the thrust caches in the Kettle, the Gillwood and the Loom Expanse", "done": {"type": "all", "of": [
+			{"type": "flag", "id": "thrust_cache_kettle"}, {"type": "flag", "id": "thrust_cache_gillwood"}, {"type": "flag", "id": "thrust_cache_loom_expanse"}]}}],
+		"rewards": {"scrap": 20},
+	},
+	{
+		"id": "tuning_crown", "title": "The Tuning Crown", "act": 3, "kind": "main", "region": "tuning_crown",
+		"summary": "Ilse Marrow's nav core is in the heart of the thing at the centre of the Loom. It sings.",
+		"requires": [{"type": "flag", "id": "crown_open"}],
+		"steps": [
+			{"text": "Go down into the Tuning Crown", "done": {"type": "flag", "id": "reached_crown"}},
+			{"text": "Tune the three resonators to the Crown's beat", "done": {"type": "all", "of": [
+				{"type": "flag", "id": "crown_res_0"}, {"type": "flag", "id": "crown_res_1"}, {"type": "flag", "id": "crown_res_2"}]}},
+			{"text": "Silence the Cantor", "done": {"type": "flag", "id": "cantor_down"}},
+			{"text": "Take Ilse Marrow's nav core from its heart", "done": {"type": "flag", "id": "crown_core"}},
+		],
 	},
 	{
 		"id": "dark_house", "title": "The dark house", "act": 2, "kind": "side", "region": "shatterlands",

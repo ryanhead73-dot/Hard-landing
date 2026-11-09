@@ -44,6 +44,16 @@ func _ready() -> void:
 		Game.delete_save()
 		get_tree().quit()
 		return
+	if args.size() > 1 and args[1] == "hall":
+		for f in ["shatterlands_open", "loom_open", "patience_open"]:
+			Game.set_flag(f)
+		await main.regions.travel("long_patience", true)
+		var hall := main.regions.scene as LongPatience
+		await _shot(out, "d_patience_hall", hall.to_global(Vector3(2.0, 0.3, 24.0)), hall.to_global(Vector3(-1.0, 4.0, -20.0)))
+		await _shot(out, "d_patience_wall", hall.to_global(Vector3(6.0, 0.3, 10.0)), hall.to_global(Vector3(-14.0, 3.0, 4.0)))
+		Game.delete_save()
+		get_tree().quit()
+		return
 	if args.size() > 1 and args[1] == "milestone_d":
 		await _milestone_d(out)
 		Game.delete_save()
