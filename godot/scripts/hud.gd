@@ -73,6 +73,8 @@ var crits_shown := 0
 ## Recent hits on Juno: [world position of the source, seconds left], drawn as red arcs.
 var _hurt_marks: Array = []
 var _message_time := 0.0
+## The waypoint marker hides inside this distance of the camera (the prompt takes over).
+const WAYPOINT_HIDE := 3.0
 var _waypoint_target = null
 
 
@@ -595,11 +597,15 @@ func _update_waypoint() -> void:
 		var flat := cam.global_basis.inverse() * (target - cam.global_position)
 		pos = Vector2(0.0 if flat.x < 0.0 else screen.x, screen.y * 0.5)
 	else:
-		pos = cam.unproject_position(target + Vector3.UP * 2.0)
+		# It floats above the goal: well clear from a distance, just over it up close (a goal a
+		# few metres away indoors would otherwise be marked up in the ceiling).
+		pos = cam.unproject_position(target + Vector3.UP * clampf(dist * 0.15, 0.3, 2.0))
 	pos = pos.clamp(Vector2(40, 90), screen - Vector2(140, 160))
 	_waypoint.text = "◆ %d m" % roundi(dist)
 	_waypoint.position = pos - Vector2(20, 10)
-	_waypoint.visible = dist > 6.0
+	# Hidden only once she's within reach of it, where the prompt takes over. (It used to hide
+	# inside 6 m, which left the opening's goals aboard the wreck with no marker at all.)
+	_waypoint.visible = dist > WAYPOINT_HIDE
 
 
 ## The camera's heading in degrees: 0 is north (-Z), 90 east (+X).

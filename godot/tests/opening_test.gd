@@ -112,6 +112,7 @@ func _wreck() -> void:
 	await _hold(1.2)
 	_check("on her feet", not player.seated and not player.crouching)
 	_check("the waypoint points at the med-seal", main._waypoint() is Vector3 and (main._waypoint() as Vector3).distance_to(op._ship(Opening.MEDSEAL)) < 0.1)
+	_check("and its marker shows on the HUD, a few metres away across the cabin", main.hud._waypoint.visible and main.hud._waypoint.text.contains("m"), main.hud._waypoint.text)
 	_place(op._ship(Opening.MEDSEAL) + Vector3(0.0, -1.2, -0.9), 0.0)
 	await _frames(5)
 	_check("the med-seal kit", _label().contains("med-seal"), _label())
@@ -150,6 +151,7 @@ func _outside() -> void:
 	_check("a jump clears it", ok)
 	await _frames(10)
 	_check("outside: a beat of its own", op.beat() == Opening.Beat.OUTSIDE, str(op.beat()))
+	_check("the marker leads to something to scan", main._waypoint() is Vector3 and op._scans().any(func(sc): return (sc[1] as Vector3).distance_to(main._waypoint()) < 0.1))
 	for s in op._scans():
 		_place(s[1] + Vector3(0.0, 0.5, 1.6), 0.0)
 		await _frames(5)

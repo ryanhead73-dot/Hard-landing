@@ -301,10 +301,10 @@ static func _check_condition(c: Dictionary, ids: Dictionary, cache_count: int) -
 			return "" if int(c.get("count", 0)) <= cache_count else "needs %d caches, the basin has %d" % [c["count"], cache_count]
 		"launched":
 			return ""
-		"any":
+		"any", "all":
 			var of: Array = c.get("of", [])
 			if of.is_empty():
-				return "an 'any' condition with nothing in it"
+				return "an '%s' condition with nothing in it" % c["type"]
 			for sub in of:
 				var why := _check_condition(sub, ids, cache_count)
 				if why != "":

@@ -479,6 +479,18 @@ func waypoint():
 			return _ship(MEDSEAL) if not Game.flags.get("medseal_taken", false) else null
 		Beat.SEALED:
 			return _ship(DOOR)
+		Beat.OUTSIDE:
+			# The nearest thing still to scan.
+			var best = null
+			var best_d := INF
+			for s in _scans():
+				if Game.flags.get(s[0], false):
+					continue
+				var d: float = (s[1] as Vector3).distance_to(main.player.global_position)
+				if d < best_d:
+					best_d = d
+					best = s[1]
+			return best
 		Beat.YARD:
 			return null
 	return null
