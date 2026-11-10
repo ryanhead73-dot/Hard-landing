@@ -90,6 +90,9 @@ func _build() -> void:
 	var cable := StandardMaterial3D.new()
 	cable.albedo_color = CABLE
 	cable.roughness = 0.8
+	if PbrSet.exists("shatterlands", "living_fibre"):
+		# Its own copy: the hit flash tints it.
+		cable = PbrSet.material("shatterlands", "living_fibre", 1.4, false, Color(0.7, 0.6, 0.56)).duplicate()
 	_flashes(cable)
 	# The rib cage: hooped ribs round the heart, top to bottom.
 	for i in 8:
@@ -263,6 +266,7 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 
 func _die() -> void:
 	remove_from_group("cantors")
+	Sfx.play("cantor_death", global_position + Vector3.UP * HEART_Y, 2.0, 0.0)
 	if _drone and is_instance_valid(_drone):
 		create_tween().tween_property(_drone, "volume_db", -40.0, 2.0)
 	super._die()

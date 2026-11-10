@@ -44,6 +44,7 @@ const SENSE := Color("ff5a3a")
 const STRIDE := 2.6
 var _stride := 0.0
 var _groan := 0.0
+var _search: Node
 var state := State.DORMANT
 var heard_at := Vector3.INF
 ## The hall it's held to (world-space x/z rectangle, set by the region).
@@ -169,7 +170,7 @@ func wake(at: Vector3) -> void:
 	if state in [State.DORMANT, State.SEARCH]:
 		state = State.HUNT
 		alert(false)
-		Sfx.play("guardian_roar", global_position, -2.0, 0.08)
+		Sfx.play("guardian_wake", global_position, 0.0, 0.05)
 
 
 ## A vibration it feels at `at` (the region reports the coil's ring and the mirrors through this).
@@ -237,6 +238,12 @@ func _physics_process(delta: float) -> void:
 	_timer -= delta
 	_groan -= delta
 	_footfalls(delta)
+	# The low scanning rumble while it stands and listens for her.
+	if state == State.SEARCH and _search == null:
+		_search = Sfx.loop("guardian_search", self, -2.0)
+	elif state != State.SEARCH and _search:
+		_search.queue_free()
+		_search = null
 	var felt := _felt()
 	if felt != Vector3.INF:
 		hear(felt)

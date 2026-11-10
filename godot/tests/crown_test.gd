@@ -81,6 +81,7 @@ func _gate() -> void:
 		return
 	_check("she stands on its floor", player.is_on_floor() and absf(player.global_position.y - tc.global_position.y) < 0.6)
 	_check("the Crown keeps to its budget", _budget(tc))
+	_check("the Crown's own music plays", main.music.pick_mood() == "tuning_crown")
 	_check("the objective is the resonators", Game.objective_text().contains("resonators"), Game.objective_text())
 	_check("and the waypoint leads to the west stone", rm.waypoint().distance_to(_at(TuningCrown.RESONATORS[0])) < 3.0)
 
@@ -146,6 +147,7 @@ func _cantor() -> void:
 	c.cycle_t = 0.2
 	c.take_damage(100.0, c.global_position + Vector3.UP * Cantor.HEART_Y, Vector3.FORWARD)
 	_check("with its petals shut, shots do nothing", c.health == hp and not c.heart_open())
+	_check("its music takes over", main.music.pick_mood() == "cantor")
 	# An anchor struck out of the gap only rings.
 	c.cycle_t = 0.4
 	tc.strike_anchor(0)

@@ -874,82 +874,11 @@ def singer_call(v):
 
 # --- The Long Patience (milestone D1) -------------------------------------------------------
 
-@sound("boost_thrust", 2)
-def boost_thrust(v):
-    """Suit thrusters: a sharp ignition pop and a short roaring hiss that falls away."""
-    d = 0.6
-    pop = place(0.05, (0, click(0.01, 600, 5000) * 1.2))
-    roar = bp(white(d), 300 + 80 * v, 3200) * env(d, 0.01, 0.45) * (0.8 + 0.2 * np.sin(2 * np.pi * 37 * t(d)))
-    body = lp(brown(d), 400) * env(d, 0.005, 0.3) * 0.8
-    return outdoor(place(d, (0, pop), (0.01, sat(roar, 1.5)), (0.0, body)), 0.2)
-
-
-@sound("mirror_alarm")
-def mirror_alarm(v):
-    """A surveillance mirror catching her: a glassy two-tone shriek with a metallic shimmer."""
-    d = 0.9
-    tone = (osc(1480, d) * (t(d) < 0.3) + osc(1110, d) * (t(d) >= 0.3)) * env(d, 0.005, 0.7, 0.4) * 0.5
-    shimmer = modal(d, metal_modes(2400, 6, 2.0, 0.5)) * 0.4
-    return indoor(place(d, (0, tone), (0, shimmer)), 0.35)
-
-
-@sound("magnet_clamp")
-def magnet_clamp(v):
-    """A cargo magnet firing: a deep electrical thunk, a rising hum and steel slamming steel."""
-    d = 1.3
-    thunk = thud(48, 0.5, 0.6) * 1.4
-    hum = osc(sweep(60, 120, 0.8), 0.8) * env(0.8, 0.02, 0.6, 0.2) * 0.5
-    slam = modal(0.9, metal_modes(310, 8, 2.4, 0.7)) * 0.9
-    return indoor(place(d, (0, sat(thunk, 1.8)), (0.02, hum), (0.12, slam)), 0.4)
-
-
-@sound("hoist_winch")
-def hoist_winch(v):
-    """The stern's cargo hoist starting up: a motor whine climbing over clanking chain."""
-    d = 2.0
-    whine = osc(sweep(140, 320, d, 0.6), d, "saw") * env(d, 0.2, 0.8, 1.0) * 0.12
-    whine = lp(whine, 1800)
-    chain = grains(d, 9, lambda i: clack(1400 + dsp.rng.uniform(-200, 200), 0.08, 0.15, 0.6))
-    return indoor(place(d, (0, whine), (0.1, chain * 0.7)), 0.3)
-
-
-@sound("cage_drop")
-def cage_drop(v):
-    """The magnetic cage losing power: a collapsing electric hum and bars sliding into the deck."""
-    d = 1.6
-    hum = osc(sweep(110, 30, 1.0), 1.0) * env(1.0, 0.005, 0.9) * 0.6
-    slide = bp(white(0.8), 400, 2500) * env(0.8, 0.05, 0.6) * 0.4
-    clunk = thud(70, 0.4, 0.5) * 1.2
-    return indoor(place(d, (0, hum), (0.15, slide), (0.9, sat(clunk, 1.6))), 0.35)
-
-
-# --- The Tuning Crown and the Cantor (milestone D2) ------------------------------------------
-
-def _bell(f, d, bright=1.0):
-    """A big hollow tuned tone: a fundamental with soft inharmonic partials, slow decay."""
-    x = osc(f, d) * 0.6 + osc(f * 2.01, d) * 0.25 * bright + osc(f * 2.98, d) * 0.12 * bright + osc(f * 4.2, d) * 0.05 * bright
-    return x * env(d, 0.02, d * 0.85)
-
-
-@sound("resonator_tick")
-def resonator_tick(v):
-    """A resonator stone's pulse: a dry woody knock with a short tuned ring."""
-    d = 0.6
-    return outdoor(place(d, (0, click(0.01, 800, 5000)), (0, _bell(392, 0.5, 0.6) * 0.6)), 0.3)
-
-
 @sound("crown_tick")
 def crown_tick(v):
     """The Crown's reference beat, far off and deep."""
     d = 1.2
     return outdoor(place(d, (0, thud(55, 0.4, 0.8)), (0, _bell(196, 1.1, 0.4) * 0.5)), 0.5)
-
-
-@sound("resonator_lock")
-def resonator_lock(v):
-    """A resonator locking in tune: three rising notes ringing into a chord."""
-    d = 2.2
-    return outdoor(place(d, (0, _bell(262, 1.8)), (0.18, _bell(330, 1.7)), (0.36, _bell(392, 1.6))), 0.45)
 
 
 @sound("cantor_high")
@@ -982,7 +911,8 @@ def cantor_wave(v):
     return outdoor(place(d, (0, sat(snap, 1.4)), (0.03, roll)), 0.4)
 
 
-# cantor_heart: replaced by Jake's heart-open chord (2026-11-09 asset pack); not synthesised.
+# Replaced by Jake's recordings (2026-11-09 asset packs), no longer synthesised here: cantor_heart,
+# mirror_alarm, magnet_clamp, hoist_winch, boost_thrust, resonator_tick, resonator_lock, cage_drop.
 
 
 @sound("cantor_anchor")
@@ -1011,8 +941,8 @@ PEAKS = {
     "ridge_thrum": 0.7, "ridge_heave": 0.6, "diver_grind": 0.35, "diver_erupt": 0.9, "pinweaver_click": 0.45,
     "thread_spool": 0.55, "thread_snap": 0.75, "singer_drone": 0.55, "singer_inhale": 0.55, "singer_chord": 0.8,
     "singer_pull": 0.75, "singer_call": 0.75,
-    "boost_thrust": 0.7, "mirror_alarm": 0.6, "magnet_clamp": 0.9, "hoist_winch": 0.6, "cage_drop": 0.65,
-    "resonator_tick": 0.5, "crown_tick": 0.6, "resonator_lock": 0.7, "cantor_high": 0.75, "cantor_mid": 0.75,
+   
+    "crown_tick": 0.6, "cantor_high": 0.75, "cantor_mid": 0.75,
     "cantor_low": 0.85, "cantor_wave": 0.85, "cantor_anchor": 0.85,
 }
 

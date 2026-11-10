@@ -44,6 +44,10 @@ const SOUNDS: Array[String] = [
 	"resonator_tick", "crown_tick", "resonator_lock", "cantor_high", "cantor_mid", "cantor_low", "cantor_wave", "cantor_heart", "cantor_anchor",
 	"guardian_roar", "guardian_step", "guardian_impact", "guardian_hurt", "cantor_drone", "cantor_windup",
 	"finale_klaxon", "launch_liftoff",
+	"resonator_tick_low", "resonator_tick_high", "tether_snap", "coolant_vent",
+	"music_cantor", "music_departure", "music_ending",
+	"guardian_wake", "guardian_search", "cantor_singer_join", "cantor_death", "shear_slide", "thrust_cache_open",
+	"aux_breaker_trip", "music_patience", "music_crown",
 ]
 const MAX_VARIANTS := 8
 

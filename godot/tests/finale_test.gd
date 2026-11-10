@@ -31,6 +31,7 @@ func _run() -> void:
 	var held := f.spool
 	await get_tree().create_timer(1.0).timeout
 	_check("held down, the spool doesn't climb", absf(f.spool - held) < 0.01, "%.2f -> %.2f" % [held, f.spool])
+	_check("the klaxon sounds and the departure music plays", f._klaxon != null and main.music.mood == "finale" and main.music.players["music_departure"].playing)
 	var w = main._waypoint()
 	_check("the scanner marks the nearest knot", w is Vector3 and [0, 1, 2].any(func(i): return (w as Vector3).distance_to(f.knot_position(i)) < 0.1))
 	var bodies := []

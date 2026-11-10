@@ -186,7 +186,7 @@ func hit_knot(i: int) -> void:
 	if knot_hits[i] > 0:
 		Sfx.play("thread_spool", knot_position(i), -4.0, 0.15)
 		return
-	Sfx.play("thread_snap", knot_position(i), 2.0, 0.1)
+	Sfx.play("tether_snap", knot_position(i), 4.0, 0.08)
 	if is_inside_tree():
 		Vfx.burst(siege.kestrel.get_parent(), knot_position(i), FIBRE, 14, 4.0, 0.06, 0.6, Vector3.UP, 120.0, -6.0)
 	if i < _knots.size() and is_instance_valid(_knots[i]):
@@ -202,7 +202,7 @@ func hit_knot(i: int) -> void:
 func vent() -> void:
 	if crisis != Crisis.OVERHEAT:
 		return
-	Sfx.play("steam_burst", siege.kestrel.to_global(siege.kestrel.interact_points["cooling"]), 0.0, 0.0)
+	Sfx.play("coolant_vent", siege.kestrel.to_global(siege.kestrel.interact_points["cooling"]), 2.0, 0.0)
 	_end_crisis()
 	voice.say_line(Story.FINALE_VENTED)
 
@@ -292,7 +292,7 @@ func _begin_crisis(c: Crisis) -> void:
 		Crisis.POWER:
 			siege.kestrel._apply_aux(false)
 			voice.interrupt(Story.FINALE_POWER)
-			Sfx.play("relay_surge", siege.kestrel.to_global(siege.kestrel.interact_points["aux_power"]), 0.0, 0.0)
+			Sfx.play("aux_breaker_trip", null, 0.0, 0.0)
 	if _klaxon == null:
 		_klaxon = Sfx.loop("finale_klaxon", siege.kestrel, -6.0)
 		if _klaxon is AudioStreamPlayer3D:
@@ -333,6 +333,9 @@ func _spawn_knots() -> void:
 	fibre.emission_enabled = true
 	fibre.emission = FIBRE
 	fibre.emission_energy_multiplier = 1.6
+	var strand_mat: Material = fibre
+	if PbrSet.exists("shatterlands", "living_fibre"):
+		strand_mat = PbrSet.material("shatterlands", "living_fibre", 0.8, false, Color(0.75, 0.66, 0.62), FIBRE, 0.5)
 	for i in KNOTS.size():
 		knot_hits.append(KNOT_HITS)
 		var at := knot_position(i)
@@ -374,7 +377,7 @@ func _spawn_knots() -> void:
 			cm.radial_segments = 5
 			cm.rings = 1
 			strand.mesh = cm
-			strand.material_override = fibre
+			strand.material_override = strand_mat
 			root.add_child(strand)
 			var side := Vector3(cos(s * TAU / 3.0), 0.0, sin(s * TAU / 3.0)) * 0.12
 			strand.position = run * 0.5 + side

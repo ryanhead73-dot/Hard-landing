@@ -29,6 +29,8 @@ const FIBRE := Color("7a5038")
 const FIBRE_DARK := Color("4a3328")
 const DUST := Color("4a3a48")
 const STONE := Color("2a2a30")
+## Each resonator's own note (west low, east middle, the lane's high).
+const TICKS := ["resonator_tick_low", "resonator_tick", "resonator_tick_high"]
 const TEAL := Color("3fe0c8")
 const PALE := Color("e6dcff")
 const AMBER := Color("ffb04a")
@@ -112,7 +114,7 @@ func build() -> void:
 	_crown_arches()
 	_stones()
 	_arena()
-	_commit_strands(_tex("fungus_stem", 0.5, false, FIBRE.lightened(0.35), _mat(FIBRE, 0.85)))
+	_commit_strands(_tex("living_fibre", 1.2, false, Color(0.8, 0.72, 0.68), _mat(FIBRE, 0.85)))
 	_end_batch()
 	_build_curtains()
 	_build_resonators()
@@ -217,7 +219,7 @@ func retune(i: int) -> void:
 	rate[i] = (rate[i] + 1) % RATES.size()
 	in_step[i] = 0
 	_res_t[i] = beat_t
-	Sfx.play("resonator_tick", to_global(RESONATORS[i] + Vector3.UP * 2.0), -4.0, 0.0)
+	Sfx.play(TICKS[i], to_global(RESONATORS[i] + Vector3.UP * 2.0), -4.0, 0.0)
 
 
 func _lock(i: int) -> void:
@@ -296,14 +298,33 @@ func interaction(pos: Vector3) -> Dictionary:
 
 # --- Running -------------------------------------------------------------------------------
 
+## Where the Crown's music is within its two-second pulse, or -1 when it isn't playing.
+func _music_phase() -> float:
+	var main := get_parent()
+	if main == null or not main.get("music"):
+		return -1.0
+	var pl: AudioStreamPlayer = main.music.players.get("music_crown")
+	if pl == null or not pl.playing or main.music.levels["music_crown"] < 0.5:
+		return -1.0
+	var at := pl.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
+	return fposmod(at, BEAT)
+
+
 func _process(delta: float) -> void:
 	_t += delta
-	beat_t += delta
 	var crown_beat := false
-	if beat_t >= BEAT:
-		beat_t -= BEAT
-		crown_beat = true
-		Sfx.play("crown_tick", to_global(ARENA + Vector3.UP * 20.0), -6.0, 0.0)
+	var phase := _music_phase()
+	if phase >= 0.0:
+		# The Crown's music strikes exactly every BEAT seconds: while it plays, the beat is its beat,
+		# so what she hears and what the stones flash to are one thing.
+		crown_beat = phase < beat_t - BEAT * 0.5
+		beat_t = phase
+	else:
+		beat_t += delta
+		if beat_t >= BEAT:
+			beat_t -= BEAT
+			crown_beat = true
+			Sfx.play("crown_tick", to_global(ARENA + Vector3.UP * 20.0), -6.0, 0.0)
 	var p := _player()
 	for i in 3:
 		_tick_resonator(i, delta, crown_beat, p)
@@ -340,7 +361,7 @@ func _tick_resonator(i: int, delta: float, crown_beat: bool, p: Node3D) -> void:
 		_res_t[i] -= rate_of(i)
 		_band_mats[i].emission_energy_multiplier = 5.0
 		if p and p.global_position.distance_to(to_global(RESONATORS[i])) < 30.0:
-			Sfx.play("resonator_tick", to_global(RESONATORS[i] + Vector3.UP * 2.0), -6.0, 0.0)
+			Sfx.play(TICKS[i], to_global(RESONATORS[i] + Vector3.UP * 2.0), -6.0, 0.0)
 	if crown_beat:
 		if in_tune(i):
 			in_step[i] += 1
@@ -381,7 +402,7 @@ func _on_note(which: int) -> void:
 			_shear_side[k] = -_shear_side[k]
 			_shear_t[k] = 0.0
 			_shear_hit[k] = false
-		Sfx.play("ridge_heave", to_global(ARENA), 0.0, 0.0)
+		Sfx.play("shear_slide", to_global(ARENA), 0.0, 0.05)
 
 
 func _on_phase(p: int) -> void:
@@ -393,6 +414,7 @@ func _on_phase(p: int) -> void:
 		var main := get_parent()
 		if main and main.has_method("spawn_enemy"):
 			main.spawn_enemy("chord_singer", to_global(ARENA + Vector3(0.0, 0.0, 16.0)), "", self)
+			Sfx.play("cantor_singer_join", to_global(ARENA + Vector3(0.0, 3.0, 16.0)), 0.0, 0.0)
 
 
 func _on_cantor_down() -> void:
@@ -498,7 +520,12 @@ func _walls() -> void:
 
 
 func _fibre_world_mat() -> Material:
-	return _tex("fungus_stem", 1.5, true, FIBRE.lightened(0.35), _mat(FIBRE, 0.85))
+	return _tex("living_fibre", 3.0, true, Color(0.72, 0.64, 0.6), _mat(FIBRE, 0.85))
+
+
+## Jake's Crown stone: pale, glassy, teal-veined. `metres` per repeat.
+func _crown_stone(metres: float, world: bool, tint: Color) -> Material:
+	return _tex("tuning_crown_stone", metres, world, tint, _mat(STONE, 0.6))
 
 
 ## The Crown itself: arches the height of a tower over the arena, a column of light in the middle.
@@ -529,7 +556,7 @@ func _crown_arches() -> void:
 
 ## Stepping stones on the ridges' safe spans and a few boulders in the bays.
 func _stones() -> void:
-	var stone := _mat(STONE, 0.7)
+	var stone := _crown_stone(3.0, true, Color(0.5, 0.52, 0.56))
 	for r in RIDGES:
 		var a: Vector3 = r[0]
 		var b: Vector3 = r[1]
@@ -541,7 +568,7 @@ func _stones() -> void:
 
 ## The arena's floor ring and the anchor pylons at its rim, with cables to where the Cantor hangs.
 func _arena() -> void:
-	var ring := _mat(Color("3a2e3c"), 0.8)
+	var ring := _crown_stone(5.0, true, Color(0.42, 0.4, 0.47))
 	_box(ARENA + Vector3(0.0, 0.03, 0.0), Vector3(ARENA_R * 2.0, 0.06, ARENA_R * 2.0), ring, false)
 	for a in ANCHORS:
 		for k in 3:
@@ -580,7 +607,7 @@ func _build_curtains() -> void:
 
 
 func _build_resonators() -> void:
-	var stone := _mat(STONE, 0.6)
+	var stone := _crown_stone(2.0, false, Color(0.62, 0.66, 0.7))
 	for i in 3:
 		var at: Vector3 = RESONATORS[i]
 		var body := StaticBody3D.new()

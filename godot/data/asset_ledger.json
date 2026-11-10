@@ -54,6 +54,16 @@
    "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Engine_Hall_and_Boss_Audio.zip): newly composed procedural synthesis and an engine-hall plating texture generated for this brief, no third-party samples, recordings or stock; audio resampled to 44.1 kHz.",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "jake_gpt_pack3": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Asset_Pack_3.zip): original synthesised music and sound design and two generated tiling materials, no third-party samples, recordings or stock; audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_pack4": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Asset_Pack_4.zip): original synthesised music and sound design and two generated tiling materials, no third-party samples, recordings or stock; audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -237,27 +247,27 @@
    "tier": "foreground"
   },
   "boost_thrust": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack3",
    "tier": "foreground"
   },
   "mirror_alarm": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack3",
    "tier": "foreground"
   },
   "magnet_clamp": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack3",
    "tier": "hero"
   },
   "hoist_winch": {
-   "source": "synth_sfx",
-   "tier": "foreground"
+   "source": "jake_gpt_pack3",
+   "tier": "bed"
   },
   "cage_drop": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack4",
    "tier": "foreground"
   },
   "resonator_tick": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack3",
    "tier": "detail"
   },
   "crown_tick": {
@@ -265,7 +275,7 @@
    "tier": "foreground"
   },
   "resonator_lock": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack3",
    "tier": "foreground"
   },
   "cantor_high": {
@@ -679,6 +689,70 @@
   "launch_liftoff": {
    "source": "jake_gpt_d",
    "tier": "foreground"
+  },
+  "resonator_tick_low": {
+   "source": "jake_gpt_pack3",
+   "tier": "detail"
+  },
+  "resonator_tick_high": {
+   "source": "jake_gpt_pack3",
+   "tier": "detail"
+  },
+  "tether_snap": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "coolant_vent": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "music_cantor": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "music_departure": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "music_ending": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "guardian_wake": {
+   "source": "jake_gpt_pack4",
+   "tier": "hero"
+  },
+  "guardian_search": {
+   "source": "jake_gpt_pack4",
+   "tier": "bed"
+  },
+  "cantor_singer_join": {
+   "source": "jake_gpt_pack4",
+   "tier": "hero"
+  },
+  "cantor_death": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "shear_slide": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "thrust_cache_open": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "aux_breaker_trip": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "music_patience": {
+   "source": "jake_gpt_pack4",
+   "tier": "music"
+  },
+  "music_crown": {
+   "source": "jake_gpt_pack4",
+   "tier": "music"
   }
  },
  "files": [
@@ -765,6 +839,22 @@
   {
    "path": "assets/textures/shatterlands/engine_hall_plating/*.png",
    "source": "jake_gpt_d"
+  },
+  {
+   "path": "assets/textures/shatterlands/tuning_crown_stone/*.png",
+   "source": "jake_gpt_pack3"
+  },
+  {
+   "path": "assets/textures/shatterlands/living_fibre/*.png",
+   "source": "jake_gpt_pack3"
+  },
+  {
+   "path": "assets/textures/shatterlands/long_patience_hull/*.png",
+   "source": "jake_gpt_pack4"
+  },
+  {
+   "path": "assets/textures/shatterlands/hauler_cargo_deck/*.png",
+   "source": "jake_gpt_pack4"
   }
  ]
 }

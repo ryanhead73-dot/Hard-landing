@@ -67,7 +67,7 @@ func open_cache(region: String) -> void:
 		return
 	Game.set_flag("thrust_cache_" + region)
 	Game.add_scrap(SCRAP)
-	Sfx.play("crawlspace_hatch", cache_at(region), -2.0, 0.0)
+	Sfx.play("thrust_cache_open", cache_at(region), 0.0, 0.0)
 	if main.get("hud"):
 		main.hud.show_message("Thrust cache: %d scrap. Someone else had thrusters once." % SCRAP)
 	_build_for(region)

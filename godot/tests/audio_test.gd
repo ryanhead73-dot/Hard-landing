@@ -190,8 +190,8 @@ func _loudest_window_db(path: String) -> float:
 
 func _music() -> void:
 	var m: MusicDirector = main.music
-	var playing := m.players.values().all(func(p): return p.playing and p.bus == "Music")
-	_check("every music layer plays together", m.players.size() == MusicDirector.LAYERS.size() and playing)
+	var playing := ["music_calm", "music_combat", "music_finale"].all(func(id): return m.players[id].playing) and m.players.values().all(func(p): return p.bus == "Music")
+	_check("the stems play together", m.players.size() == MusicDirector.LAYERS.size() and playing)
 	player.revive(ARENA)
 	await get_tree().create_timer(0.6).timeout
 	_check("music starts calm", m.mood == "calm" and m.levels["music_combat"] < 0.1)
@@ -208,7 +208,11 @@ func _music() -> void:
 	_check("a siege is combat", main.siege.is_active() and m.mood == "combat")
 	main.siege.stand_down()
 	_clear_enemies()
-	_check("the finale has its own layer", m.targets("finale")["music_finale"] == 1.0 and m.targets("combat")["music_finale"] == 0.0)
+	_check("the finale has its own piece", m.targets("finale")["music_departure"] == 1.0 and m.targets("finale")["music_calm"] == 0.0 and not m.targets("combat").has("music_departure"))
+	_check("and so does the Cantor", m.targets("cantor")["music_cantor"] == 1.0 and m.targets("cantor")["music_combat"] == 0.0)
+	_check("the Long Patience and the Crown have their own", m.targets("long_patience")["music_patience"] == 1.0 and m.targets("tuning_crown")["music_crown"] == 1.0 and m.targets("tuning_crown")["music_calm"] == 0.0)
+	_check("the set pieces wait their turn", not m.players["music_cantor"].playing and not m.players["music_departure"].playing)
+	_check("the ending sting plays once", m.sting.stream != null and not Sfx.loops(m.sting.stream) and Sfx.loops(Sfx.stream("music_cantor")))
 
 
 func _ambience() -> void:
