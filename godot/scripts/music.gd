@@ -88,6 +88,10 @@ func _process(delta: float) -> void:
 		var was := mood
 		mood = pick_mood()
 		if mood == "ending" and was != "ending" and sting.stream:
+			# The sting has the room to itself: the departure piece cuts, it doesn't fade under it.
+			for id in FREE_LAYERS:
+				levels[id] = 0.0
+				players[id].stop()
 			sting.play()
 	var want := targets(mood)
 	for id in LAYERS:

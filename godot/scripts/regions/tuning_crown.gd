@@ -74,6 +74,9 @@ var ridges: Array[LoomRidge] = []
 var rate := [4, 0, 3]
 var in_step := [0, 0, 0]
 var beat_t := 0.0
+var _anchor_frame := -1
+## Whether the beat was the music's last frame (see _music_phase).
+var _on_music := false
 var _res_t := [0.0, 0.0, 0.0]
 var _band_mats: Array[StandardMaterial3D] = []
 var _ref_mats: Array[StandardMaterial3D] = []
@@ -234,6 +237,8 @@ func wake_cantor(main: Node) -> Cantor:
 		return cantor
 	cantor = main.spawn_enemy("cantor", to_global(ARENA), "", self) as Cantor
 	cantor.reset_to(int(Game.flags.get("cantor_phase", 0)))
+	if cantor.phase == Cantor.Phase.RESOLVE:
+		_spawn_singer(main)
 	cantor.phase_changed.connect(_on_phase)
 	cantor.note.connect(_on_note)
 	cantor.died.connect(func(_e): _on_cantor_down())
@@ -243,6 +248,11 @@ func wake_cantor(main: Node) -> Cantor:
 func strike_anchor(i: int) -> void:
 	if cantor == null or not is_instance_valid(cantor) or cantor.dead:
 		return
+	# One strike a frame: a scattergun's pellets all land at once, and the ones after the pellet
+	# that broke it would otherwise ring it as a miss.
+	if _anchor_frame == Engine.get_physics_frames():
+		return
+	_anchor_frame = Engine.get_physics_frames()
 	if cantor.anchor_struck():
 		_anchor_flash[i] = 1.5
 		Sfx.play("cantor_anchor", to_global(ANCHORS[i] + Vector3.UP * ANCHOR_Y), 0.0, 0.0)
@@ -279,7 +289,10 @@ func reset_fight() -> void:
 		_shears[k].position.x = _shear_side[k] * SHEAR_SPAN
 	for e in get_tree().get_nodes_in_group("chord_singers"):
 		if is_ancestor_of(e):
+			e.remove_from_group("chord_singers")
 			e.queue_free()
+	if cantor and is_instance_valid(cantor) and not cantor.dead and cantor.phase == Cantor.Phase.RESOLVE:
+		_spawn_singer(get_parent())
 
 
 func interaction(pos: Vector3) -> Dictionary:
@@ -317,9 +330,11 @@ func _process(delta: float) -> void:
 	if phase >= 0.0:
 		# The Crown's music strikes exactly every BEAT seconds: while it plays, the beat is its beat,
 		# so what she hears and what the stones flash to are one thing.
-		crown_beat = phase < beat_t - BEAT * 0.5
+		crown_beat = _on_music and phase < beat_t - BEAT * 0.5
 		beat_t = phase
+		_on_music = true
 	else:
+		_on_music = false
 		beat_t += delta
 		if beat_t >= BEAT:
 			beat_t -= BEAT
@@ -375,7 +390,7 @@ func _tick_shears(delta: float, p: Node3D) -> void:
 	var live := cantor != null and is_instance_valid(cantor) and not cantor.dead and cantor.phase >= Cantor.Phase.RESPOND
 	for k in _shears.size():
 		_shear_mats[k].emission_energy_multiplier = move_toward(_shear_mats[k].emission_energy_multiplier, 0.4, delta * 3.0)
-		if not live:
+		if not live and _shear_t[k] >= 1.0:
 			continue
 		if _shear_t[k] < 1.0:
 			_shear_t[k] = minf(_shear_t[k] + delta / 1.4, 1.0)
@@ -411,10 +426,14 @@ func _on_phase(p: int) -> void:
 		_say(Story.CANTOR_RESPOND)
 	elif p == Cantor.Phase.RESOLVE:
 		_say(Story.CANTOR_RESOLVE)
-		var main := get_parent()
-		if main and main.has_method("spawn_enemy"):
-			main.spawn_enemy("chord_singer", to_global(ARENA + Vector3(0.0, 0.0, 16.0)), "", self)
-			Sfx.play("cantor_singer_join", to_global(ARENA + Vector3(0.0, 3.0, 16.0)), 0.0, 0.0)
+		_spawn_singer(get_parent())
+
+
+## The last phase's chord singer (also after a death or a load in that phase).
+func _spawn_singer(main: Node) -> void:
+	if main and main.has_method("spawn_enemy"):
+		main.spawn_enemy("chord_singer", to_global(ARENA + Vector3(0.0, 0.0, 16.0)), "", self)
+		Sfx.play("cantor_singer_join", to_global(ARENA + Vector3(0.0, 3.0, 16.0)), 0.0, 0.0)
 
 
 func _on_cantor_down() -> void:

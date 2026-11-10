@@ -142,6 +142,8 @@ func _process(delta: float) -> void:
 func _update_goal() -> void:
 	if not Game.flags.get("found_ferro9", false):
 		goal = WRECK + Vector3(0.0, 2.0, 0.0)
+	elif Game.phase() == "return":
+		goal = exit_point + Vector3(0.0, 1.0, 0.0)
 	elif ferro and ferro.active():
 		goal = to_local(ferro.goal_point())
 	elif gear and gear.active():

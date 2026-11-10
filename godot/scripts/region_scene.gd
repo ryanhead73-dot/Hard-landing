@@ -51,6 +51,11 @@ func interaction(_pos: Vector3) -> Dictionary:
 	return {}
 
 
+## Why Juno can't leave this way right now, or "" (e.g. a part too heavy to climb out with).
+func exit_blocked() -> String:
+	return ""
+
+
 func entry_global() -> Vector3:
 	return to_global(entry)
 

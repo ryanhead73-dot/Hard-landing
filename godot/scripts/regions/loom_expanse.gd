@@ -179,7 +179,9 @@ func _first_sightings(at: Vector3) -> void:
 
 ## The waypoint: the overlook until Juno has seen the Crown, then the survey locker, then home.
 func _update_goal() -> void:
-	if not Game.flags.get("loom_crown_seen", false):
+	if Game.phase() == "return":
+		goal = exit_point + Vector3(0.0, 1.0, 0.0)
+	elif not Game.flags.get("loom_crown_seen", false):
 		goal = OVERLOOK + Vector3(0.0, 1.5, 0.0)
 	elif not Game.flags.get("weave_grips", false):
 		goal = LOCKER + Vector3(0.0, 1.2, 0.0)

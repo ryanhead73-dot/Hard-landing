@@ -246,7 +246,8 @@ func _process(delta: float) -> void:
 		return
 	if mounted():
 		_tick_drone(delta)
-	Game.set_region_objective(objective())
+	if mounted() or Game.current_repair() == "landing_gear":
+		Game.set_region_objective(objective())
 
 
 func _tick_drone(delta: float) -> void:

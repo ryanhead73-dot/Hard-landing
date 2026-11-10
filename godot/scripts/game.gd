@@ -514,6 +514,7 @@ func reset() -> void:
 	mission_stage.clear()
 	mission_done.clear()
 	mission_objective = ""
+	opening_objective = ""
 	region_objective = ""
 	region = SaveMigrations.DEFAULT_REGION
 	act = 1

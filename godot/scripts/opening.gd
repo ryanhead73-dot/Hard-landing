@@ -137,6 +137,9 @@ func _on_fell(braced: int) -> void:
 
 ## After the crash (or loading a save mid-opening): the Kettle beats from where she is.
 func resume() -> void:
+	# Saved during the watcher's crossing: it has been and gone.
+	if beat() == Beat.ARMED and Game.flags.get("carcass_seen", false):
+		Game.set_flag("opening", Beat.WATCHED)
 	main.player.armed = beat() >= Beat.ARMED
 	_build_props()
 	_sync()
@@ -172,6 +175,10 @@ func _process(delta: float) -> void:
 	if _wake_lock:
 		main.player.crouching = true
 	match beat():
+		Beat.ARMED:
+			if not Game.flags.get("carcass_seen", false) and main.player.global_position.distance_to(main.sites["aux_power"].global_position) < 14.0:
+				Game.set_flag("carcass_seen", true)
+				_set_beat(Beat.WATCHED)
 		Beat.WATCHED:
 			_hungry_tick(delta)
 
@@ -491,8 +498,16 @@ func waypoint():
 					best_d = d
 					best = s[1]
 			return best
+		Beat.ARMED:
+			if not Game.flags.get("carcass_seen", false):
+				return _ground(GULLY_AT, 1.0)
+		Beat.WATCHED:
+			if _contact and is_instance_valid(_contact):
+				return _contact.global_position + Vector3.UP * 0.5
+			return main.sites["aux_power"].global_position + Vector3.UP * 1.5
 		Beat.YARD:
-			return null
+			# Contact in hand: the relay job's own marks take over.
+			return main.missions.waypoint()
 	return null
 
 
@@ -512,7 +527,7 @@ func objective() -> String:
 		Beat.TRAIL:
 			return "Follow the reflector beads toward the relay"
 		Beat.ARMED:
-			return "Head on to the relay station"
+			return "Head on toward the relay: check the downed drone in the gully"
 		Beat.WATCHED:
 			return "Find a battery contact for the relay"
 	return ""

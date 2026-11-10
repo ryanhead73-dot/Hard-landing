@@ -59,7 +59,9 @@ func _init() -> void:
 	leash_range = 999.0
 	drops = Vector2i(0, 0)
 	death_puff = 3.0
-	weak_radius = 1.6
+	# A little over the heart's own radius: a hit lands on its surface, and at exactly the radius
+	# rounding would decide whether it counted.
+	weak_radius = 1.75
 
 
 func display_name() -> String:

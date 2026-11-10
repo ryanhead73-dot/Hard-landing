@@ -86,7 +86,7 @@ func _exit_tree() -> void:
 
 
 func active() -> bool:
-	return not done() and not Game.is_repaired("wing") and Game.flags.get("ferro_gear", false) == true
+	return not done() and not Game.is_repaired("wing") and (Game.flags.get("ferro_gear", false) == true or Game.is_repaired("landing_gear"))
 
 
 func done() -> bool:
@@ -201,7 +201,9 @@ func _process(delta: float) -> void:
 		return
 	if started():
 		_run(delta)
-	Game.set_region_objective(objective())
+	# Ahead of its turn (another part on its way home), the chase doesn't take the line.
+	if started() or Game.current_repair() == "wing":
+		Game.set_region_objective(objective())
 
 
 func _run(delta: float) -> void:

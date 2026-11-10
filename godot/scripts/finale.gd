@@ -64,6 +64,7 @@ var _said_half := false
 var _said_late := false
 var _knots: Array[Node3D] = []
 var _klaxon: Node
+var _knot_frame := {}
 
 
 func _ready() -> void:
@@ -87,6 +88,17 @@ func start() -> void:
 	siege.start_finale()
 	voice.interrupt(Story.FINALE_START)
 	Sfx.play("power_up", null, -4.0, 0.0)
+
+
+## After a load: a spool that was already full stays full (the crises and the assault are behind her).
+func restore() -> void:
+	if not Game.flags.get("finale_ready", false) or Game.current_repair() != "" or Game.launched or state != State.IDLE:
+		return
+	spool = SPOOL_TIME
+	stage = CRISES.size()
+	pulse_t = 0.0
+	_set_state(State.READY)
+	siege.kestrel.set_engine_power(0.6)
 
 
 ## Tests: skip straight past every crisis (the spool and the assault still run).
@@ -182,6 +194,10 @@ func waypoint(from: Vector3):
 func hit_knot(i: int) -> void:
 	if crisis != Crisis.TETHERS or i >= knot_hits.size() or knot_hits[i] <= 0:
 		return
+	# One hit a shot: a scattergun's pellets all land in the same frame.
+	if _knot_frame.get(i, -1) == Engine.get_physics_frames():
+		return
+	_knot_frame[i] = Engine.get_physics_frames()
 	knot_hits[i] -= 1
 	if knot_hits[i] > 0:
 		Sfx.play("thread_spool", knot_position(i), -4.0, 0.15)
@@ -246,6 +262,7 @@ func _physics_process(delta: float) -> void:
 		spool = SPOOL_TIME
 		pulse_t = 0.0
 		_set_state(State.READY)
+		Game.set_flag("finale_ready")
 		siege.stand_down()
 		voice.interrupt([Story.FINALE_READY])
 		_pulse()

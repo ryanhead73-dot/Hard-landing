@@ -230,6 +230,9 @@ func _guardian() -> void:
 # --- The hoist -----------------------------------------------------------------------------
 
 func _hoist() -> void:
+	_place(lp.exit_global() + Vector3(0.0, 0.3, 0.0), 0.0)
+	await _frames(4)
+	_check("the coil can't be carried out of the breach", Game.carrying == "drive_coil" and _label().contains("hoist") and not _label().begins_with("[E]"), _label())
 	_check("the objective is the hoist", Game.objective_text().contains("hoist"), Game.objective_text())
 	_check("and the waypoint", rm.waypoint().distance_to(_at(LongPatience.HOIST)) < 3.0)
 	_place(_at(LongPatience.HOIST + Vector3(0.0, 0.5, 2.0)), 0.0)
@@ -238,6 +241,9 @@ func _hoist() -> void:
 	await _press("interact")
 	await _frames(3)
 	_check("it's loaded and rising", Game.carrying == "" and lp.hoisting() and Game.objective_text().contains("Hold out"), Game.objective_text())
+	lp.hoist_t = LongPatience.HOIST_TIME - 3.0
+	lp._restore()
+	_check("a reload mid-lift starts the lift over rather than finishing it", lp.hoisting() and lp.hoist_t < 1.0 and not Game.delivered("drive_coil"))
 	lp.hoist_t = LongPatience.HOIST_TIME - 0.5
 	await get_tree().create_timer(1.0).timeout
 	_check("at the top it's away home", Game.flags.get("patience_coil") == true and Game.delivered("drive_coil") and not lp.hoisting())

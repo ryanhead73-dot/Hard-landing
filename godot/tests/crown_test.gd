@@ -158,8 +158,12 @@ func _cantor() -> void:
 		if ch is StaticBody3D and ch.has_meta("on_hit"):
 			housing = ch
 			break
-	(housing.get_meta("on_hit") as Callable).call()
+	await get_tree().physics_frame
+	# A scattergun's eight pellets land in one frame: one strike, and no miss rung over it.
+	for pellet in 8:
+		(housing.get_meta("on_hit") as Callable).call()
 	_check("struck in the quiet after the low note, the phrase breaks and the heart opens", c.heart_open() and c.interrupts == 1)
+	_check("a scattergun blast is one clean strike", tc._anchor_flash.any(func(f): return f > 0.0) and not tc._anchor_flash.any(func(f): return f < 0.0), str(tc._anchor_flash))
 	c.take_damage(c.health - c.phase_health(1) + 1.0, c.global_position, Vector3.FORWARD)
 	_check("a third of its health and it moves to its second phase", c.phase == Cantor.Phase.RESPOND and not c.heart_open() and Game.flags.get("cantor_phase") == Cantor.Phase.RESPOND)
 	# Shear walls slide on the middle note.
@@ -182,6 +186,9 @@ func _cantor() -> void:
 	c.take_damage(c.health - c.phase_health(2) + 1.0, c.global_position, Vector3.FORWARD)
 	await _frames(3)
 	_check("at two thirds down it resolves, and a chord singer joins", c.phase == Cantor.Phase.RESOLVE and get_tree().get_nodes_in_group("chord_singers").size() >= 1, "phase %d, %.0f, open %s, singers %d" % [c.phase, c.health, c.heart_open(), get_tree().get_nodes_in_group("chord_singers").size()])
+	tc.reset_fight()
+	await _frames(3)
+	_check("going down in the last phase, the chord singer is back with it", get_tree().get_nodes_in_group("chord_singers").filter(func(e): return not e.is_queued_for_deletion()).size() == 1 and c.phase == Cantor.Phase.RESOLVE, "%d" % get_tree().get_nodes_in_group("chord_singers").size())
 	c.cycle_t = Cantor.GAP_FROM + 0.1
 	tc.strike_anchor(3)
 	_check("in the last phase anchors don't open it", not c.heart_open())

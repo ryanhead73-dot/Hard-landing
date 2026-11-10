@@ -40,13 +40,17 @@ func _run() -> void:
 			bodies.append(n.get_child(0))
 	_check("each knot is something to shoot", bodies.size() == 3 and bodies.all(func(b): return b is StaticBody3D and b.has_meta("on_hit")), "%d" % bodies.size())
 	for i in Finale.KNOT_HITS - 1:
-		(bodies[0].get_meta("on_hit") as Callable).call()
-	_check("a knot takes a few hits", f.knots_left() == 3)
+		# A scattergun's pellets land in one frame and count as one hit.
+		for pellet in 8:
+			(bodies[0].get_meta("on_hit") as Callable).call()
+		await get_tree().physics_frame
+	_check("a knot takes a few hits, and a scattergun blast is one of them", f.knots_left() == 3 and f.knot_hits[0] == 1, str(f.knot_hits))
 	(bodies[0].get_meta("on_hit") as Callable).call()
 	_check("then it's shot through", f.knots_left() == 2 and Game.objective_text().contains(": 2"), Game.objective_text())
 	for b in bodies.slice(1):
 		for i in Finale.KNOT_HITS:
 			(b.get_meta("on_hit") as Callable).call()
+			await get_tree().physics_frame
 	await _frames(3)
 	_check("with every knot cut the spool climbs again", f.crisis == Finale.Crisis.NONE and f.spool > held and main.voice.heard("Spool's climbing"))
 	_check("and the tethers are gone", kestrel.get_parent().get_children().all(func(n): return not String(n.name).begins_with("Tether") or n.is_queued_for_deletion()))
@@ -101,6 +105,10 @@ func _run() -> void:
 	f.spool = Finale.SPOOL_TIME - 0.05
 	await _frames(4)
 	_check("full spool: ready, and the ground answers with a pulse", f.state == Finale.State.READY and f.pulses == 1)
+	f.state = Finale.State.IDLE
+	f.spool = 0.0
+	f.restore()
+	_check("a full spool survives a reload", Game.flags.get("finale_ready") == true and f.state == Finale.State.READY and f.spool == Finale.SPOOL_TIME)
 	_check("the objective says to wait for the quiet", Game.objective_text().contains("quiet"), Game.objective_text())
 	player.revive(main.install_point("launch") + Vector3.UP * 0.2)
 	await _frames(5)

@@ -87,6 +87,9 @@ func interaction(pos: Vector3) -> Dictionary:
 		return {}
 	if scene:
 		if pos.distance_to(scene.exit_global()) < 3.0:
+			var why := scene.exit_blocked()
+			if why != "":
+				return {"label": why}
 			return {"label": "[E] " + scene.exit_label, "action": travel.bind(parent_of(current))}
 		for id in RegionDB.travel_regions():
 			var r := RegionDB.get_region(id)

@@ -118,14 +118,33 @@ func build() -> void:
 
 func _process(_delta: float) -> void:
 	var beyond := _route_on()
-	if wing and wing.active() and Game.current_repair() == "wing":
+	var hub := ""
+	if Game.phase() == "return":
+		goal = exit_point + Vector3(0.0, 1.0, 0.0)
+	elif wing and wing.active() and Game.current_repair() == "wing":
 		goal = to_local(wing.goal_point())
 	elif beyond != "":
 		goal = RegionDB.get_region(beyond)["gate_pos"] + Vector3(0.0, 1.0, 0.0)
 	elif way_north_open():
 		goal = NORTH_SPLIT + Vector3(0.0, 1.0, 0.0)
+	elif greenhouses and greenhouses.hailed() and not nest_cleared():
+		goal = NEST + Vector3(0.0, 1.5, 0.0)
+		hub = "Clear the scuttler nest under the Marigold's tail, as Reyes asked"
+	elif greenhouses and greenhouses.is_open() and greenhouses.reyes:
+		goal = to_local(greenhouses.reyes.global_position) + Vector3(0.0, 2.0, 0.0)
+		hub = "Talk to Reyes inside the greenhouses"
 	else:
 		goal = Greenhouses.AT + Vector3(0.0, 1.0, Greenhouses.HALF.y + 2.0)
+	# The hub's own steps have the line while they're what's next; then it goes back.
+	if hub != "":
+		Game.set_region_objective(hub)
+		_hub_line = hub
+	elif _hub_line != "" and Game.region_objective == _hub_line:
+		Game.set_region_objective("")
+		_hub_line = ""
+
+
+var _hub_line := ""
 
 
 func spawn_residents(main: Node) -> Array[Enemy]:

@@ -48,7 +48,7 @@ const CAGE := Vector3(0.0, 0.0, -30.0)
 const CAGE_R := 2.2
 const COIL_USE := Vector3(0.0, 0.0, -27.0)
 const BREAKER := Vector3(13.4, 0.0, -26.0)
-const HOIST := Vector3(-10.0, 0.0, 21.0)
+const HOIST := Vector3(-8.0, 0.0, 21.0)
 const HOIST_TIME := 20.0
 const DISTRESS := Vector3(12.6, 0.0, 25.0)
 const MAGNETS := [Vector3(0.0, 0.0, -16.0), Vector3(-4.0, 0.0, -2.0), Vector3(-7.0, 0.0, 10.0)]
@@ -180,6 +180,13 @@ func coil_out() -> bool:
 
 func hoisting() -> bool:
 	return Game.flags.get("patience_hoist", false) == true and not done()
+
+
+## The coil is a two-handed lift: it leaves by the hoist, not up the breach.
+func exit_blocked() -> String:
+	if Game.carrying == "drive_coil":
+		return "Not with the coil in your arms: it goes up on the cargo hoist by the breach"
+	return ""
 
 
 func done() -> bool:
@@ -447,7 +454,8 @@ func _restore() -> void:
 		# Lost between the cage and the hoist (a load from before the carry): it's back in its cradle.
 		Game.flags["patience_coil_out"] = false
 	if Game.flags.get("patience_hoist", false) and not Game.flags.get("patience_coil", false):
-		_finish()
+		# Loaded but not yet at the rim: the lift starts over, and she holds out again.
+		hoist_t = 0.0
 	_sync()
 
 

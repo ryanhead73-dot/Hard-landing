@@ -338,7 +338,10 @@ func _ready() -> void:
 	_build_drone_station()
 	Game.flag_changed.connect(func(id: String, _v: Variant):
 		if id == "drone_out":
-			_sync_drone())
+			_sync_drone()
+		elif id.begins_with("delivered_") and _v == true:
+			# A part sent home is a checkpoint: the job that got it shouldn't be lost to a quit.
+			save_game.call_deferred())
 	landmarks = Landmarks.new()
 	add_child(landmarks)
 	landmarks.setup(self)
@@ -673,6 +676,7 @@ func load_state(data: Dictionary) -> void:
 		if site_states.has(id):
 			(sites[id] as ExpeditionSite).set_state(site_states[id])
 	missions.restore()
+	finale.restore()
 	wildlife.restore()
 	var pending := int(data.get("siege_pending", -1))
 	if pending >= 0:
@@ -764,7 +768,8 @@ func _find_interaction() -> Dictionary:
 		return cache
 	if current != "" and _near_install(current):
 		var r := Campaign.get_repair(current)
-		if Game.carrying == r["component"] or Game.delivered(r["component"]):
+		# A sourced part arrives by delivery; one carried home by hand skipped its region's job.
+		if Game.delivered(r["component"]) or (Game.carrying == r["component"] and not Campaign.sourced(current)):
 			return {"label": "[E] %s" % r["install_label"], "action": _install.bind(current)}
 		return {"label": r["bay_label"]}
 	if finale.crisis == Finale.Crisis.OVERHEAT and _near_install("cooling"):

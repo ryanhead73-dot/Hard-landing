@@ -280,13 +280,15 @@ func _physics_process(delta: float) -> void:
 			velocity.z = _charge_dir.z * CHARGE_SPEED
 			if not _charge_hit and _target_alive() and global_position.distance_to(target.global_position) < 2.4:
 				_charge_hit = true
-				hits += 1
-				target.take_damage(CHARGE_DAMAGE, global_position)
-				Sfx.play("guardian_impact", global_position + Vector3.UP, 0.0, 0.05)
-				if "velocity" in target:
-					target.velocity += _charge_dir * 8.0 + Vector3.UP * 4.0
-				if target.has_method("add_trauma"):
-					target.add_trauma(0.5)
+				# A dodge through the charge takes no hit and no shove.
+				if not (target.has_method("is_dodging") and target.is_dodging()):
+					target.take_damage(CHARGE_DAMAGE, global_position)
+					hits += 1
+					Sfx.play("guardian_impact", global_position + Vector3.UP, 0.0, 0.05)
+					if "velocity" in target:
+						target.velocity += _charge_dir * 8.0 + Vector3.UP * 4.0
+					if target.has_method("add_trauma"):
+						target.add_trauma(0.5)
 			if _timer <= 0.0 or (is_on_wall() and _timer < CHARGE_TIME - 0.1):
 				if is_on_wall():
 					Sfx.play("guardian_impact", global_position + Vector3.UP, -2.0, 0.1)
@@ -386,6 +388,9 @@ func _on_hurt(_dir: Vector3) -> void:
 
 func _die() -> void:
 	state = State.DEAD
+	if _search and is_instance_valid(_search):
+		_search.queue_free()
+	_search = null
 	remove_from_group("guardians")
 	Game.set_flag("patience_guardian_down")
 	super._die()

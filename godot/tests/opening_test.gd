@@ -219,6 +219,7 @@ func _yard() -> void:
 	_place(op._ground(Opening.GULLY_AT, 0.5) + Vector3(1.6, 0.0, 1.6), 0.0)
 	await _frames(5)
 	_check("the dead drone", _label().contains("drone"), _label())
+	_check("and the marker points at it", main._waypoint() is Vector3 and (main._waypoint() as Vector3).distance_to(op._ground(Opening.GULLY_AT, 1.0)) < 0.5)
 	var hp := player.health
 	await _press("interact")
 	await _frames(10)
@@ -241,6 +242,7 @@ func _yard() -> void:
 	await _frames(5)
 	await _press("interact")
 	_check("contact in hand", Game.flags.get("relay_contact", false) and op.beat() == Opening.Beat.YARD)
+	_check("then the relay job's own marker takes over", main._waypoint() is Vector3, str(main._waypoint()))
 
 
 func _relay() -> void:
