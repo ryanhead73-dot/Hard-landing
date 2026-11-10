@@ -224,6 +224,7 @@ static func all() -> Array[Dictionary]:
 			_all.append(q)
 			prev = r["id"]
 		_all.append_array(EXTRA)
+		_all.append_array(SideJobDB.quests())
 		for q in _all:
 			_by_id[q["id"]] = q
 	return _all

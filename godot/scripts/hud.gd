@@ -15,6 +15,9 @@ static func help_text() -> String:
 var _objective: Label
 var _hidden_for_cinematic: Array = []
 var _waypoint: Label
+## The tracked side job's marker, in teal so it never reads as the main objective.
+var _job_marker: Label
+var _job_target = null
 var _crosshair: Control
 var _ammo: Label
 var _health_fill: ColorRect
@@ -119,6 +122,7 @@ func _ready() -> void:
 	add_child(_scan)
 
 	_waypoint = _label("small", UiStyle.ORANGE)
+	_job_marker = _label("small", UiStyle.TEAL)
 
 	_crosshair = Control.new()
 	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -331,6 +335,15 @@ func set_objective(text: String) -> void:
 ## Shows a marker over a world position (Vector3), or hides it when given null.
 func set_waypoint(target) -> void:
 	_waypoint_target = target
+
+
+## The side job's marker (SideJobs.waypoint()), or null.
+func set_job_waypoint(target) -> void:
+	_job_target = target
+
+
+func job_marker_visible() -> bool:
+	return _job_marker.visible
 
 
 func show_hint(text: String) -> void:
@@ -585,11 +598,16 @@ func set_dev(visible_now: bool, text: String) -> void:
 
 
 func _update_waypoint() -> void:
+	_place_marker(_waypoint, _waypoint_target, "◆")
+	_place_marker(_job_marker, _job_target, "◇")
+
+
+func _place_marker(marker: Label, at, glyph: String) -> void:
 	var cam := get_viewport().get_camera_3d()
-	if _waypoint_target == null or cam == null:
-		_waypoint.visible = false
+	if at == null or cam == null:
+		marker.visible = false
 		return
-	var target: Vector3 = _waypoint_target
+	var target: Vector3 = at
 	var screen := get_viewport().get_visible_rect().size
 	var dist := cam.global_position.distance_to(target)
 	var pos: Vector2
@@ -601,11 +619,11 @@ func _update_waypoint() -> void:
 		# few metres away indoors would otherwise be marked up in the ceiling).
 		pos = cam.unproject_position(target + Vector3.UP * clampf(dist * 0.15, 0.3, 2.0))
 	pos = pos.clamp(Vector2(40, 90), screen - Vector2(140, 160))
-	_waypoint.text = "◆ %d m" % roundi(dist)
-	_waypoint.position = pos - Vector2(20, 10)
+	marker.text = "%s %d m" % [glyph, roundi(dist)]
+	marker.position = pos - Vector2(20, 10)
 	# Hidden only once she's within reach of it, where the prompt takes over. (It used to hide
 	# inside 6 m, which left the opening's goals aboard the wreck with no marker at all.)
-	_waypoint.visible = dist > WAYPOINT_HIDE
+	marker.visible = dist > WAYPOINT_HIDE
 
 
 ## The camera's heading in degrees: 0 is north (-Z), 90 east (+X).

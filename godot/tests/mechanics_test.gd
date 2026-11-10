@@ -417,6 +417,9 @@ func _difficulty_and_balance() -> void:
 
 func _save_load() -> void:
 	_clear_enemies()
+	# Drops from earlier fights would be picked up mid-check and change the scrap count.
+	for s in get_tree().get_nodes_in_group("scrap"):
+		s.queue_free()
 	# Build up a state worth saving.
 	for id in ["aux_power", "cooling", "canopy"]:
 		kestrel.set_repaired(id, true)

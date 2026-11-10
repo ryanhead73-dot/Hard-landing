@@ -132,6 +132,8 @@ var ambience: Ambience
 var missions: MissionRunner
 ## Every quest's state (QuestDB / QuestLog), rebuilt from the game after a load.
 var quests: QuestLog
+## The optional jobs survivors and survey posts hand out (SideJobDB).
+var jobs: SideJobs
 ## Travel between the Kettle and the other regions (RegionDB / RegionManager).
 var regions: RegionManager
 var opening: Opening
@@ -314,6 +316,10 @@ func _ready() -> void:
 	regions.name = "Regions"
 	add_child(regions)
 	regions.setup(self)
+	jobs = SideJobs.new()
+	jobs.name = "Jobs"
+	add_child(jobs)
+	jobs.setup(self)
 	opening = Opening.new()
 	opening.name = "Opening"
 	add_child(opening)
@@ -421,6 +427,7 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_just_pressed("beacon") and not player.dead and beacon.unlocked():
 		beacon.place()
 	hud.set_waypoint(_waypoint())
+	hud.set_job_waypoint(jobs.waypoint())
 	hud.beacon_target = beacon.here()
 	hud.set_scan(scanner_marks())
 	_pack_check -= _delta
@@ -718,6 +725,10 @@ func _find_interaction() -> Dictionary:
 	if player.dead or Game.launched:
 		return {}
 	var pos := player.global_position
+	# A survivor with a job (or a report to hear) offers that before small talk.
+	var job := jobs.interaction(pos)
+	if not job.is_empty():
+		return job
 	var gate := regions.interaction(pos)
 	if not gate.is_empty():
 		return gate

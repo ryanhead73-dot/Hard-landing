@@ -398,7 +398,7 @@ func load_settings() -> void:
 ## the SFX bus pulls them down under gunfire and blasts, and a "Duck" amplifier that Sfx.duck()
 ## drives for story beats (dialogue, the aux power-up).
 static func ensure_buses() -> void:
-	for bus_name in ["Music", "Ambience", "SFX", "Interior"]:
+	for bus_name in ["Music", "Ambience", "SFX", "Interior", "Voice"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			var i := AudioServer.bus_count - 1

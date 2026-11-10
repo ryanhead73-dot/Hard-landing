@@ -21,6 +21,7 @@ func _run() -> void:
 	_buses()
 	await _ducking()
 	_ledger()
+	await _hob_voice()
 	await _music()
 	await _ambience()
 	await _spool()
@@ -110,6 +111,34 @@ func _ducking() -> void:
 ## The licence ledger: every sound shipped has a row naming a known source, and every sound sits in
 ## its tier's loudness range (the loudest 100 ms of the file), so a replacement recording can't
 ## arrive far too hot or too quiet.
+## HOB speaks every fixed line he has in Story; the subtitle waits for him to finish.
+func _hob_voice() -> void:
+	var missing: PackedStringArray = []
+	var lines := 0
+	var consts: Dictionary = (load("res://scripts/story.gd") as Script).get_script_constant_map()
+	for k in consts:
+		var v = consts[k]
+		if not v is Array:
+			continue
+		var group: Array = v if (v as Array).size() > 0 and v[0] is Array else [v]
+		for line in group:
+			if line is Array and line.size() == 2 and line[0] is String and line[0] == Story.HOB and line[1] is String and not String(line[1]).contains("%"):
+				lines += 1
+				if Voice.take(Story.HOB, line[1]) == null:
+					missing.append(String(line[1]).left(40))
+	_check("every one of HOB's lines in Story has a spoken take", lines > 80 and missing.is_empty(), "%d lines; missing: %s" % [lines, ", ".join(missing)])
+	_check("nobody else is voiced", Voice.take(Story.JUNO, "Mark the knots. I'll cut us loose.") == null)
+	var v: Voice = main.voice
+	v.interrupt([Story.FINALE_READY])
+	await _frames(2)
+	_check("HOB is heard on the Voice bus", v.speaking() and v._speaker.bus == "Voice")
+	var take := Voice.take(Story.HOB, Story.FINALE_READY[1])
+	_check("and the subtitle stays until he's done", v._time >= take.get_length())
+	v.clear()
+	await _frames(2)
+	_check("clearing the subtitles stops him", not v.speaking())
+
+
 func _ledger() -> void:
 	var ledger: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/asset_ledger.json"))
 	var audio: Dictionary = ledger["audio"]

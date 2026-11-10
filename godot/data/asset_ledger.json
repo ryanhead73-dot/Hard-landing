@@ -69,6 +69,13 @@
    "origin": "Made for Hard Landing by Jake, 2026-11-10 (Hard_Landing_Asset_Pack_5.zip): original synthesised music and creature and world sound design and two generated tiling materials, no third-party samples, recordings or stock; creature sequences cut at their cue points into separate cues and levelled, audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "kokoro_tts": {
+   "origin": "HOB's voice: each line spoken by the Kokoro-82M text-to-speech model (voice bm_george, via kokoro-onnx, model files v1.0) on 2026-11-10, then given a ship-computer treatment by tools/audio/make_hob_voice.py and encoded to Ogg Vorbis",
+   "licence": "Apache License 2.0 (model weights and voices)",
+   "author": "hexgrad (Kokoro-82M); thewh1teagle (kokoro-onnx)",
+   "url": "https://huggingface.co/hexgrad/Kokoro-82M",
+   "credit": "Kokoro-82M text-to-speech (HOB's voice)"
   }
  },
  "tiers": {
@@ -912,6 +919,10 @@
   {
    "path": "assets/textures/shatterlands/gillwood_bark/*.png",
    "source": "jake_gpt_pack5"
+  },
+  {
+   "path": "audio/voice/hob/*.ogg",
+   "source": "kokoro_tts"
   }
  ]
 }
