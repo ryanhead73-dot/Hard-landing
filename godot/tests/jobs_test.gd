@@ -29,7 +29,7 @@ func _run() -> void:
 	_check("once the story's moved on, the first jobs are on offer", jobs.available("weather_eye") and jobs.available("east_glass") and jobs.available("survey_stakes"))
 	_check("a job that follows another waits for it", not jobs.available("spindle_chord"))
 	_check("the journal lists them as side quests", main.quests.state_of("job_weather_eye") == "active" and QuestDB.get_quest("job_weather_eye")["kind"] == "side", main.quests.state_of("job_weather_eye"))
-	for id in ["weather_eye", "the_roost", "east_glass", "cap_watch", "brandt_flare", "stay_line", "survey_stakes", "spindle_chord", "voss_recorder", "spore_count", "ridge_watch", "old_warden"]:
+	for id in ["weather_eye", "the_roost", "east_glass", "cap_watch", "brandt_flare", "stay_line", "survey_stakes", "spindle_chord", "voss_recorder", "spore_count", "ridge_watch", "glowcaps", "night_gate", "black_box", "silk_anchors", "old_warden", "cold_box", "ghost_signal"]:
 		await _job(id)
 	_check("every job is done", SideJobDB.JOBS.all(func(j): return jobs.done(j["id"]) and main.quests.is_done("job_" + j["id"])))
 	_check("and nothing is tracked", jobs.tracked == "" and jobs.waypoint() == null)
@@ -126,6 +126,16 @@ func _job(id: String) -> void:
 				await _frames(4)
 			"use":
 				var pts: Array = s["points"]
+				if s.has("timer") and pts.size() > 1:
+					_place(jobs.at(region, pts[0]) + Vector3(0.0, 0.3, 1.2), 0.0)
+					await _frames(4)
+					if main._interaction.has("action"):
+						(main._interaction["action"] as Callable).call()
+					await _frames(2)
+					_check("%s: the first one starts the clock" % tag, jobs.clock(id) > 0.0 and main.hud.job_note.ends_with("s"), "%.1f '%s'" % [jobs.clock(id), main.hud.job_note])
+					jobs._clocks[id] = 0.02
+					await _frames(4)
+					_check("%s: run out and they come undone" % tag, jobs.clock(id) < 0.0 and not Game.flags.get(SideJobDB.point_flag(id, i, 0), false))
 				for k in pts.size():
 					var why := _open_ground(region, pts[k])
 					_check("%s: point %d on open ground" % [tag, k], why == "", why)

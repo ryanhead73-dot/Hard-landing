@@ -25,6 +25,8 @@ var _spawned := {}
 var _hold := {}
 var _ring: MeshInstance3D
 var _rebuild_queued := false
+## Timed use stages: job id -> seconds left, from the first point worked.
+var _clocks := {}
 
 
 func setup(m: Node) -> void:
@@ -33,6 +35,9 @@ func setup(m: Node) -> void:
 	main.player.died.connect(_on_player_died)
 	Game.flag_changed.connect(_on_flag_changed)
 	tracked = String(Game.flags.get("job_tracked", ""))
+	# A timed stage left half done (a load) starts over: the clock didn't save.
+	for id in running():
+		_reset_timed(id)
 	_rebuild.call_deferred()
 
 
@@ -116,6 +121,7 @@ func _complete_stage(id: String) -> void:
 	_foes.erase(id)
 	if not _hold.is_empty() and _hold["job"] == id:
 		_end_hold()
+	_clocks.erase(id)
 	Game.set_flag(SideJobDB.stage_flag(id, i))
 	if s.has("say"):
 		main.voice.say(s["say"])
@@ -272,6 +278,11 @@ func _use(id: String, i: int, k: int) -> void:
 	main.player.anim.play("interact")
 	Sfx.play("scrap_pickup", null, -4.0, 0.0)
 	var s: Dictionary = SideJobDB.get_job(id)["stages"][i]
+	if s.has("timer") and not _clocks.has(id) and _points_done(id, i) < (s["points"] as Array).size():
+		_clocks[id] = float(s["timer"])
+		main.hud.show_message("%s: %d s for the rest" % [SideJobDB.get_job(id)["title"], int(s["timer"])])
+		_rebuild()
+		return
 	if _points_done(id, i) >= (s["points"] as Array).size():
 		_complete_stage(id)
 	else:
@@ -309,6 +320,41 @@ func _process(delta: float) -> void:
 					_complete_stage(id)
 	if not _hold.is_empty():
 		_run_hold(delta)
+	_run_clocks(delta)
+
+
+## Timed stages: the clock runs while Juno is where they are; run out and the points come undone.
+func _run_clocks(delta: float) -> void:
+	var note := ""
+	for id in _clocks.keys():
+		var s := stage(id)
+		if s.is_empty() or not s.has("timer"):
+			_clocks.erase(id)
+			continue
+		_clocks[id] -= delta
+		if _clocks[id] <= 0.0:
+			_clocks.erase(id)
+			_reset_timed(id)
+			Sfx.play("arc_zap", null, -8.0, 0.0)
+			main.hud.show_message(String(s.get("slip", "Too slow. They've spoiled: start again")))
+			_rebuild()
+			continue
+		if id == tracked:
+			note = "%d s" % ceili(_clocks[id])
+	main.hud.job_note = note
+
+
+func clock(id: String) -> float:
+	return float(_clocks.get(id, -1.0))
+
+
+func _reset_timed(id: String) -> void:
+	var s := stage(id)
+	if s.is_empty() or not s.has("timer"):
+		return
+	var i := stage_index(id)
+	for k in (s["points"] as Array).size():
+		Game.flags.erase(SideJobDB.point_flag(id, i, k))
 
 
 func _spawn(id: String, kind: String, local: Vector3, count: bool) -> Enemy:
@@ -419,6 +465,9 @@ func ring_visible() -> bool:
 func _on_travelled(_from: String, _to: String) -> void:
 	_spawned.clear()
 	_foes.clear()
+	for id in _clocks.keys():
+		_reset_timed(id)
+	_clocks.clear()
 	if not _hold.is_empty():
 		_end_hold()
 	_rebuild.call_deferred()

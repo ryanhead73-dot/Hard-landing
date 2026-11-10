@@ -18,6 +18,8 @@ var _waypoint: Label
 ## The tracked side job's marker, in teal so it never reads as the main objective.
 var _job_marker: Label
 var _job_target = null
+## A few words after the job marker's distance (a timed job's clock).
+var job_note := ""
 var _crosshair: Control
 var _ammo: Label
 var _health_fill: ColorRect
@@ -600,6 +602,8 @@ func set_dev(visible_now: bool, text: String) -> void:
 func _update_waypoint() -> void:
 	_place_marker(_waypoint, _waypoint_target, "◆")
 	_place_marker(_job_marker, _job_target, "◇")
+	if _job_marker.visible and job_note != "":
+		_job_marker.text += "  " + job_note
 
 
 func _place_marker(marker: Label, at, glyph: String) -> void:
