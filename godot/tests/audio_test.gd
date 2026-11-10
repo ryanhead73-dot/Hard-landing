@@ -211,6 +211,7 @@ func _music() -> void:
 	_check("the finale has its own piece", m.targets("finale")["music_departure"] == 1.0 and m.targets("finale")["music_calm"] == 0.0 and not m.targets("combat").has("music_departure"))
 	_check("and so does the Cantor", m.targets("cantor")["music_cantor"] == 1.0 and m.targets("cantor")["music_combat"] == 0.0)
 	_check("the Long Patience and the Crown have their own", m.targets("long_patience")["music_patience"] == 1.0 and m.targets("tuning_crown")["music_crown"] == 1.0 and m.targets("tuning_crown")["music_calm"] == 0.0)
+	_check("the regions have exploration pieces and share a combat one", m.targets("gillwood")["music_gillwood"] == 1.0 and m.targets("loom_expanse")["music_loom"] == 1.0 and m.targets("shatterlands")["music_shatterlands"] == 1.0 and m.targets("region_combat")["music_region_combat"] == 1.0)
 	_check("the set pieces wait their turn", not m.players["music_cantor"].playing and not m.players["music_departure"].playing)
 	_check("the ending sting plays once", m.sting.stream != null and not Sfx.loops(m.sting.stream) and Sfx.loops(Sfx.stream("music_cantor")))
 

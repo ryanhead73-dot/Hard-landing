@@ -30,6 +30,10 @@ func _ready() -> void:
 	top_level = true
 	name = "UtilityDrone"
 	_build()
+	var hover := Sfx.loop("drone_hover", self, -8.0)
+	if hover is AudioStreamPlayer3D:
+		(hover as AudioStreamPlayer3D).max_distance = 18.0
+		(hover as AudioStreamPlayer3D).unit_size = 3.0
 	if player:
 		global_position = player.global_position + FOLLOW
 
@@ -142,7 +146,7 @@ func _send(p: Node3D) -> void:
 	sp.target = player
 	sp.magnet_range = 80.0
 	fetched += 1
-	Sfx.play("ui_click", global_position, -10.0, 0.2)
+	Sfx.play("drone_chirp", global_position, -6.0, 0.05)
 
 
 ## Patches her suit when she's badly hurt.

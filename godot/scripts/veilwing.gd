@@ -200,7 +200,7 @@ func _physics_process(delta: float) -> void:
 func _start_flare() -> void:
 	state = State.FLARE
 	_timer = flare_time
-	Sfx.play("lurker_hiss", global_position, -2.0, 0.35)
+	Sfx.play("veilwing_screech", global_position, 2.0, 0.1)
 
 
 func _start_swoop() -> void:
@@ -209,6 +209,7 @@ func _start_swoop() -> void:
 	_hit_this_pass = false
 	_closest = INF
 	_timer = 3.0
+	Sfx.play("veilwing_dive", global_position, 0.0, 0.08)
 	if _target_alive():
 		var lead: Vector3 = target.velocity * LEAD if "velocity" in target else Vector3.ZERO
 		_dir = (target.global_position + Vector3.UP * 1.2 + lead - global_position).normalized()
@@ -218,6 +219,7 @@ func _start_swoop() -> void:
 func _start_climb() -> void:
 	state = State.CLIMB
 	_timer = 2.2
+	Sfx.play("veilwing_flap", global_position, -2.0, 0.08)
 	var flat := Vector3(_dir.x, 0.0, _dir.z).normalized()
 	var ground := global_position.y
 	if is_inside_tree():

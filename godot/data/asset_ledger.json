@@ -64,6 +64,11 @@
    "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Asset_Pack_4.zip): original synthesised music and sound design and two generated tiling materials, no third-party samples, recordings or stock; audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
    "licence": "Project original",
    "author": "Hard Landing team"
+  },
+  "jake_gpt_pack5": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-10 (Hard_Landing_Asset_Pack_5.zip): original synthesised music and creature and world sound design and two generated tiling materials, no third-party samples, recordings or stock; creature sequences cut at their cue points into separate cues and levelled, audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
   }
  },
  "tiers": {
@@ -199,7 +204,7 @@
    "tier": "foreground"
   },
   "ridge_thrum": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "ridge_heave": {
@@ -207,19 +212,19 @@
    "tier": "foreground"
   },
   "diver_grind": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "diver_erupt": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "pinweaver_click": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "detail"
   },
   "thread_spool": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "thread_snap": {
@@ -231,11 +236,11 @@
    "tier": "foreground"
   },
   "singer_inhale": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "singer_chord": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "singer_pull": {
@@ -243,7 +248,7 @@
    "tier": "foreground"
   },
   "singer_call": {
-   "source": "synth_sfx",
+   "source": "jake_gpt_pack5",
    "tier": "foreground"
   },
   "boost_thrust": {
@@ -753,6 +758,50 @@
   "music_crown": {
    "source": "jake_gpt_pack4",
    "tier": "music"
+  },
+  "veilwing_screech": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "veilwing_dive": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "veilwing_flap": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "airlock_open": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "beacon_plant": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "drone_hover": {
+   "source": "jake_gpt_pack5",
+   "tier": "bed"
+  },
+  "drone_chirp": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "music_shatterlands": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_gillwood": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_loom": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_region_combat": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
   }
  },
  "files": [
@@ -855,6 +904,14 @@
   {
    "path": "assets/textures/shatterlands/hauler_cargo_deck/*.png",
    "source": "jake_gpt_pack4"
+  },
+  {
+   "path": "assets/textures/shatterlands/loom_ridge_rock/*.png",
+   "source": "jake_gpt_pack5"
+  },
+  {
+   "path": "assets/textures/shatterlands/gillwood_bark/*.png",
+   "source": "jake_gpt_pack5"
   }
  ]
 }

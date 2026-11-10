@@ -48,6 +48,8 @@ const SOUNDS: Array[String] = [
 	"music_cantor", "music_departure", "music_ending",
 	"guardian_wake", "guardian_search", "cantor_singer_join", "cantor_death", "shear_slide", "thrust_cache_open",
 	"aux_breaker_trip", "music_patience", "music_crown",
+	"veilwing_screech", "veilwing_dive", "veilwing_flap", "airlock_open", "beacon_plant", "drone_hover", "drone_chirp",
+	"music_shatterlands", "music_gillwood", "music_loom", "music_region_combat",
 ]
 const MAX_VARIANTS := 8
 

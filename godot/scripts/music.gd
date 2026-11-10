@@ -10,15 +10,21 @@ extends Node
 ## sting. They run free, like the opening's cues, and start from the top when they come in.
 
 const LAYERS := ["music_calm", "music_combat", "music_finale", "music_ship_theme", "music_sighting", "music_first_fight",
-	"music_cantor", "music_departure", "music_patience", "music_crown"]
+	"music_cantor", "music_departure", "music_patience", "music_crown",
+	"music_shatterlands", "music_gillwood", "music_loom", "music_region_combat"]
 ## A region with a piece of its own, played instead of the stems while Juno is there.
-const REGION_MUSIC := {"long_patience": "music_patience", "tuning_crown": "music_crown"}
+const REGION_MUSIC := {
+	"long_patience": "music_patience", "tuning_crown": "music_crown",
+	"shatterlands": "music_shatterlands", "gillwood": "music_gillwood", "loom_expanse": "music_loom",
+}
+## Regions whose fights bring in the regional combat piece (the others keep their own throughout).
+const COMBAT_REGIONS := ["shatterlands", "gillwood", "loom_expanse"]
 ## The opening's own cues (Opening.music_levels): free-running loops, restarted from the top
 ## whenever one comes in from silence, so each cue starts on its first bar.
 const OPENING_LAYERS := ["music_ship_theme", "music_sighting", "music_first_fight"]
 ## Every free-running cue: the opening's and the two set pieces.
 const FREE_LAYERS := ["music_ship_theme", "music_sighting", "music_first_fight", "music_cantor", "music_departure",
-	"music_patience", "music_crown"]
+	"music_patience", "music_crown", "music_shatterlands", "music_gillwood", "music_loom", "music_region_combat"]
 const ENDING := "music_ending"
 const BASE_DB := {
 	"music_calm": -8.0, "music_combat": -7.0, "music_finale": -6.0,
@@ -26,6 +32,8 @@ const BASE_DB := {
 	"music_cantor": -7.0, "music_departure": -6.0,
 	# The stealth piece is mastered quiet on purpose (it sits under dialogue).
 	"music_patience": -2.0, "music_crown": -7.0,
+	# The exploration pieces are mastered quiet too (peaks near -18 dBFS).
+	"music_shatterlands": -2.0, "music_gillwood": -2.0, "music_loom": -2.0, "music_region_combat": -3.0,
 }
 const COMBAT_RANGE := 45.0
 const FADE := 0.5  ## Linear volume per second.
@@ -37,6 +45,7 @@ var levels := {
 	"music_ship_theme": 0.0, "music_sighting": 0.0, "music_first_fight": 0.0,
 	"music_cantor": 0.0, "music_departure": 0.0,
 	"music_patience": 0.0, "music_crown": 0.0,
+	"music_shatterlands": 0.0, "music_gillwood": 0.0, "music_loom": 0.0, "music_region_combat": 0.0,
 }
 var players := {}
 ## The ending sting (one play, when the ending card comes up).
@@ -100,7 +109,9 @@ func targets(m: String) -> Dictionary:
 	match m:
 		"combat":
 			return {"music_calm": 0.8, "music_combat": 1.0, "music_finale": 0.0}
-		"long_patience", "tuning_crown":
+		"region_combat":
+			return {"music_calm": 0.0, "music_combat": 0.0, "music_finale": 0.0, "music_region_combat": 1.0}
+		"long_patience", "tuning_crown", "shatterlands", "gillwood", "loom_expanse":
 			return {"music_calm": 0.0, "music_combat": 0.0, "music_finale": 0.0, REGION_MUSIC[m]: 1.0}
 		"cantor":
 			return {"music_calm": 0.0, "music_combat": 0.0, "music_finale": 0.0, "music_cantor": 1.0}
@@ -124,14 +135,21 @@ func pick_mood() -> String:
 	if get_tree().get_nodes_in_group("cantors").any(func(c): return not c.dead):
 		return "cantor"
 	if main.get("regions") and REGION_MUSIC.has(main.regions.current):
+		if main.regions.current in COMBAT_REGIONS and _hunted():
+			return "region_combat"
 		return main.regions.current
 	if main.siege.is_active():
 		return "combat"
+	return "combat" if _hunted() else "calm"
+
+
+## Wildlife is hunting close to Juno.
+func _hunted() -> bool:
 	var p: Node3D = main.player
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.hunting and not e.dead and e.global_position.distance_to(p.global_position) < COMBAT_RANGE:
-			return "combat"
-	return "calm"
+			return true
+	return false
 
 
 func _apply() -> void:

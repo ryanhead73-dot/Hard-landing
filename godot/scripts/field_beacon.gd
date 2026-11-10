@@ -53,7 +53,7 @@ func place() -> bool:
 	Game.set_flag("beacon_region", main.regions.current)
 	Game.set_flag("beacon_at", [at.x, at.y, at.z])
 	placed += 1
-	Sfx.play("beacon_ping", at + Vector3.UP, 0.0, 0.0)
+	Sfx.play("beacon_plant", at + Vector3.UP, 0.0, 0.0)
 	main.hud.show_message("Beacon planted. If you go down out here, you'll come back up beside it.")
 	return true
 

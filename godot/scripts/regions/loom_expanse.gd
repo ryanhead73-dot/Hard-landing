@@ -334,6 +334,11 @@ func _set_open(node: Node3D, open: bool) -> void:
 
 # --- Building ------------------------------------------------------------------------------
 
+## Jake's Loom rock: dark stone scored with fine grooves, as if wire was dragged through it.
+func _scored_rock(metres: float) -> Material:
+	return _tex("loom_ridge_rock", metres, true, Color(1.25, 1.2, 1.3), _basalt(metres))
+
+
 func _fibre(metres := 0.6, tint := FIBRE) -> Material:
 	return _tex("fungus_stem", metres, false, tint.lightened(0.35), _mat(tint, 0.85))
 
@@ -502,7 +507,7 @@ func _weave() -> void:
 	for s in STONES:
 		var c: Vector2 = s[0]
 		var h: Vector2 = s[1]
-		_box(Vector3(c.x, 0.04, c.y), Vector3(h.x * 2.0, 0.08, h.y * 2.0), _basalt(3.0), false)
+		_box(Vector3(c.x, 0.04, c.y), Vector3(h.x * 2.0, 0.08, h.y * 2.0), _scored_rock(3.0), false)
 	# The bypass gate: fibres laced across the gap at the lane's south end.
 	bypass = Node3D.new()
 	bypass.name = "Bypass"
@@ -555,7 +560,7 @@ func _bowl() -> void:
 		add_child(mi)
 		_arch(p + Vector3(-2.4, 0.0, 0.0), p + Vector3(2.4, 0.0, 0.0), 3.0, 0.6, 2, 6)
 	for b in BOULDERS:
-		_box(b[0] + Vector3(0.0, b[1].y * 0.5, 0.0), b[1], _basalt(3.0), true, self, Basis(Vector3.UP, _rng.randf_range(-0.4, 0.4)))
+		_box(b[0] + Vector3(0.0, b[1].y * 0.5, 0.0), b[1], _scored_rock(3.0), true, self, Basis(Vector3.UP, _rng.randf_range(-0.4, 0.4)))
 	var light := OmniLight3D.new()
 	light.light_color = GILLS
 	light.light_energy = 1.2
@@ -582,7 +587,7 @@ func _bowl() -> void:
 	for i in 3:
 		_strand(LOCKER + Vector3(-1.5 + i * 1.5, 0.0, -1.2), LOCKER + Vector3(-1.0 + i, 2.6, -0.2), 0.12)
 	# The ledge, a ramp up its west side, and the survey marker: a tripod over a sample case.
-	_box(LEDGE[0], LEDGE[1], _basalt(4.0), true)
+	_box(LEDGE[0], LEDGE[1], _scored_rock(4.0), true)
 	_ramp(Vector3(26.0, 0.0, -62.0), Vector3(34.0, 3.0, -62.0), 4.0)
 	for i in 3:
 		var a := i * TAU / 3.0

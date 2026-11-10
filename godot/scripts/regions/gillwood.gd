@@ -421,7 +421,7 @@ func _trees() -> void:
 		body.add_child(shape)
 		add_child(body)
 	var mats := [
-		_tex("fungus_stem", 2.0, true, Color(0.85, 0.9, 1.0), _mat(STEM, 0.7)),
+		_tex("gillwood_bark", 2.5, true, Color(0.78, 0.84, 0.95), _mat(STEM, 0.7)),
 		_mat(TREE_CAP, 0.6),
 		_tex("fungus_cap_underside", 2.5, true, Color(0.8, 0.85, 1.0), _glow(GILLS, 1.4), GILLS, 3.5),
 	]
@@ -622,7 +622,7 @@ func _ferro() -> void:
 ## a third under the port wingtip with a branch platform level with the walkway (and a plank
 ## across), and the fallen trunk Juno walks up from the clearing to the wing's trailing edge.
 func _wedge(hull_mat: Material) -> void:
-	var stem := _tex("fungus_stem", 2.0, true, Color(0.85, 0.9, 1.0), _mat(STEM, 0.7))
+	var stem := _tex("gillwood_bark", 2.5, true, Color(0.78, 0.84, 0.95), _mat(STEM, 0.7))
 	var gills := _tex("fungus_cap_underside", 2.5, true, Color(0.8, 0.85, 1.0), _glow(GILLS, 1.4), GILLS, 3.5)
 	for at in [Vector3(-3.0, 0.0, -6.6), Vector3(3.2, 0.0, -5.6), PERCH + Vector3(-1.0, 0.0, 0.0)]:
 		var base := to_local(fore.to_global(at))

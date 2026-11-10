@@ -747,17 +747,6 @@ def hull_groan(v):
 
 # --- The Loom Expanse (milestone C) ---------------------------------------------------------
 
-@sound("ridge_thrum")
-def ridge_thrum(v):
-    """A live ridge winding up: a low, swelling string-like thrum under the ground."""
-    d = 1.5
-    f = sweep(46, 58, d)
-    body = (osc(f, d) + 0.6 * osc(f * 2.003, d, "saw") * 0.4 + 0.3 * fm(f * 3, 0.5, 1.5, d))
-    body *= (t(d) / d) ** 1.5 * (0.75 + 0.25 * np.sin(2 * np.pi * 9 * t(d)))
-    creak = bp(white(d), 200, 900) * (t(d) / d) ** 2 * 0.25
-    return outdoor(lp(body + creak, 1200) * np.minimum((d - t(d)) / 0.08, 1.0), 0.35)
-
-
 @sound("ridge_heave", 2)
 def ridge_heave(v):
     """The swell throwing her: a dull fibrous whump, a rope-groan and a scatter of grit."""
@@ -766,45 +755,6 @@ def ridge_heave(v):
     groan = creature(0.6, 140 + 15 * v, 90, "o", 0.5, 0.5, 1.2, 3) * env(0.6, 0.05, 0.5) * 0.35
     grit = grains(0.5, 60, lambda i: bp(white(0.008), 1500, 6000) * dsp.rng.uniform(0.05, 0.4)) * np.linspace(1, 0, n(0.5))
     return outdoor(place(d, (0, sat(whump, 1.6)), (0.02, groan), (0.08, grit)), 0.3)
-
-
-@sound("diver_grind", 2)
-def diver_grind(v):
-    """A ridge diver under the weave: a moving rasp of fibre and grit, felt more than heard."""
-    d = 1.0
-    rasp = bp(white(d), 120, 700) * (0.6 + 0.4 * np.sin(2 * np.pi * (11 + 2 * v) * t(d))) * env(d, 0.15, 0.6)
-    sub = osc(sweep(38, 44, d), d) * env(d, 0.2, 0.6) * 0.5
-    crackle = grains(d, 40, lambda i: lp(white(0.01), 2500) * dsp.rng.uniform(0.05, 0.3))
-    return outdoor(place(d, (0, rasp * 0.9), (0, sub), (0, crackle)), 0.25)
-
-
-@sound("diver_erupt", 2)
-def diver_erupt(v):
-    """Out of the ground: a tearing burst of weave, a gulp of air, falling grit."""
-    d = 1.4
-    tear = bp(white(0.35), 300, 3500) * env(0.35, 0.002, 0.3) * 1.1
-    boom = thud(55 + 5 * v, 0.6, 0.5) * 1.6
-    gulp = creature(0.5, 220 + 30 * v, 120, "o", 0.6, 0.5, 2.0, 8) * env(0.5, 0.01, 0.4) * 0.5
-    fall = grains(1.0, 45, lambda i: bp(white(0.01), 800, 5000) * dsp.rng.uniform(0.05, 0.5)) * np.exp(-t(1.0) * 2.5)
-    return outdoor(place(d, (0, sat(boom, 2.0)), (0, tear), (0.05, gulp), (0.15, fall)), 0.35)
-
-
-@sound("pinweaver_click", 3)
-def pinweaver_click(v):
-    """A pinweaver's legs: dry, precise taps of a tension frame finding its footing."""
-    taps = place(0.3, (0, clack(2600 + 300 * v, 0.04, 0.08, 0.8)), (0.07 + 0.02 * v, clack(3100 - 200 * v, 0.03, 0.08, 0.6)),
-                 (0.15, clack(2400, 0.03, 0.08, 0.5)))
-    return outdoor(taps, 0.2)
-
-
-@sound("thread_spool")
-def thread_spool(v):
-    """A trip-thread paying out: a rising, whirring zip with a taut ring at the end."""
-    d = 1.0
-    zip_ = bp(white(d), 2000, 8000) * (0.5 + 0.5 * np.sin(2 * np.pi * sweep(40, 90, d) * t(d))) * env(d, 0.05, 0.4) * 0.6
-    whir = osc(sweep(600, 1400, d), d, "saw") * env(d, 0.1, 0.4) * 0.12
-    ring = modal(0.6, [(1850, 0.4, 1.0), (3720, 0.25, 0.4)]) * 0.4
-    return outdoor(place(1.3, (0, lp(zip_ + whir, 9000)), (0.85, ring)), 0.25)
 
 
 @sound("thread_snap", 2)
@@ -833,25 +783,6 @@ def singer_drone(v):
     return outdoor(x, 0.45)
 
 
-@sound("singer_inhale")
-def singer_inhale(v):
-    """Drawing breath before a song: a rising rush of air through the bell."""
-    d = 1.4
-    air = bp(white(d), 400, 3000) * (t(d) / d) ** 1.4
-    whistle = osc(sweep(300, 520, d), d) * (t(d) / d) ** 3 * 0.15
-    return outdoor((air + whistle) * np.minimum((d - t(d)) / 0.05, 1.0), 0.35)
-
-
-@sound("singer_chord", 2)
-def singer_chord(v):
-    """Dissonance: a wide, beating cluster that swells and leans sour."""
-    d = 2.2
-    base = 146.8 + 10 * v
-    cluster = sum(_hollow(base * r * (1 + 0.004 * np.sin(2 * np.pi * (3 + k) * t(d))), d, "a") / (k + 1) for k, r in enumerate((1.0, 1.06, 1.41, 1.5)))
-    x = cluster * adsr(d, 0.15, 0.3, 0.8, 1.0) * 0.6
-    return outdoor(sat(x, 1.3), 0.5)
-
-
 @sound("singer_pull")
 def singer_pull(v):
     """The pull: a low tone that bends downward and draws in, rings collapsing on it."""
@@ -862,17 +793,11 @@ def singer_pull(v):
     return outdoor(place(d, (0, x), (0, whoosh)), 0.45)
 
 
-@sound("singer_call")
-def singer_call(v):
-    """The call: a bright, rising two-note cry that carries across the bowl."""
-    d = 1.6
-    a = _hollow(sweep(330, 392, 0.6), 0.6, "a") * env(0.6, 0.04, 0.5)
-    b = _hollow(sweep(392, 523, 0.9), 0.9, "i") * env(0.9, 0.04, 0.8)
-    shimmer = osc(sweep(2000, 2600, d), d) * env(d, 0.2, 1.0) * 0.06
-    return outdoor(place(d, (0, a * 0.6), (0.45, b * 0.7), (0.3, shimmer)), 0.55)
+def _bell(f, d, bright=1.0):
+    """A big hollow tuned tone: a fundamental with soft inharmonic partials, slow decay."""
+    x = osc(f, d) * 0.6 + osc(f * 2.01, d) * 0.25 * bright + osc(f * 2.98, d) * 0.12 * bright + osc(f * 4.2, d) * 0.05 * bright
+    return x * env(d, 0.02, d * 0.85)
 
-
-# --- The Long Patience (milestone D1) -------------------------------------------------------
 
 @sound("crown_tick")
 def crown_tick(v):
@@ -912,7 +837,8 @@ def cantor_wave(v):
 
 
 # Replaced by Jake's recordings (2026-11-09 asset packs), no longer synthesised here: cantor_heart,
-# mirror_alarm, magnet_clamp, hoist_winch, boost_thrust, resonator_tick, resonator_lock, cage_drop.
+# mirror_alarm, magnet_clamp, hoist_winch, boost_thrust, resonator_tick, resonator_lock, cage_drop,
+# diver_grind, diver_erupt, pinweaver_click, thread_spool, singer_inhale, singer_chord, singer_call, ridge_thrum.
 
 
 @sound("cantor_anchor")
@@ -938,9 +864,9 @@ PEAKS = {
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
     "signal_ping": 0.4, "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
     "hull_groan": 0.9, "aux_restart": 0.85, "lamp_strike": 0.45,
-    "ridge_thrum": 0.7, "ridge_heave": 0.6, "diver_grind": 0.35, "diver_erupt": 0.9, "pinweaver_click": 0.45,
-    "thread_spool": 0.55, "thread_snap": 0.75, "singer_drone": 0.55, "singer_inhale": 0.55, "singer_chord": 0.8,
-    "singer_pull": 0.75, "singer_call": 0.75,
+    "ridge_heave": 0.6,
+    "thread_snap": 0.75, "singer_drone": 0.55,
+    "singer_pull": 0.75,
    
     "crown_tick": 0.6, "cantor_high": 0.75, "cantor_mid": 0.75,
     "cantor_low": 0.85, "cantor_wave": 0.85, "cantor_anchor": 0.85,

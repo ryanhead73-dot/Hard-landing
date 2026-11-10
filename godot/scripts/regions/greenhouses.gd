@@ -158,7 +158,7 @@ func open_gate() -> void:
 	var main := _main()
 	if main:
 		main.voice.say(Story.GREENHOUSE_OPEN)
-	Sfx.play("hull_groan", gate_pos, -4.0)
+	Sfx.play("airlock_open", gate_pos, 0.0)
 	_sync_gate(true)
 
 
