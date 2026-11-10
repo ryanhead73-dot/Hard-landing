@@ -137,6 +137,11 @@ func _hob_voice() -> void:
 	v.clear()
 	await _frames(2)
 	_check("clearing the subtitles stops him", not v.speaking())
+	Game.voice_volume = 0.5
+	Game.apply_settings()
+	_check("the voice slider sets the Voice bus", absf(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Voice")) - linear_to_db(0.5)) < 0.01)
+	Game.voice_volume = 1.0
+	Game.apply_settings()
 
 
 func _ledger() -> void:

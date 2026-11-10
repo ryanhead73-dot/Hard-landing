@@ -77,6 +77,8 @@ var master_volume := 0.8
 var music_volume := 0.7
 ## Sound effects (the SFX bus: weapons, creatures, machines, UI).
 var sfx_volume := 1.0
+## HOB's spoken lines (the Voice bus).
+var voice_volume := 1.0
 ## The frame-rate readout (F3).
 var show_fps := false
 ## Subtitles: 0 off, 1 on, 2 large, 3 largest.
@@ -373,6 +375,7 @@ func load_settings() -> void:
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
+		voice_volume = cfg.get_value("audio", "voice_volume", voice_volume)
 		show_fps = cfg.get_value("video", "show_fps", show_fps)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
@@ -458,6 +461,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("audio", "sfx_volume", sfx_volume)
+	cfg.set_value("audio", "voice_volume", voice_volume)
 	cfg.set_value("video", "show_fps", show_fps)
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.set_value("game", "screen_shake", screen_shake)
@@ -480,6 +484,7 @@ func apply_settings() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Voice"), linear_to_db(maxf(voice_volume, 0.0001)))
 	_apply_display()
 	settings_changed.emit()
 

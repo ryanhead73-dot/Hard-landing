@@ -108,6 +108,11 @@ func _ready() -> void:
 	effects.value_changed.connect(func(v: float):
 		Game.sfx_volume = v
 		Game.apply_settings())
+	var voice := _slider(_grid, "HOB's voice", 0.0, 1.0, 0.05, Game.voice_volume)
+	voice.name = "VoiceVolume"
+	voice.value_changed.connect(func(v: float):
+		Game.voice_volume = v
+		Game.apply_settings())
 	var subs := OptionButton.new()
 	subs.name = "Subtitles"
 	for t in Game.SUBTITLE_NAMES:
