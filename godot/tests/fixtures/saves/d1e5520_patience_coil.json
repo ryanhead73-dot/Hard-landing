@@ -1,0 +1,169 @@
+{
+  "act": 1,
+  "ammo": {
+    "rifle": [
+      24,
+      -1
+    ]
+  },
+  "caches_opened": [],
+  "caches_seen": [
+    0
+  ],
+  "carrying": "drive_coil",
+  "charges": 1,
+  "day_time": 0.713888888888888,
+  "flags": {
+    "ferro_canopy": true,
+    "ferro_gear": true,
+    "found_ferro9": true,
+    "greenhouse_open": true,
+    "loom_open": true,
+    "marigold_wing": true,
+    "met_reyes": true,
+    "nest_cleared": true,
+    "opening": 8,
+    "patience_coil_out": false,
+    "patience_open": true,
+    "patience_power_off": true,
+    "reached_gillwood": true,
+    "reached_greenhouses": true,
+    "reached_loom": true,
+    "reached_patience": true,
+    "relay_contact": true,
+    "reyes_talked": true,
+    "shatterlands_open": true
+  },
+  "hints_seen": [
+    "move"
+  ],
+  "logs": [],
+  "mission_done": [],
+  "mission_stage": {},
+  "quests": {
+    "ferro_9": {
+      "state": "done",
+      "step": 4
+    },
+    "marigold": {
+      "state": "active",
+      "step": 0
+    },
+    "repair_aux_power": {
+      "state": "done",
+      "step": 1
+    },
+    "repair_canopy": {
+      "state": "done",
+      "step": 1
+    },
+    "repair_cooling": {
+      "state": "done",
+      "step": 1
+    },
+    "repair_engine": {
+      "state": "active",
+      "step": 0
+    },
+    "repair_landing_gear": {
+      "state": "done",
+      "step": 1
+    },
+    "repair_wing": {
+      "state": "done",
+      "step": 1
+    },
+    "the_loom": {
+      "state": "active",
+      "step": 1
+    },
+    "the_lost": {
+      "state": "done",
+      "step": 4
+    }
+  },
+  "region": "long_patience",
+  "repaired": {
+    "aux_power": true,
+    "canopy": true,
+    "cooling": true,
+    "landing_gear": true,
+    "wing": true
+  },
+  "scrap": 60,
+  "siege_pending": -1,
+  "sites": {
+    "aux_power": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "canopy": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "cooling": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "engine": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "landing_gear": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "navigation": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    },
+    "wing": {
+      "component_taken": false,
+      "crates": [
+        false,
+        false,
+        false
+      ],
+      "pack_spawned": false
+    }
+  },
+  "stims": 1,
+  "upgrades": [],
+  "version": 2,
+  "weapon": "rifle",
+  "weapons": [
+    "rifle"
+  ]
+}

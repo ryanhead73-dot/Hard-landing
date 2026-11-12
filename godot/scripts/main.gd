@@ -671,6 +671,13 @@ func save_game() -> bool:
 
 func load_state(data: Dictionary) -> void:
 	Game.apply_session(data)
+	# A save from before a part came from a region can have it in her arms in the Kettle. It
+	# can't be fitted by hand any more, so it counts as sent home.
+	for id in Campaign.SOURCED:
+		var comp: String = Campaign.get_repair(id)["component"]
+		if Game.carrying == comp and String(data.get("region", "kettle")) != String(Campaign.SOURCED[id]["region"]):
+			Game.carrying = ""
+			Game.flags["delivered_" + comp] = true
 	# Repairs coming back would read as the mission moving on; keep the devices worked.
 	var done := Game.mission_done.duplicate()
 	var repaired: Dictionary = data.get("repaired", {})
