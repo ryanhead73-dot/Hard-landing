@@ -594,7 +594,6 @@ func _regions() -> void:
 	player.health = 100.0
 	await get_tree().create_timer(0.5).timeout
 	_check("cleared, the hoist can be powered", ge.brood_cleared() and ge.waiting() == "hoist")
-	player.damaged.disconnect(keep_alive)
 	_place(ge.post_pos(6) + Vector3(0.0, 0.5, 0.0), 0.0)
 	await _frames(3)
 	_check("Reyes's hoist takes power", _label().contains("hoist"), _label())
@@ -606,6 +605,7 @@ func _regions() -> void:
 	_check("at the hoist the strut goes up and home", ge.done() and Game.delivered("struts"), "at %d" % ge.at)
 	await get_tree().create_timer(1.6).timeout
 	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0, "quest %s, step %d, waypoint %s, dead %s, hp %.0f" % [main.quests.state_of("ferro_9"), main.quests.step_of("ferro_9"), rm.waypoint() - gw.exit_global(), player.dead, player.health])
+	player.damaged.disconnect(keep_alive)
 	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
 	# The Gillwood's own creature: roosts under the caps, flares, swoops; stepping aside dodges.
 	_check("veilwings roost in the Gillwood", gw.residents.filter(func(r): return r[0] == "veilwing").size() == 3)
