@@ -251,7 +251,7 @@ func _diver() -> void:
 		if d.state == RidgeDiver.State.PROWL or d.state == RidgeDiver.State.TRACK:
 			d.heard_at = player.global_position
 			d.state = RidgeDiver.State.TRACK
-	_check("it comes under her and marks the spot", d.state == RidgeDiver.State.MARK and d._ring.visible)
+	_check("it comes under her and marks the spot", d.state == RidgeDiver.State.MARK and d._ring.visible, "%s after %.1f s, %.1f m from her, on weave %s, hp %.0f" % [RidgeDiver.State.find_key(d.state), mark_t, Vector2(d.global_position.x - player.global_position.x, d.global_position.z - player.global_position.z).length(), loom.on_weave(player.global_position), player.health])
 	var t := 0.0
 	while d.state == RidgeDiver.State.MARK and t < 3.0:
 		await get_tree().physics_frame
