@@ -5,7 +5,7 @@ extends Node3D
 
 const CREATURES := ["scuttler", "spitter", "ram", "warden", "lurker", "skimmer", "drifter",
 	"veilwing", "ridge_diver", "pinweaver", "chord_singer", "patience_guardian", "cantor",
-	"juno", "survivor"]
+	"juno", "reyes", "okafor", "brandt", "haddad", "teo"]
 const CLASSES := {"scuttler": "Scuttler", "spitter": "Spitter", "ram": "Ram", "warden": "Warden",
 	"lurker": "Lurker", "skimmer": "Skimmer", "drifter": "Drifter", "veilwing": "Veilwing",
 	"ridge_diver": "RidgeDiver", "pinweaver": "Pinweaver", "chord_singer": "ChordSinger",
@@ -13,6 +13,8 @@ const CLASSES := {"scuttler": "Scuttler", "spitter": "Spitter", "ram": "Ram", "w
 
 ## The clip each model is shown in.
 const SHOW := {"veilwing": "climb", "ridge_diver": "surfaced", "skimmer": "idle"}
+## The survivors (blender/build_people.py), each in the loop they hold at the greenhouses.
+const PEOPLE := {"reyes": "at_ease", "okafor": "idle", "brandt": "crouch", "haddad": "watch", "teo": "crouch"}
 
 var out := "user://creature_shots"
 
@@ -95,6 +97,14 @@ func _spawn(n: String) -> Node3D:
 		return holder3
 	var holder := Node3D.new()
 	add_child(holder)
+	if PEOPLE.has(n):
+		var person := Rig.spawn("person_" + n, holder)
+		var loops := person.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if loops:
+			loops.play(PEOPLE[n])
+			loops.seek(loops.current_animation_length * 0.3, true)
+			loops.pause()
+		return holder
 	var rig := Rig.spawn("juno_rigged", holder)
 	var mount := Rig.attach(rig, "WeaponMount")
 	if mount and n == "juno":
