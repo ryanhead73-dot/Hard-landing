@@ -28,6 +28,8 @@ const KINDS := {
 	"ridge_diver": {"legs": "none", "stride": 2.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 	"pinweaver": {"legs": "none", "stride": 1.8, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 	"chord_singer": {"legs": "none", "stride": 1.5, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"patience_guardian": {"legs": "none", "stride": 2.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"cantor": {"legs": "none", "stride": 1.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 }
 const SHOTS := {"attack": 0.35, "slam": 0.45, "hurt": 0.3}
 
@@ -276,7 +278,7 @@ func _build_tree(clips: AnimationPlayer) -> void:
 	bt.connect_node("move", 0, "idle")
 	bt.connect_node("move", 1, "walk_speed")
 	var state := AnimationNodeTransition.new()
-	state.xfade_time = 0.2
+	state.xfade_time = 0.25
 	state.add_input("base")
 	bt.add_node("state", state)
 	bt.connect_node("state", 0, "move")

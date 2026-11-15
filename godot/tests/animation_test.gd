@@ -19,6 +19,7 @@ func _run() -> void:
 	await _juno_down()
 	await _wildlife()
 	await _lurker_emerge()
+	await _skinned_wildlife()
 	await _ship()
 	await _intro()
 	finished = true
@@ -228,6 +229,32 @@ func _wildlife() -> void:
 
 
 ## A lurker bursting out of its pool eases its jaw open over a few frames instead of snapping it.
+## The creatures modelled as one skinned mesh (blender/build_creatures.py): each has its clips,
+## a weak spot that follows its bone, and the clip for the state it is in plays.
+func _skinned_wildlife() -> void:
+	var clips := {"drifter": ["idle", "walk", "swell", "die"], "veilwing": ["roost", "flare", "swoop", "climb", "die"],
+		"ridge_diver": ["surfaced", "attack", "dive", "die"], "pinweaver": ["idle", "walk", "anchor", "spool", "recover", "die"],
+		"chord_singer": ["idle", "walk", "plant", "inhale", "sing", "stagger", "die"],
+		"patience_guardian": ["idle", "walk", "dormant", "brace", "charge", "pinned", "die"], "cantor": ["listen", "open", "die"]}
+	for kind in clips:
+		var e := main.spawn_enemy("guardian" if kind == "patience_guardian" else kind, ARENA + Vector3(0.0, 0.5, -6.0), "") as Enemy
+		await _frames(3)
+		var player_clips := e.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		var missing: Array = []
+		for c in clips[kind]:
+			if player_clips == null or not player_clips.has_animation(c):
+				missing.append(c)
+		var meshes := 0
+		for n in e.find_children("*", "MeshInstance3D", true, false):
+			if (n as MeshInstance3D).skeleton != NodePath():
+				meshes += 1
+		_check("%s: one skinned mesh with its clips" % kind, missing.is_empty() and meshes == 1 and e.anim and e.anim.tree != null,
+			"missing %s, skinned meshes %d" % [missing, meshes])
+		_check("%s: its weak spot follows a bone" % kind, e._weak != null and is_instance_valid(e._weak), e.weak_joint)
+		e.queue_free()
+		await _frames(2)
+
+
 func _lurker_emerge() -> void:
 	var lk: Enemy = main.spawn_enemy("lurker", ARENA + Vector3(0.0, 0.0, -20.0))
 	lk.target = null

@@ -213,7 +213,8 @@ func _physics_process(delta: float) -> void:
 		State.SURFACED:
 			var rise := clampf((SURFACE_TIME + _open_for - INHALE_TIME - _timer) / 0.2, 0.0, 1.0)
 			_body.position.y = lerpf(-2.0, 0.0, rise)
-			_gill_mat.emission_energy_multiplier = 3.5 if _weak_open() else 0.5
+			if _gill_mat:
+				_gill_mat.emission_energy_multiplier = 3.5 if _weak_open() else 0.5
 			if _target_alive():
 				_face(target.global_position, clampf(4.0 * delta, 0.0, 1.0))
 			if _timer <= 0.0:

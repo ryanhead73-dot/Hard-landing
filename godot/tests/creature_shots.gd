@@ -11,6 +11,9 @@ const CLASSES := {"scuttler": "Scuttler", "spitter": "Spitter", "ram": "Ram", "w
 	"ridge_diver": "RidgeDiver", "pinweaver": "Pinweaver", "chord_singer": "ChordSinger",
 	"patience_guardian": "PatienceGuardian", "cantor": "Cantor"}
 
+## The clip each model is shown in.
+const SHOW := {"veilwing": "climb", "ridge_diver": "surfaced", "skimmer": "idle"}
+
 var out := "user://creature_shots"
 
 
@@ -78,10 +81,18 @@ func _ready() -> void:
 
 func _spawn(n: String) -> Node3D:
 	if CLASSES.has(n):
-		var script := load("res://scripts/%s.gd" % n) as Script
-		var e := script.new() as Node3D
-		add_child(e)
-		return e
+		# The model on its own, holding a pose that shows it off (in the game a ridge diver starts
+		# underground and a veilwing hangs at its roost).
+		var holder3 := Node3D.new()
+		add_child(holder3)
+		var model := Rig.spawn(n, holder3)
+		var clips := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		var clip: String = SHOW.get(n, "idle")
+		if clips and clips.has_animation(clip):
+			clips.play(clip)
+			clips.seek(clips.current_animation_length * 0.3, true)
+			clips.pause()
+		return holder3
 	var holder := Node3D.new()
 	add_child(holder)
 	var rig := Rig.spawn("juno_rigged", holder)

@@ -51,7 +51,7 @@ func _init() -> void:
 	drops = Vector2i(0, 1)
 	death_puff = 0.5
 	weak_joint = "Core"
-	weak_offset = Vector3.ZERO
+	weak_offset = Vector3(0.0, 0.12, 0.0)
 	weak_radius = 0.26
 
 

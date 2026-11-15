@@ -904,7 +904,337 @@ def chord_singer():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer}
+# --- Patience guardian -------------------------------------------------------------------
+
+def patience_guardian():
+    """The Long Patience's guardian: a plated quadruped the size of a cargo loader. Three
+    overlapping carapace plates streaked with rust (the rear one hinges up when a cargo magnet
+    tears at it, baring the amber vent underneath: the weak spot), a blunt ram of a head with a
+    row of red sensing pits along the brow and no eyes, and four pillar legs. Faces -z."""
+    c = Creature("patience_guardian")
+    c.material("guardian_shell", rough=0.5, metal=0.35)
+    c.material("guardian_hide", rough=0.85)
+    c.material("guardian_sense", rough=0.4, emit="ff5a3a", energy=1.2)
+    c.material("guardian_vent", rough=0.4, emit="ffb04a", energy=0.0)
+
+    c.bone("Body", (0, 1.25, 0.9), (0, 1.25, -0.8))
+    c.bone("Head", (0, 1.1, -1.25), (0, 0.95, -2.1), "Body")
+    c.bone("Jaw", (0, 0.8, -1.4), (0, 0.6, -2.0), "Head")
+    c.bone("PlateBack", (0, 1.8, 0.3), (0, 1.75, 1.5), "Body")
+    c.bone("Vent", (0, 1.7, 1.0), (0, 1.95, 1.0), "Body")
+
+    def shell_paint(p, n):
+        base = mix(C("2a2624"), C("4a433f"), 0.5 + 0.5 * fbm(p, 2.5, 3, 1.0))
+        # Rust runs down from the ridges and pools at the plate edges.
+        streak = smooth(0.1, 0.7, 0.5 + 0.5 * fbm(V((p.x * 6.0, p.y * 0.8, p.z * 6.0)), 1.0, 2, 3.0))
+        rust = streak * smooth(0.6, -0.2, n.y) * 0.55
+        base = mix(base, C("6e3b22"), rust)
+        return mix(base, C("6d6a66"), smooth(0.75, 1.0, n.y) * 0.3)
+
+    def hide_paint(p, n):
+        return mix(C("3a2a22"), C("6e4a36"), 0.5 + 0.5 * fbm(p, 4.0, 3, 5.0))
+
+    core = ellipsoid((0, 1.2, 0.05), (0.88, 0.6, 1.45), segs=24, rings=16,
+                     fn=lambda u: 1.0 - 0.18 * max(0.0, -u.y) ** 2)
+    core.plates(0.02, 3.5, 4.0)
+    c.part(core, "Body", "guardian_hide", hide_paint)
+
+    def ridge(u):
+        # A keel down the middle and two shoulders of ridge either side.
+        k = 1.0 + 0.07 * math.exp(-(u.x / 0.12) ** 2) + 0.04 * math.exp(-((abs(u.x) - 0.5) / 0.1) ** 2)
+        return k + 0.03 * fbm(u, 5.0, 2, 2.0)
+
+    plates = [("Body", (0, 1.22, -0.72), (1.06, 0.82, 0.78), -8), ("Body", (0, 1.3, 0.12), (1.02, 0.84, 0.74), 2),
+              ("PlateBack", (0, 1.24, 0.95), (0.95, 0.8, 0.8), 12)]
+    for i, (bone, at, radii, tilt) in enumerate(plates):
+        sh = shell(at, radii, cover=0.5, thick=0.09, segs=26, rings=9, fn=ridge, rot=(tilt, 0, 0), lip=0.08)
+        sh.plates(0.012, 5.0, float(i))
+        c.part(sh, bone, "guardian_shell", shell_paint)
+        # Bosses along the rim, like rivets grown rather than driven.
+        # A ridge of worn knobs down the keel.
+        for k in range(3):
+            z = at[2] - radii[2] * 0.45 + k * radii[2] * 0.45
+            c.part(ellipsoid((0, at[1] + radii[1] * 0.98 + 0.06, z), (0.09, 0.07, 0.16), segs=10, rings=6), bone,
+                   "guardian_shell", "1c1917")
+    # Tail stub.
+    c.part(tube([(0, 1.25, 1.35), (0, 1.1, 1.7), (0, 0.85, 1.9)], [0.3, 0.2, 0.08], sides=10, samples=4), "Body", "guardian_hide", hide_paint)
+
+    # The vent under the rear plate: a bed of amber slats.
+    for i in range(6):
+        z = 0.62 + i * 0.14
+        c.part(ellipsoid((0, 1.74 - 0.012 * i * i, z), (0.46 - 0.03 * i, 0.07, 0.05), segs=12, rings=6), "Vent", "guardian_vent",
+               lambda p, n: mix(C("5a3208"), C("ffc56a"), smooth(0.2, 1.0, n.y)), ao=False)
+
+    # Head: a ram. A domed boss plate, a flat striking face, heavy lower jaw, two horn stubs.
+    def head_fn(u):
+        k = 1.0 + 0.15 * smooth(0.2, 0.9, u.y) * smooth(0.6, -0.4, u.z)
+        k *= 1.0 - 0.22 * smooth(0.55, 1.0, -u.z)
+        return k
+
+    head = ellipsoid((0, 1.05, -1.62), (0.68, 0.52, 0.62), segs=24, rings=14, fn=head_fn)
+    head.plates(0.014, 5.0, 7.0)
+    c.part(head, ["Head", "Body"], "guardian_shell", shell_paint, falloff=5.0)
+    face = shell((0, 1.02, -1.75), (0.62, 0.5, 0.5), cover=0.42, thick=0.08, segs=20, rings=6, rot=(-82, 0, 0), lip=0.05)
+    c.part(face, "Head", "guardian_shell", lambda p, n: mix(shell_paint(p, n), C("8a8884"), 0.35 * smooth(-2.1, -2.26, p.z)))
+    c.part(tube([(0, 1.3, -1.1), (0, 1.25, -1.35)], [0.5, 0.48], sides=12, samples=1), ["Body", "Head"], "guardian_hide", hide_paint)
+    jaw = ellipsoid((0, 0.68, -1.68), (0.5, 0.2, 0.5), segs=16, rings=10, fn=lambda u: 1.0 - 0.2 * smooth(0.4, 1.0, -u.z))
+    c.part(jaw, "Jaw", "guardian_hide", mottled("2a1e18", "5a3a2a", freq=5.0, seed=8.0))
+    for k in range(6):
+        x = -0.3 + k * 0.12
+        c.part(spike((x, 0.76, -2.05 + abs(x) * 0.4), (x, 0.92, -2.1 + abs(x) * 0.4), 0.04, sides=5), "Jaw", "guardian_hide", "b8ab96")
+    for s in (-1.0, 1.0):
+        c.part(tube([(0.55 * s, 1.2, -1.5), (0.82 * s, 1.3, -1.62), (0.9 * s, 1.22, -1.86)], [0.14, 0.1, 0.03], sides=8, samples=3,
+                    caps=("round", "point")), "Head", "guardian_shell", "1c1917")
+    # Sensing pits along the brow.
+    for k in range(7):
+        x = -0.42 + k * 0.14
+        z = -2.14 + abs(x) * 0.42
+        c.part(ellipsoid((x, 1.3 - abs(x) * 0.1, z), (0.065, 0.05, 0.05), segs=8, rings=5), "Head", "guardian_sense", "ffb09a", ao=False)
+
+    # Legs: short thick pillars, a plated knee, three blunt toes.
+    legs = []
+    for fb, zs in (("F", -1.0), ("B", 1.0)):
+        for side, s in (("L", -1.0), ("R", 1.0)):
+            hip = V((0.72 * s, 1.05, 0.92 * zs))
+            knee = V((0.98 * s, 0.62, (0.92 - 0.14) * zs + 0.12))
+            foot = V((0.92 * s, 0.0, 0.95 * zs))
+            up = c.bone("Leg%s%s" % (fb, side), hip, knee, "Body")
+            lo = c.bone("Shin%s%s" % (fb, side), knee, foot, up)
+            legs.append((fb, side, s, zs, up, lo, hip, knee, foot))
+            c.part(tube([hip, knee], [0.3, 0.24], sides=10, samples=3), [up, "Body"], "guardian_hide", hide_paint, falloff=5.0)
+            c.part(tube([knee, knee.lerp(foot, 0.6), foot + V((0, 0.14, 0))], [0.23, 0.19, 0.24], sides=10, samples=3), [lo], "guardian_hide", hide_paint)
+            cap = shell(knee + V((0.1 * s, 0.0, 0)), (0.3, 0.32, 0.3), cover=0.45, thick=0.06, segs=12, rings=5, rot=(0, 0, -70 * s))
+            c.part(cap, up, "guardian_shell", shell_paint)
+            for k in (-1, 0, 1):
+                tp = foot + V((0.1 * s * (1 - abs(k)) + 0.0, 0.07, -0.26 + 0.0)) + V((0.2 * k, 0, 0.06 * abs(k)))
+                c.part(ellipsoid(tp, (0.1, 0.08, 0.15), segs=8, rings=5), lo, "guardian_shell", "1c1917")
+    c.build()
+
+    def stand(drop=0.0, spread=1.0, shift=(0, 0, 0), lift=None, tuck=0.0):
+        pose = {}
+        off = V((shift[0], shift[1] - drop, shift[2]))
+        for fb, side, s, zs, up, lo, _, _, foot in legs:
+            f = V((foot.x * spread, (lift or {}).get(fb + side, 0.0), foot.z * (1.0 - tuck)))
+            pose.update(c.leg_ik(up, lo, f, off))
+        return pose, {"Body": tuple(off)}
+
+    def with_body(posed, extra, scales=None):
+        pose, offsets = posed
+        return (merge(pose, extra), offsets, scales or {})
+
+    def step(ph, stride, lift, bob):
+        """A trot: diagonal pairs."""
+        pose = {}
+        off = V((0, bob * math.sin(ph * 2), 0))
+        for fb, side, s, zs, up, lo, _, _, foot in legs:
+            psi = (ph + (math.pi if (fb == "F") != (side == "L") else 0.0)) % TAU
+            if psi < math.pi:
+                z, y = -stride * 0.5 + stride * psi / math.pi, 0.0
+            else:
+                t = (psi - math.pi) / math.pi
+                z, y = stride * 0.5 - stride * (0.5 - 0.5 * math.cos(t * math.pi)), lift * math.sin(t * math.pi)
+            pose.update(c.leg_ik(up, lo, foot + V((0, y, z)), off))
+        return pose, {"Body": tuple(off)}
+
+    c.cycle("idle", 90, lambda ph: with_body(
+        stand(0.03 + 0.03 * math.sin(ph)),
+        {"Body": (1.0 * math.sin(ph), 0, 0), "Head": (4 * math.sin(ph), 12 * math.sin(ph * 0.5), 0), "Jaw": (-4 - 3 * math.sin(ph), 0, 0)}), steps=8)
+    c.cycle("walk", 24, lambda ph: with_body(
+        step(ph, 1.2, 0.22, 0.04), {"Body": (1.5 * math.sin(ph * 2), 0, 2.5 * math.sin(ph)), "Head": (3 * math.sin(ph * 2 + 1), -4 * math.sin(ph), 0)}), steps=12)
+    # Asleep in its alcove: down on its belly, head on the floor, breathing slow.
+    c.cycle("dormant", 120, lambda ph: with_body(
+        stand(0.6 + 0.02 * math.sin(ph), 1.12), {"Body": (0, 0, 0), "Head": (-16, 0, 0), "Jaw": (0, 0, 0)}), steps=4)
+    # Braced to charge: weight thrown back on its haunches, head down behind the plate, shaking.
+    c.cycle("brace", 6, lambda ph: with_body(
+        stand(0.26, 1.05, shift=(0.02 * math.sin(ph), 0, 0.3)),
+        {"Body": (-7, 0, 1.0 * math.sin(ph)), "Head": (-20, 0, 0), "Jaw": (-14, 0, 0)}), steps=4)
+    c.cycle("charge", 10, lambda ph: with_body(
+        step(ph, 1.7, 0.4, 0.1), {"Body": (-6 + 3 * math.sin(ph * 2), 0, 2 * math.sin(ph)), "Head": (-24, 0, 0), "Jaw": (-6, 0, 0)}), steps=10)
+    c.cycle("recover", 30, lambda ph: with_body(
+        stand(0.14 + 0.04 * math.sin(ph * 2), 1.04), {"Body": (3, 0, 0), "Head": (8, 16 * math.sin(ph), 6 * math.sin(ph)), "Jaw": (-18 - 6 * math.sin(ph * 2), 0, 0)}), steps=8)
+    # Hauled up by a cargo magnet: legs off the floor and working at nothing, the back plate wrenched open.
+    def pinned(ph):
+        lift = {fb + side: 0.3 + 0.16 * math.sin(ph * 2 + i * 1.7) for i, (fb, side, *_r) in enumerate(legs)}
+        return with_body(stand(0.0, 0.86, lift=lift, tuck=0.2),
+                         {"Body": (5 * math.sin(ph), 0, 6 * math.cos(ph)), "Head": (-18 + 8 * math.sin(ph * 2), 14 * math.sin(ph), 0),
+                          "Jaw": (-26, 0, 0), "PlateBack": (34 + 3 * math.sin(ph * 4), 0, 0)}, {"Vent": 1.15 + 0.08 * math.sin(ph * 4)})
+    c.cycle("pinned", 24, pinned, steps=8)
+    c.clip("hurt", [(0,) + with_body(stand(), {}), (2,) + with_body(stand(0.08, shift=(0, 0, 0.1)), {"Body": (3, 0, 3), "Head": (10, 0, 6)}),
+                    (6,) + with_body(stand(0.02), {"Head": (-4, 0, -2)}), (9,) + with_body(stand(), {})])
+    c.clip("die", [(0,) + with_body(stand(), {}),
+                   (6,) + with_body(stand(-0.08, 0.98), {"Body": (8, 0, 0), "Head": (26, 0, 0), "Jaw": (-30, 0, 0)}),
+                   (18,) + with_body(stand(0.5, 1.12), {"Body": (-4, 0, 8), "Head": (-10, 0, 10), "Jaw": (-20, 0, 0), "PlateBack": (10, 0, 0)}),
+                   (30,) + with_body(stand(0.66, 1.2, shift=(0.1, 0, 0)), {"Body": (-2, 0, 16), "Head": (-20, 10, 16), "Jaw": (-10, 0, 0), "PlateBack": (14, 0, 0)})])
+    c.export()
+
+
+# --- The Cantor --------------------------------------------------------------------------
+
+def braid(pts, radius, strands=3, twist=5.0, sides=6, samples=6):
+    """A cable of `strands` thinner tubes wound round each other along pts (a Geo)."""
+    from creature_kit import Geo
+    path = [V(p) for p in pts]
+    n = 40
+    # Resample the path evenly.
+    lens = [0.0]
+    for i in range(1, len(path)):
+        lens.append(lens[-1] + (path[i] - path[i - 1]).length)
+    total = lens[-1]
+
+    def at(d):
+        for i in range(1, len(path)):
+            if lens[i] >= d:
+                f = (d - lens[i - 1]) / max(lens[i] - lens[i - 1], 1e-9)
+                return path[i - 1].lerp(path[i], f), (path[i] - path[i - 1]).normalized()
+        return path[-1], (path[-1] - path[-2]).normalized()
+    geo = Geo()
+    for k in range(strands):
+        pts_k = []
+        side = None
+        for i in range(n + 1):
+            p, t = at(total * i / n)
+            if side is None:
+                side = t.cross(V((0, 1, 0)) if abs(t.y) < 0.9 else V((1, 0, 0))).normalized()
+            side = (side - t * side.dot(t)).normalized()
+            up = side.cross(t)
+            a = TAU * k / strands + twist * TAU * i / n
+            pts_k.append(p + (side * math.cos(a) + up * math.sin(a)) * radius * 0.55)
+        geo.add(tube(pts_k, [radius * 0.55] * len(pts_k), sides=sides, samples=1, caps=("round", "round")))
+    return geo
+
+
+def cantor():
+    """The Cantor: a hollow rib cage of braided living cable hung over the Tuning Crown's floor,
+    the heart-node (teal, the weak spot) in the middle behind three woven petals that fold open,
+    a crown of cable at the top where the four anchor lines meet, and a frayed knot of root
+    tendrils hanging below. Origin is the floor under it; the heart is at 7 m."""
+    HY = 7.0
+    c = Creature("cantor")
+    c.material("cantor_cable", rough=0.75)
+    c.material("cantor_heart", rough=0.3, emit="3fe0c8", energy=1.0)
+    c.material("cantor_petal", rough=0.6)
+    c.material("cantor_glow", rough=0.4, emit="ff9a5a", energy=0.9)
+
+    c.bone("Cage", (0, HY - 4.8, 0), (0, HY + 4.8, 0))
+    c.bone("Heart", (0, HY - 1.0, 0), (0, HY + 1.0, 0), "Cage")
+    c.bone("Crown", (0, HY + 4.6, 0), (0, HY + 6.0, 0), "Cage")
+    for i in range(3):
+        a = TAU * i / 3
+        d = V((math.sin(a), 0, -math.cos(a)))
+        c.bone("Petal%d" % (i + 1), V((0, HY + 1.55, 0)) + d * 0.35, V((0, HY - 1.4, 0)) + d * 1.25, "Cage")
+
+    def cable_paint(p, n):
+        base = mix(C("3e2a24"), C("7a5544"), 0.5 + 0.5 * fbm(p, 1.6, 3, 1.0))
+        base = mix(base, C("a07a62"), smooth(0.5, 1.0, n.y) * 0.3)
+        # Faint violet sheen in the crevices, like the Loom's light caught in the fibre.
+        return mix(base, C("4a3060"), smooth(0.0, -0.8, n.y) * 0.35)
+
+    # Ribs: eight braided hoops round the heart, swelling at the equator.
+    RIBS = 8
+    for i in range(RIBS):
+        a = TAU * i / RIBS + 0.2
+        d = V((math.cos(a), 0, math.sin(a)))
+        pts = []
+        for k in range(17):
+            th = math.pi * k / 16
+            r = 4.0 * math.sin(th) * (1.0 + 0.06 * math.sin(th * 3 + i))
+            y = HY + 5.2 * math.cos(th)
+            pts.append(d * r + V((0, y, 0)) + V((-d.z, 0, d.x)) * 0.35 * math.sin(th * 2))
+        c.part(braid(pts, 0.28, strands=3, twist=4.0 + i % 3, sides=6), "Cage", "cantor_cable", cable_paint, ao=False)
+    # Two girdles round the cage holding the ribs.
+    for y, r in ((HY + 2.6, 3.45), (HY - 2.6, 3.45)):
+        pts = [V((math.cos(TAU * k / 24) * r, y + 0.2 * math.sin(TAU * k / 8), math.sin(TAU * k / 24) * r)) for k in range(25)]
+        c.part(braid(pts, 0.18, strands=2, twist=14.0, sides=5), "Cage", "cantor_cable", cable_paint, ao=False)
+    # Crown: a knot where the ribs and anchor lines meet, with glowing fruit-like nodes.
+    crown = ellipsoid((0, HY + 5.3, 0), (0.9, 0.7, 0.9), segs=18, rings=12,
+                      fn=lambda u: 1.0 + 0.18 * math.sin(math.atan2(u.z, u.x) * 6) * (1 - abs(u.y)))
+    crown.bumps(0.08, 2.5, 3.0, 2)
+    c.part(crown, "Crown", "cantor_cable", cable_paint)
+    for i in range(4):
+        a = TAU * i / 4 + math.pi / 4
+        d = V((math.cos(a), 0, math.sin(a)))
+        c.part(braid([V((0, HY + 5.4, 0)) + d * 0.5, V((0, HY + 6.2, 0)) + d * 1.6, V((0, HY + 6.6, 0)) + d * 2.6], 0.24, strands=3,
+                     twist=3.0), "Crown", "cantor_cable", cable_paint, ao=False)
+        c.part(ellipsoid(V((0, HY + 5.0, 0)) + d * 0.9, (0.22, 0.28, 0.22), segs=10, rings=6), "Crown", "cantor_glow", "ffc49a", ao=False)
+    # Bottom knot and the frayed root tendrils trailing toward the floor.
+    knot = ellipsoid((0, HY - 5.2, 0), (0.75, 0.55, 0.75), segs=16, rings=10)
+    knot.bumps(0.08, 2.5, 4.0, 2)
+    c.part(knot, "Cage", "cantor_cable", cable_paint)
+    for i in range(9):
+        a = TAU * i / 9 + 0.3
+        d = V((math.cos(a), 0, math.sin(a)))
+        ln = 2.4 + 1.2 * ((i * 5) % 3) / 2
+        pts = [V((0, HY - 5.4, 0)) + d * 0.4, V((0, HY - 5.4 - ln * 0.4, 0)) + d * 0.9, V((0, HY - 5.4 - ln, 0)) + d * 1.3]
+        c.part(tube(pts, [0.12, 0.08, 0.02], sides=6, samples=4, caps=("round", "point")), "Cage", "cantor_cable", cable_paint, ao=False)
+
+    # The heart-node: a knotted teal organ, lobed, with veins.
+    def heart_fn(u):
+        return 1.0 + 0.12 * math.sin(u.x * 5 + 1) * math.sin(u.y * 4) * math.sin(u.z * 5 + 2) + 0.05 * math.sin(math.atan2(u.z, u.x) * 5)
+
+    heart = ellipsoid((0, HY, 0), (1.05, 1.2, 1.05), segs=28, rings=18, fn=heart_fn)
+    heart.bumps(0.03, 3.0, 5.0, 2)
+    c.part(heart, "Heart", "cantor_heart",
+           lambda p, n: mix(C("0f6a5c"), C("8cfbea"), smooth(0.25, 0.75, 0.5 + 0.5 * fbm(p, 2.2, 3, 6.0))), ao=False)
+    # The cables it hangs from inside the cage.
+    for i in range(3):
+        a = TAU * i / 3 + 0.5
+        d = V((math.cos(a), 0, math.sin(a)))
+        c.part(tube([V((0, HY + 1.0, 0)) + d * 0.3, V((0, HY + 3.0, 0)) + d * 0.7, V((0, HY + 4.9, 0)) + d * 0.3], [0.1, 0.08, 0.12],
+                    sides=6, samples=4), ["Heart", "Crown"], "cantor_cable", cable_paint, ao=False, falloff=2.0)
+        c.part(tube([V((0, HY - 1.0, 0)) + d * 0.3, V((0, HY - 3.0, 0)) + d * 0.7, V((0, HY - 5.0, 0)) + d * 0.3], [0.1, 0.08, 0.12],
+                    sides=6, samples=4), ["Heart", "Cage"], "cantor_cable", cable_paint, ao=False, falloff=2.0)
+
+    # Petals: woven shields round the heart, hinged at the top, each a curved leaf of cable.
+    for i in range(3):
+        a = TAU * i / 3
+        d = V((math.sin(a), 0, -math.cos(a)))
+        side = V((-d.z, 0, d.x))
+        ea, eb = [], []
+        for k in range(9):
+            t = k / 8
+            y = HY + 1.6 - 3.2 * t
+            w = 1.75 * math.sin(math.pi * (0.08 + 0.84 * t)) + 0.05
+            bulge = 1.3 + 0.3 * math.sin(math.pi * t)
+            ea.append(V((0, y, 0)) + d * bulge - side * w)
+            eb.append(V((0, y, 0)) + d * bulge + side * w)
+        pet = sheet(ea, eb, nv=8, thick=0.16, camber=lambda u, v: 0.45 * math.sin(v * math.pi))
+        pet.plates(0.03, 3.0, float(i))
+
+        def petal_paint(p, n, i=i):
+            weave = 0.5 + 0.5 * math.sin(p.y * 9.0) * math.sin((p.x + p.z) * 9.0)
+            return mix(mix(C("4a3028"), C("8a6a5a"), weave), C("c08a70"), smooth(0.7, 1.0, n.y) * 0.3)
+        c.part(pet, "Petal%d" % (i + 1), "cantor_petal", petal_paint)
+        # A spine of cable down the middle of each petal.
+        c.part(tube([V((0, HY + 1.6, 0)) + d * 1.35, V((0, HY, 0)) + d * 1.95, V((0, HY - 1.6, 0)) + d * 1.4], [0.13, 0.15, 0.06],
+                    sides=6, samples=5, caps=("round", "point")), "Petal%d" % (i + 1), "cantor_cable", cable_paint)
+    c.build(ao_reach=1.5)
+
+    def petals(open_deg):
+        out = {}
+        for i in range(3):
+            a = TAU * i / 3
+            d = V((math.sin(a), 0, -math.cos(a)))
+            ax = V((-d.z, 0, d.x))
+            out["Petal%d" % (i + 1)] = axis(ax, open_deg)
+        return out
+
+    c.cycle("idle", 120, lambda ph: ({"Cage": (1.2 * math.sin(ph), 0, 1.2 * math.cos(ph)), "Crown": (0, 4 * math.sin(ph), 0)},
+                                     {"Heart": (0, 0.05 * math.sin(ph * 2), 0)}, {"Heart": 1.0 + 0.04 * math.sin(ph * 2)}), steps=8)
+    for name in ("listen", "respond", "resolve"):
+        c.cycle(name, 138, lambda ph: (
+            merge({"Cage": (1.5 * math.sin(ph), 0, 1.5 * math.cos(ph)), "Crown": (0, 6 * math.sin(ph), 0)}),
+            {"Heart": (0, 0.06 * math.sin(ph * 3), 0)}, {"Heart": 1.0 + 0.06 * math.sin(ph * 3)}), steps=12)
+    c.cycle("walk", 60, lambda ph: ({"Cage": (2 * math.sin(ph), 0, 0)},), steps=4)
+    # Held open (the game crossfades into it), the heart beating.
+    c.cycle("open", 24, lambda ph: (merge(petals(68.0 + 3 * math.sin(ph)), {"Cage": (1.0 * math.sin(ph), 0, 0)}), {},
+                                    {"Heart": 1.08 + 0.06 * math.sin(ph * 2)}), steps=8)
+    c.clip("hurt", [(0, {}, {}, {}), (3, {"Cage": (3, 0, 2)}, {}, {"Heart": 0.9}), (8, {}, {}, {"Heart": 1.04}), (12, {}, {}, {})])
+    c.clip("die", [(0, petals(66.0)), (20, merge(petals(95.0), {"Cage": (6, 0, 4)}), {}, {"Heart": 1.25}),
+                   (50, merge(petals(110.0), {"Cage": (10, 0, 8)}), {"Heart": (0, -1.5, 0)}, {"Heart": 0.6})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor}
 
 
 def main():

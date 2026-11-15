@@ -71,6 +71,7 @@ func _init() -> void:
 	leash_range = 999.0
 	drops = Vector2i(10, 14)
 	death_puff = 2.0
+	weak_joint = "Vent"
 	weak_radius = 0.9
 
 
@@ -93,69 +94,12 @@ func _setup() -> void:
 func _build() -> void:
 	_body = Node3D.new()
 	add_child(_body)
-	var shell := StandardMaterial3D.new()
-	shell.albedo_color = SHELL
-	shell.roughness = 0.5
-	shell.metallic = 0.4
-	_flashes(shell)
-	var rust := StandardMaterial3D.new()
-	rust.albedo_color = RUST
-	rust.roughness = 0.85
-	_flashes(rust)
-	# A low, broad carapace in three overlapping plates, a blunt ram of a head and four short legs.
-	for i in 3:
-		var plate := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(2.1 - i * 0.2, 0.7, 1.3)
-		plate.mesh = bm
-		plate.material_override = shell if i != 1 else rust
-		plate.position = Vector3(0.0, 1.55 + i * 0.12, 0.9 - i * 0.95)
-		plate.rotation.x = -0.12 + i * 0.1
-		_body.add_child(plate)
-	var head := MeshInstance3D.new()
-	var hm := BoxMesh.new()
-	hm.size = Vector3(1.3, 0.9, 0.8)
-	head.mesh = hm
-	head.material_override = shell
-	head.position = Vector3(0.0, 1.0, -1.65)
-	_body.add_child(head)
-	for x in [-0.85, 0.85]:
-		for z in [-0.9, 0.9]:
-			var leg := MeshInstance3D.new()
-			var lm := BoxMesh.new()
-			lm.size = Vector3(0.35, 1.1, 0.45)
-			leg.mesh = lm
-			leg.material_override = rust
-			leg.position = Vector3(x, 0.55, z)
-			leg.rotation.z = signf(x) * 0.18
-			_body.add_child(leg)
-	# The sensing pits along its brow: they flare when it feels her.
-	_sense_mat = StandardMaterial3D.new()
-	_sense_mat.albedo_color = SENSE.darkened(0.5)
-	_sense_mat.emission_enabled = true
-	_sense_mat.emission = SENSE
-	_sense_mat.emission_energy_multiplier = 0.4
-	var pits := MeshInstance3D.new()
-	var pm := BoxMesh.new()
-	pm.size = Vector3(1.0, 0.12, 0.06)
-	pits.mesh = pm
-	pits.material_override = _sense_mat
-	pits.position = Vector3(0.0, 1.25, -2.06)
-	_body.add_child(pits)
-	# The back vent under the rear plate: shut until a magnet tears the plate up.
-	_vent_mat = StandardMaterial3D.new()
-	_vent_mat.albedo_color = Color("ffb04a").darkened(0.6)
-	_vent_mat.emission_enabled = true
-	_vent_mat.emission = Color("ffb04a")
-	_vent_mat.emission_energy_multiplier = 0.0
-	_back = MeshInstance3D.new()
-	var vm := BoxMesh.new()
-	vm.size = Vector3(1.0, 0.2, 0.8)
-	(_back as MeshInstance3D).mesh = vm
-	(_back as MeshInstance3D).material_override = _vent_mat
-	_back.position = Vector3(0.0, 1.95, 1.0)
-	_body.add_child(_back)
-	_weak = _back
+	_load_rig("patience_guardian", _body)
+	# The sensing pits along its brow flare when it feels her; the vent under the rear plate
+	# glows when a magnet tears the plate up (the pinned clip).
+	_sense_mat = Rig.own_material(_rig, "guardian_sense")
+	_vent_mat = Rig.own_material(_rig, "guardian_vent")
+	_back = _weak
 
 
 func asleep() -> bool:
@@ -247,7 +191,8 @@ func _physics_process(delta: float) -> void:
 	var felt := _felt()
 	if felt != Vector3.INF:
 		hear(felt)
-	_sense_mat.emission_energy_multiplier = 0.4 if state == State.DORMANT else (5.0 if state == State.BRACE else 1.8)
+	if _sense_mat:
+		_sense_mat.emission_energy_multiplier = 0.4 if state == State.DORMANT else (5.0 if state == State.BRACE else 1.8)
 	match state:
 		State.DORMANT:
 			velocity.x = 0.0
@@ -302,12 +247,12 @@ func _physics_process(delta: float) -> void:
 		State.PINNED:
 			velocity = Vector3.ZERO
 			_body.position.y = lerpf(_body.position.y, 0.7, clampf(6.0 * delta, 0.0, 1.0))
-			_back.position.y = 2.25
-			_vent_mat.emission_energy_multiplier = 3.5
+			if _vent_mat:
+				_vent_mat.emission_energy_multiplier = 3.5
 			if _timer <= 0.0:
 				_body.position.y = 0.0
-				_back.position.y = 1.95
-				_vent_mat.emission_energy_multiplier = 0.0
+				if _vent_mat:
+					_vent_mat.emission_energy_multiplier = 0.0
 				state = State.RECOVER
 				_timer = RECOVER_TIME
 	if state != State.PINNED:
@@ -396,9 +341,9 @@ func _die() -> void:
 	super._die()
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.5, SENSE, 16, 3.0, 0.08, 0.6, Vector3.UP, 180.0, -3.0)
-	var tween := create_tween()
-	tween.tween_property(_body, "position:y", -0.6, 1.2)
-	tween.tween_property(_body, "rotation:z", 0.25, 0.4)
+	# The die clip brings it down onto its side; it stays where it fell.
+	if _sense_mat:
+		_sense_mat.emission_energy_multiplier = 0.0
 
 
 func anim_state() -> String:

@@ -151,7 +151,8 @@ func _physics_process(delta: float) -> void:
 					state = State.REST
 					_timer = REST_TIME
 		State.INHALE:
-			_membrane_mat.emission_energy_multiplier = lerpf(0.6, 4.0, clampf(1.0 - _timer / INHALE_TIME, 0.0, 1.0))
+			if _membrane_mat:
+				_membrane_mat.emission_energy_multiplier = lerpf(0.6, 4.0, clampf(1.0 - _timer / INHALE_TIME, 0.0, 1.0))
 			if _target_alive():
 				_face(target.global_position, clampf(3.0 * delta, 0.0, 1.0))
 			if _timer <= 0.0:
@@ -171,7 +172,8 @@ func _physics_process(delta: float) -> void:
 				_next_patch(false)
 				state = State.WALK
 	if state != State.INHALE:
-		_membrane_mat.emission_energy_multiplier = lerpf(_membrane_mat.emission_energy_multiplier, 0.3, clampf(5.0 * delta, 0.0, 1.0))
+		if _membrane_mat:
+			_membrane_mat.emission_energy_multiplier = lerpf(_membrane_mat.emission_energy_multiplier, 0.3, clampf(5.0 * delta, 0.0, 1.0))
 	if want != Vector3.ZERO:
 		var dir := _steer_around_walls(want, delta)
 		velocity.x = dir.x * WALK_SPEED
