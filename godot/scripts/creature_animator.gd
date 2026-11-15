@@ -17,7 +17,7 @@ extends Node
 ## one-shots; and the die clip at the end.
 
 const KINDS := {
-	"scuttler": {"legs": "splay", "stride": 1.1, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
+	"scuttler": {"legs": "splay", "stride": 1.5, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
 	"spitter": {"legs": "hang", "stride": 1.5, "swing": 26.0, "lift": 0.0, "knee": 38.0, "bob": 0.04},
 	"ram": {"legs": "hang", "stride": 2.6, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
 	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},

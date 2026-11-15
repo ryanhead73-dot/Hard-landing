@@ -14,7 +14,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from creature_kit import (C, Creature, Rot, V, axis, cells, ellipsoid, fbm, flat, hollow, lathe, merge, mix, mottled,  # noqa: E402,F401
+from creature_kit import (C, Creature, Gait, Rot, V, axis, cells, ellipsoid, fbm, flat, hollow, lathe, merge, mix, mottled,  # noqa: E402,F401
                           sheet, shell, slab, smooth, spike, tube)
 
 TAU = 2 * math.pi
@@ -1234,7 +1234,177 @@ def cantor():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor}
+# --- Scuttler ----------------------------------------------------------------------------
+
+BASALT = "1b1d20"
+OXIDE = "b4612a"
+
+
+def basalt_shell(seed=0.0, rim=0.6):
+    """Basalt-dark chitin that passes for rock, its plate edges weathered to oxide orange."""
+    base = mottled("181a1d", "2e3236", freq=6.0, seed=seed)
+
+    def paint(p, n):
+        c = base(p, n)
+        edge = smooth(0.62, 0.12, n.y) * rim
+        c = mix(c, mix(C("7a3a1a"), C(OXIDE), 0.5 + 0.5 * fbm(p, 9.0, 2, seed)), edge * (0.55 + 0.45 * fbm(p, 5.0, 2, seed + 3)))
+        return mix(c, C("4c555c"), smooth(0.55, 1.0, n.y) * 0.35)
+    return paint
+
+
+def scuttler():
+    """Basin scuttler: a basalt-backed hunter the size of a big dog, on six spiked legs with the
+    knees above its back. Overlapping dorsal plates with oxide rims and side spines, a ridge of
+    teal moss crystals down the spine (the weak spot), a low wedge head with four teal eyes and
+    sickle mandibles."""
+    c = Creature("scuttler")
+    c.material("scuttler_shell", rough=0.5, metal=0.15)
+    c.material("scuttler_belly", rough=0.8)
+    c.material("moss_glow", rough=0.4, emit="3fd1b5", energy=3.0)
+
+    c.bone("Body", (0, 0.5, 0.05), (0, 0.5, -0.45))
+    c.bone("Head", (0, 0.52, -0.6), (0, 0.47, -0.9), "Body")
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.bone("Jaw" + side, (0.1 * s, 0.43, -0.86), (0.07 * s, 0.4, -1.14), "Head")
+
+    shell_paint = basalt_shell(1.0)
+    leg_paint = basalt_shell(4.0, rim=0.3)
+    belly = mottled("24272a", "33383b", freq=8.0, seed=2.0)
+
+    # Core and underside.
+    core = ellipsoid((0, 0.5, 0.12), (0.4, 0.24, 0.66), segs=22, rings=14,
+                     fn=lambda u: 1.0 + 0.06 * math.sin(u.z * 18.0) * smooth(0.2, -0.6, u.y))
+    c.part(core, "Body", "scuttler_belly", belly)
+    # Rear: the abdomen narrows to a blunt point.
+    c.part(tube([(0, 0.52, 0.55), (0, 0.5, 0.82), (0, 0.44, 0.98)], [0.24, 0.16, 0.05], sides=10, samples=3, caps=("flat", "point")),
+           "Body", "scuttler_belly", belly)
+    # Overlapping dorsal plates, front to back, each one riding up over the next.
+    for i, z in enumerate((-0.36, -0.08, 0.2, 0.48, 0.74)):
+        w = (0.46, 0.52, 0.5, 0.42, 0.3)[i]
+        plate = shell((0, 0.56 - 0.02 * i, z), (w, 0.27 - 0.02 * i, 0.24), cover=0.44, thick=0.05, segs=18, rings=7,
+                      rot=(8, 0, 0), lip=0.12)
+        plate.plates(0.006, 14.0, float(i))
+        c.part(plate, "Body", "scuttler_shell", shell_paint, hard=50)
+        # Side spines off each plate's rim, raked back.
+        for s in (-1.0, 1.0):
+            base = V((w * 0.86 * s, 0.6 - 0.02 * i, z + 0.05))
+            c.part(spike(base, base + V((0.16 * s, 0.14, 0.2)), 0.045, sides=5, bend=base + V((0.12 * s, 0.04, 0.08))),
+                   "Body", "scuttler_shell", shell_paint)
+    # The moss ridge: teal crystals down the spine, tallest over the middle.
+    for i, z in enumerate((-0.3, -0.06, 0.18, 0.42, 0.64)):
+        h = (0.14, 0.24, 0.28, 0.22, 0.14)[i]
+        y0 = 0.8 - 0.02 * i
+        c.part(spike((0, y0, z), (0, y0 + h, z + 0.12), 0.06, sides=6), "Body", "moss_glow",
+               lambda p, n: mix(C("1f8f7a"), C("9ffbe9"), smooth(0.8, 1.05, p.y)), ao=False)
+        for s in (-1.0, 1.0):
+            c.part(spike((0.08 * s, y0 - 0.02, z + 0.04), (0.14 * s, y0 + h * 0.5, z + 0.12), 0.035, sides=5), "Body", "moss_glow",
+                   lambda p, n: mix(C("1f8f7a"), C("7df5dc"), smooth(0.8, 1.0, p.y)), ao=False)
+
+    # Head: a low wedge under a brow shield that ends in two short horns.
+    head = ellipsoid((0, 0.5, -0.74), (0.22, 0.14, 0.2), segs=16, rings=10,
+                     fn=lambda u: 1.0 - 0.25 * smooth(0.0, 1.0, -u.z) * smooth(-0.2, 0.6, -u.y))
+    c.part(head, ["Head", "Body"], "scuttler_belly", belly, falloff=5.0)
+    brow = shell((0, 0.52, -0.72), (0.27, 0.17, 0.26), cover=0.42, thick=0.04, segs=16, rings=6, rot=(-6, 0, 0), lip=0.1)
+    c.part(brow, "Head", "scuttler_shell", shell_paint, hard=50)
+    for s in (-1.0, 1.0):
+        b = V((0.15 * s, 0.6, -0.86))
+        c.part(spike(b, b + V((0.08 * s, 0.1, -0.14)), 0.04, sides=5), "Head", "scuttler_shell", "3a2a20")
+        # Eyes: a big pair and a small pair, under the brow.
+        for x, y, z, r in ((0.11, 0.53, -0.92, 0.04), (0.05, 0.56, -0.95, 0.026)):
+            c.part(ellipsoid((x * s, y, z), (r, r, r), segs=8, rings=5), "Head", "moss_glow", "9ffbe9", ao=False)
+    # Sickle mandibles and a pair of palps.
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.part(tube([(0.1 * s, 0.43, -0.86), (0.15 * s, 0.41, -1.0), (0.11 * s, 0.39, -1.12), (0.02 * s, 0.38, -1.17)],
+                    [0.04, 0.032, 0.02, 0.004], sides=6, samples=3, caps=("round", "point")),
+               "Jaw" + side, "scuttler_shell", lambda p, n: mix(C("2a1d17"), C("c27a3e"), smooth(-1.0, -1.16, p.z)))
+        c.part(tube([(0.06 * s, 0.42, -0.88), (0.09 * s, 0.34, -0.98), (0.07 * s, 0.3, -1.04)], [0.018, 0.014, 0.01], sides=5, samples=2),
+               "Head", "scuttler_belly", "3a3f42")
+
+    # Six legs, knees high, feet like picks.
+    legs = []
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        for row in (1, 2, 3):
+            hz, kz, fz = ((-0.32, -0.62, -1.0), (0.02, 0.0, 0.02), (0.34, 0.62, 0.95))[row - 1]
+            hip = V((0.34 * s, 0.47, hz))
+            knee = V((0.8 * s, 0.9 - 0.04 * (row == 3), kz))
+            foot = V(((1.18 if row == 2 else 1.08) * s, 0.0, fz))
+            thigh = c.bone("Leg%s%d" % (side, row), hip, knee, "Body")
+            shin = c.bone("Foot%s%d" % (side, row), knee, foot, thigh)
+            phase = math.pi * ((row - 1 + (1 if s > 0 else 0)) % 2)
+            legs.append((thigh, shin, phase))
+            bow = hip.lerp(knee, 0.5) + V((0, 0.05, 0))
+            c.part(tube([hip, bow, knee], [(0.075, 0.09), (0.065, 0.08), 0.055], sides=8, samples=4),
+                   thigh, "scuttler_shell", leg_paint)
+            c.part(ellipsoid(hip, (0.09, 0.09, 0.09), segs=10, rings=6), ["Body", thigh], "scuttler_belly", belly)
+            c.part(ellipsoid(knee, (0.07, 0.08, 0.07), segs=10, rings=6), [thigh, shin], "scuttler_shell",
+                   lambda p, n: mix(C("2a2c30"), C(OXIDE), smooth(0.2, 1.0, n.y) * 0.6), falloff=2.0)
+            # A spur off the top of the knee.
+            c.part(spike(knee + V((0, 0.04, 0)), knee + V((0.1 * s, 0.2, 0.06)), 0.035, sides=5), thigh, "scuttler_shell", "2a2220")
+            mid = knee.lerp(foot, 0.45) + V((0.06 * s, 0, 0))
+            c.part(tube([knee, mid, foot + V((-0.02 * s, 0.14, 0)), foot], [0.05, 0.04, 0.026, 0.004], sides=7, samples=4,
+                        caps=("round", "point")), shin, "scuttler_shell",
+                   lambda p, n: mix(mix(C("1c1e21"), C("33373b"), smooth(0.3, 1.0, n.y)), C("8a5a36"), smooth(0.25, 0.0, p.y) * 0.7))
+            # Little back-raked barbs down the shin.
+            for k in (0.3, 0.6):
+                at = knee.lerp(foot, k)
+                c.part(spike(at, at + V((0.06 * s, 0.03, 0.08)), 0.018, sides=4), shin, "scuttler_shell", "2a2220")
+    c.build()
+
+    g = Gait(c, "Body", legs)
+
+    def body(posed, extra=None, offsets=None, scales=None):
+        pose, offs = posed
+        return (merge(pose, extra or {}), merge(offs, offsets or {}), scales or {})
+
+    def jaws(deg):
+        return {"JawL": (0, deg, 0), "JawR": (0, -deg, 0)}
+
+    # Idle (2.7 s): breathing, head tasting the air, one foot then another shifting.
+    def idle(ph):
+        lift = {}
+        if 0.6 < ph < 1.6:
+            lift["LegL2"] = (0, 0.1 * math.sin((ph - 0.6) * math.pi), -0.06 * math.sin((ph - 0.6) * math.pi))
+        if 3.6 < ph < 4.6:
+            lift["LegR1"] = (0, 0.12 * math.sin((ph - 3.6) * math.pi), -0.08 * math.sin((ph - 3.6) * math.pi))
+        return body(g.stand((0, 0.015 * math.sin(ph), 0), (1.5 * math.sin(ph), 0, 0), feet=lift),
+                    merge({"Head": (3 * math.sin(ph * 2), 14 * math.sin(ph), 0)}, jaws(5 + 5 * math.sin(ph * 3))))
+    c.cycle("idle", 80, idle, steps=16)
+    # Walk (0.8 s, 1.5 m): alternating tripods, feet planted, the body rolling over them.
+    c.cycle("walk", 24, lambda ph: body(
+        g.step(ph, 0.75, 0.26, (0, 0.02 * math.sin(ph * 2), 0), (0, 2 * math.sin(ph * 2), 3 * math.sin(ph))),
+        merge({"Head": (0, -6 * math.sin(ph), 0)}, jaws(4))), steps=12)
+    # Wind-up: crouched at the back, front reared, front feet raised and jaws gaping, trembling.
+    rear = {"LegL1": (0, 0.42, -0.1), "LegR1": (0, 0.42, -0.1)}
+    c.cycle("windup", 15, lambda ph: body(
+        g.stand((0, 0.04, 0.12), (13 + 1.0 * math.sin(ph * 2), 0, 0), spread=1.05, feet=rear),
+        merge({"Head": (8, 0, 0)}, jaws(32 + 4 * math.sin(ph * 2)))), steps=6)
+    # Attack (0.35 s): thrown forward and down from the wind-up, front feet driving in, jaws snapping.
+    lunge = {"LegL1": (0, 0.0, -0.35), "LegR1": (0, 0.0, -0.35)}
+    c.clip("attack", [(0,) + body(g.stand((0, 0.04, 0.12), (13, 0, 0), 1.05, rear), merge({"Head": (8, 0, 0)}, jaws(34))),
+                      (4,) + body(g.stand((0, -0.1, -0.32), (-14, 0, 0), 1.05, lunge), merge({"Head": (-12, 0, 0)}, jaws(-12))),
+                      (10,) + body(g.stand((0, -0.06, -0.2), (-8, 0, 0), 1.05, lunge), merge({"Head": (-6, 0, 0)}, jaws(6)))])
+    c.clip("hurt", [(0,) + body(g.stand()),
+                    (2,) + body(g.stand((0.05, 0.02, 0.06), (-6, 0, 9)), {"Head": (12, 8, 0)}),
+                    (5,) + body(g.stand((-0.02, 0, 0), (2, 0, -6)), {"Head": (6, -4, 0)}),
+                    (9,) + body(g.stand())])
+    # Stagger: reeling, legs splayed wide to catch itself, head hanging.
+    c.cycle("stagger", 12, lambda ph: body(
+        g.stand((0.05 * math.sin(ph), -0.08, 0.04), (-5, 6 * math.sin(ph), 10 * math.sin(ph)), spread=1.15),
+        merge({"Head": (-18, 0, 0)}, jaws(14))), steps=4)
+    # Die (0.6 s; the game rolls it over): legs spasm, then curl up under the shell.
+    curl = {}
+    for thigh, shin, _ in legs:
+        s = -1.0 if thigh[3] == "L" else 1.0
+        curl[thigh] = (0, 0, -s * 52)
+        curl[shin] = (0, 0, -s * 60)
+    c.clip("die", [(0,) + body(g.stand()),
+                   (4,) + body(g.step(1.0, 0.7, 0.35, (0, 0.06, 0), (-8, 0, 6)), {"Head": (14, 0, 0)}),
+                   (10, merge(curl, {"Head": (-25, 0, 0)}, jaws(22)), {"Body": (0, -0.1, 0)}),
+                   (18, merge(curl, {"Head": (-26, 0, 0)}, jaws(26)), {"Body": (0, -0.12, 0)})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler}
 
 
 def main():

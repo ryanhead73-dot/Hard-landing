@@ -182,21 +182,24 @@ func _wildlife() -> void:
 	for kind in made:
 		var e: Enemy = made[kind]
 		e.velocity = Vector3(2.5, 0.0, 0.0)
-	var ranges := {}
+	# How far the first leg's hip turns, about whichever axis it turns most (the procedural legs
+	# swing about one axis; the IK legs of the skinned models about a slanted one).
+	var lo := {}
+	var hi := {}
 	for f in 50:
 		await get_tree().process_frame
 		for kind in made:
 			var e: Enemy = made[kind]
 			var leg: String = e.anim.legs[0][0]
 			var r: Vector3 = e.anim.pose.rot_of(leg)
-			var v := r.y if e.anim._cfg["legs"] == "splay" else r.x
-			var span: Vector2 = ranges.get(kind, Vector2(999.0, -999.0))
-			ranges[kind] = Vector2(minf(span.x, v), maxf(span.y, v))
+			lo[kind] = (lo.get(kind, r) as Vector3).min(r)
+			hi[kind] = (hi.get(kind, r) as Vector3).max(r)
 	var detail := ""
-	for kind in ranges:
-		var span: Vector2 = ranges[kind]
-		detail += "%s=%.0f " % [kind, span.y - span.x]
-		swing_ok = swing_ok and span.y - span.x > 10.0
+	for kind in lo:
+		var span: Vector3 = hi[kind] - lo[kind]
+		var most := maxf(span.x, maxf(span.y, span.z))
+		detail += "%s=%.0f " % [kind, most]
+		swing_ok = swing_ok and most > 10.0
 	_check("every creature's legs walk", swing_ok, detail)
 	for kind in made:
 		(made[kind] as Enemy).velocity = Vector3.ZERO

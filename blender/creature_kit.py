@@ -814,6 +814,59 @@ class Creature:
         print("saved", os.path.relpath(blend, bm.ROOT))
 
 
+class Gait:
+    """Legs that keep their feet planted, posed by IK, for a creature whose legs hang off one
+    body bone. legs: [(thigh, shin, phase)], the shin's tail being the foot; phase offsets the
+    leg in the step cycle (0 or pi for tripods and diagonal pairs). Every pose comes back as
+    (pose, offsets) with the body's own turn and offset in it, ready for clip()/cycle()."""
+
+    def __init__(self, c, body, legs):
+        self.c = c
+        self.body = body
+        self.legs = [(t, s, ph, V(c.bones[s][1])) for t, s, ph in legs]
+
+    def _place(self, feet, off, turn):
+        m = godot_basis(turn)
+        pivot = V(self.c.bones[self.body][0])
+        off = V(off)
+        pose = {self.body: tuple(turn)}
+        for thigh, shin, _, rest in self.legs:
+            h0 = V(self.c.bones[thigh][0])
+            hip = off + m @ (h0 - pivot) - (h0 - pivot)
+            pose.update(self.c.leg_ik(thigh, shin, feet.get(thigh, rest), hip, Rot(m)))
+        return pose, {self.body: tuple(off)}
+
+    def foot(self, thigh):
+        return next(r for t, _, _, r in self.legs if t == thigh).copy()
+
+    def stand(self, off=(0, 0, 0), turn=(0, 0, 0), spread=1.0, feet=None):
+        """All feet on their rest spots (pushed out from the middle by `spread`); feet
+        {thigh: (dx, dy, dz)} moves single feet from there."""
+        out = {}
+        for thigh, _, _, rest in self.legs:
+            f = V((rest.x * spread, rest.y, rest.z * spread))
+            if feet and thigh in feet:
+                f += V(feet[thigh])
+            out[thigh] = f
+        return self._place(out, off, turn)
+
+    def step(self, ph, stride, lift, off=(0, 0, 0), turn=(0, 0, 0), spread=1.0):
+        """One walk cycle (ph 0..2pi): each foot is down for half of it, sliding back under the
+        body by `stride`, then swings forward `lift` off the ground. The body covers 2 x stride
+        a cycle, so a game stride of S wants stride = S / 2."""
+        out = {}
+        for thigh, _, phase, rest in self.legs:
+            psi = (ph + phase) % (2 * math.pi)
+            if psi < math.pi:
+                z, y = -stride * 0.5 + stride * psi / math.pi, 0.0
+            else:
+                t = (psi - math.pi) / math.pi
+                z = stride * 0.5 - stride * (0.5 - 0.5 * math.cos(t * math.pi))
+                y = lift * math.sin(t * math.pi)
+            out[thigh] = V((rest.x * spread, rest.y + y, rest.z * spread + z))
+        return self._place(out, off, turn)
+
+
 def _godot_rot(deg):
     """Godot Euler degrees (applied y, then x, then z, as Node3D does) -> Blender-space matrix."""
     x, y, z = (math.radians(a) for a in deg)
