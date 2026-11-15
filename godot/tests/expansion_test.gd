@@ -565,11 +565,16 @@ func _regions() -> void:
 	await _frames(3)
 	await _press("interact")
 	# Well clear of the hoist while the drone comes down off the ridge and the brood wakes.
+	# On a slow machine the drone takes longer, and the brood by the hoist is only a few metres
+	# on: she's here to watch the drone, not to fight them, so nothing they do can kill her.
+	var keep_alive := func(_a: float): player.health = player.max_health()
+	player.damaged.connect(keep_alive)
 	_place(gw.to_global(GearEscort.START + Vector3(-4.0, 0.5, 0.0)), 0.0)
 	gear_wait = 0.0
 	while gear_wait < 14.0 and ge.at < 5:
 		await get_tree().physics_frame
 		gear_wait += get_physics_process_delta_time()
+
 	_check("a pod Juno burst first lets it pass", ge.at == 5 and ge.jams == 1, "at %d, jams %d" % [ge.at, ge.jams])
 	# Path recovery: a fresh escort built from the flags puts the drone back where it was.
 	var ge2 := GearEscort.new()
@@ -589,6 +594,7 @@ func _regions() -> void:
 	player.health = 100.0
 	await get_tree().create_timer(0.5).timeout
 	_check("cleared, the hoist can be powered", ge.brood_cleared() and ge.waiting() == "hoist")
+	player.damaged.disconnect(keep_alive)
 	_place(ge.post_pos(6) + Vector3(0.0, 0.5, 0.0), 0.0)
 	await _frames(3)
 	_check("Reyes's hoist takes power", _label().contains("hoist"), _label())
