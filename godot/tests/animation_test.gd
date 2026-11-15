@@ -188,7 +188,9 @@ func _wildlife() -> void:
 	var hi := {}
 	# Over a full stride or so (the IK legs turn less per step but keep at it all cycle).
 	var t := 0.0
-	while t < 1.2:
+	var frames := 0
+	while t < 1.2 and frames < 600:
+		frames += 1
 		await get_tree().process_frame
 		t += get_process_delta_time()
 		for kind in made:

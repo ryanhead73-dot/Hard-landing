@@ -247,7 +247,8 @@ func _drive_tree(st: String, hv: float) -> void:
 		tree.set("parameters/alive/transition_request", "dead" if dead else "alive")
 	if kind == "skimmer" and pose.has("WingR"):
 		wing_beat = pose.rot_of("WingR").z
-	# Swelling the acid sac and pulsing the Warden's core stay procedural (scale, on top of the clips).
+	# The rigid-part models swell the acid sac and pulse the Warden's core here; the skinned ones
+	# have it in their clips (pose.node() is null for a bone).
 	var t := shot_progress()
 	var punch := sin(clampf(t, 0.0, 1.0) * PI) if t >= 0.0 else 0.0
 	var sac := pose.node("Sac")

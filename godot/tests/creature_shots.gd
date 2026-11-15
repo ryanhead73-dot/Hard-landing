@@ -1,5 +1,5 @@
 extends Node3D
-## Dev utility: a lineup of every creature, Juno and a survivor, one framed shot each from the
+## Dev utility: a lineup of every creature, Juno and the survivors, one framed shot each from the
 ## front three-quarter and one from the side, for reviewing models. Needs a real renderer:
 ##   xvfb-run godot --path . --rendering-driver opengl3 res://tests/creature_shots.tscn -- <out_dir> [names]
 
@@ -109,16 +109,6 @@ func _spawn(n: String) -> Node3D:
 	var mount := Rig.attach(rig, "WeaponMount")
 	if mount and n == "juno":
 		Rig.spawn("rifle", mount).position = Vector3(0.0, -0.01, 0.1)
-	if n == "survivor":
-		for mi in Rig.meshes(rig):
-			for i in mi.mesh.get_surface_count():
-				var src := mi.get_active_material(i) as StandardMaterial3D
-				if src == null:
-					continue
-				var m := src.duplicate() as StandardMaterial3D
-				if m.albedo_color.get_luminance() > 0.55:
-					m.albedo_color = Color("7a8a6a")
-				mi.set_surface_override_material(i, m)
 	var player := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if player and player.has_animation("idle"):
 		player.play("idle")

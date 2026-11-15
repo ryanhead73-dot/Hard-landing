@@ -458,8 +458,8 @@ func _gate() -> void:
 	intercom_pos = to_global(Vector3(-GATE_WIDTH * 0.5 - 0.3, 0.0, z + 1.4))
 
 
-## Lt. Sana Reyes: Juno's own suit model in Ferro-9's colours (slate with an amber stripe), standing
-## easy inside the gate. Hidden until the gate opens.
+## Lt. Sana Reyes: her own model (officer's jacket in Ferro-9 slate with amber boards), standing
+## at ease inside the gate. Hidden until the gate opens.
 func _reyes() -> void:
 	reyes = _person("Reyes", REYES_AT, 0.0, FERRO, "at_ease")
 
