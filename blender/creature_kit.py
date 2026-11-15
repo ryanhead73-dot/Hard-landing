@@ -850,17 +850,22 @@ class Gait:
             out[thigh] = f
         return self._place(out, off, turn)
 
-    def step(self, ph, stride, lift, off=(0, 0, 0), turn=(0, 0, 0), spread=1.0):
+    def step(self, ph, stride, lift, off=(0, 0, 0), turn=(0, 0, 0), spread=1.0, phases=None, duty=0.5):
         """One walk cycle (ph 0..2pi): each foot is down for half of it, sliding back under the
         body by `stride`, then swings forward `lift` off the ground. The body covers 2 x stride
-        a cycle, so a game stride of S wants stride = S / 2."""
+        a cycle, so a game stride of S wants stride = S / 2. phases {thigh: phase} overrides the
+        legs' own (a gallop bounds with both fronts together); duty is the share of the cycle a
+        foot spends down."""
         out = {}
+        down = 2 * math.pi * duty
         for thigh, _, phase, rest in self.legs:
+            if phases and thigh in phases:
+                phase = phases[thigh]
             psi = (ph + phase) % (2 * math.pi)
-            if psi < math.pi:
-                z, y = -stride * 0.5 + stride * psi / math.pi, 0.0
+            if psi < down:
+                z, y = -stride * 0.5 + stride * psi / down, 0.0
             else:
-                t = (psi - math.pi) / math.pi
+                t = (psi - down) / (2 * math.pi - down)
                 z = stride * 0.5 - stride * (0.5 - 0.5 * math.cos(t * math.pi))
                 y = lift * math.sin(t * math.pi)
             out[thigh] = V((rest.x * spread, rest.y + y, rest.z * spread + z))

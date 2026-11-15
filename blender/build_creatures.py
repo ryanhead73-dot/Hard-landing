@@ -1517,7 +1517,156 @@ def spitter():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter}
+# --- Ram ---------------------------------------------------------------------------------
+
+def ram():
+    """Ram: a rhino-heavy charger. Oxide-orange armour plates over a slate hide, a low head
+    behind a wide horned shield, teal vents glowing between the back plates (the weak spot),
+    pillar legs on split hooves, and a short spiked tail."""
+    c = Creature("ram")
+    c.material("ram_hide", rough=0.8)
+    c.material("ram_plate", rough=0.45, metal=0.3)
+    c.material("moss_glow", rough=0.4, emit="3fd1b5", energy=2.0)
+    c.material("ram_horn", rough=0.6)
+
+    c.bone("Body", (0, 1.0, 0.5), (0, 1.0, -0.5))
+    c.bone("Head", (0, 0.98, -0.95), (0, 0.88, -1.5), "Body")
+    c.bone("Tail", (0, 1.08, 1.05), (0, 0.9, 1.6), "Body")
+
+    hide = mottled("2b2f33", "41464b", freq=5.0, seed=7.0, belly="56524a", belly_at=-0.4)
+
+    def armour(seed):
+        def paint(p, n):
+            base = mix(C("4e2814"), C("8c4a22"), 0.5 + 0.5 * fbm(p, 4.0, 3, seed))
+            worn = smooth(0.2, 0.55, fbm(p, 9.0, 2, seed + 2.0))
+            c0 = mix(base, C("a39a8a"), worn * 0.5)
+            c0 = mix(c0, C("1e1a17"), smooth(0.45, 0.0, n.y) * 0.55)
+            return mix(c0, C("c07a48"), smooth(0.75, 1.0, n.y) * 0.2)
+        return paint
+    horn = lambda p, n: mix(C("6e6656"), C("cfc4a8"), smooth(0.4, 1.0, n.y) * 0.6 + 0.3 * fbm(p, 14.0, 2, 1.0))
+
+    # Barrel with a shoulder hump.
+    barrel = ellipsoid((0, 1.0, 0.1), (0.64, 0.56, 1.08), segs=24, rings=16,
+                       fn=lambda u: 1.0 + 0.16 * smooth(0.2, 0.9, u.y) * smooth(0.3, -0.5, u.z) - 0.06 * smooth(-0.2, -0.9, u.y))
+    barrel.bumps(0.02, 4.0, 3.0)
+    c.part(barrel, "Body", "ram_hide", hide)
+    # Neck: thick, sloping down to the head.
+    c.part(tube([(0, 1.08, -0.6), (0, 1.02, -0.85), (0, 0.96, -1.0)], [(0.46, 0.44), (0.4, 0.38), (0.34, 0.32)], sides=12, samples=3),
+           ["Body", "Head"], "ram_hide", hide, falloff=3.0)
+    # Overlapping back plates, front to back, with teal vents between them.
+    for i, z in enumerate((-0.62, -0.3, 0.02, 0.34, 0.66)):
+        w = (0.6, 0.66, 0.66, 0.6, 0.5)[i]
+        pl = shell((0, 1.3 + (0.08 if i < 2 else 0.0) - 0.04 * i, z), (w, 0.36, 0.3), cover=0.4, thick=0.06, segs=20, rings=7,
+                   rot=(10, 0, 0), lip=0.1)
+        pl.plates(0.008, 9.0, float(i))
+        c.part(pl, "Body", "ram_plate", armour(float(i)), hard=45)
+        if 0 < i < 5:
+            for x in (-0.24, 0.24):
+                c.part(ellipsoid((x, 1.6 - 0.04 * i + (0.06 if i == 1 else 0.0), z - 0.17), (0.13, 0.05, 0.06), segs=10, rings=6),
+                       "Body", "moss_glow", lambda p, n: mix(C("1f8f7a"), C("9ffbe9"), smooth(0.3, 1.0, n.y)), ao=False)
+    # Flank plates.
+    for s in (-1.0, 1.0):
+        fl = shell((0.42 * s, 1.0, 0.1), (0.3, 0.24, 0.85), cover=0.36, thick=0.05, segs=18, rings=6, rot=(0, 0, -62 * s), lip=0.08)
+        c.part(fl, "Body", "ram_plate", armour(9.0 + s), hard=45)
+    # Tail: short, ending in a spiked knob.
+    c.part(tube([(0, 1.1, 0.95), (0, 1.02, 1.3), (0, 0.9, 1.58)], [0.2, 0.14, 0.12], sides=10, samples=3), ["Body", "Tail"], "ram_hide", hide)
+    c.part(ellipsoid((0, 0.88, 1.62), (0.15, 0.14, 0.16), segs=12, rings=8), "Tail", "ram_plate", armour(12.0))
+    for d in ((0, 1, 0.3), (0.8, 0.4, 0.4), (-0.8, 0.4, 0.4), (0, -0.4, 1)):
+        b = V((0, 0.88, 1.62)) + V(d).normalized() * 0.12
+        c.part(spike(b, b + V(d).normalized() * 0.16, 0.04, sides=5), "Tail", "ram_horn", horn)
+
+    # Head: a heavy skull behind a wide shield, a nose horn and two forward-curving horns.
+    skull = ellipsoid((0, 0.88, -1.22), (0.32, 0.3, 0.38), segs=18, rings=12,
+                      fn=lambda u: 1.0 - 0.18 * smooth(0.0, 1.0, -u.z) * smooth(-0.3, 0.8, u.y))
+    c.part(skull, "Head", "ram_hide", hide)
+    # A frill behind the skull, leaning back over the neck.
+    shield = shell((0, 1.12, -0.98), (0.72, 0.16, 0.5), cover=0.5, thick=0.07, segs=22, rings=6, rot=(-55, 0, 0), lip=0.15,
+                   fn=lambda u: 1.0 + 0.1 * math.cos(math.atan2(u.z, u.x) * 5.0) * smooth(0.3, 0.0, u.y))
+    shield.plates(0.01, 6.0, 4.0)
+    c.part(shield, "Head", "ram_plate", armour(20.0), hard=45)
+    # The shield's rim glows faintly (the old crest).
+    up = V((0, math.cos(math.radians(35)), math.sin(math.radians(35))))
+    rim = [V((0, 1.12, -0.98)) + V((0.74 * math.cos(t), 0, 0)) + up * (0.52 * math.sin(t)) for t in
+           [math.radians(a) for a in (25, 60, 90, 120, 155)]]
+    c.part(tube(rim, [0.028] * 5, sides=5, samples=4), "Head", "moss_glow", "7df5dc", ao=False)
+    c.part(spike((0, 0.86, -1.52), (0, 1.12, -1.86), 0.11, sides=8, bend=(0, 0.92, -1.78)), "Head", "ram_horn", horn)
+    c.part(spike((0, 1.0, -1.42), (0, 1.12, -1.58), 0.06, sides=6), "Head", "ram_horn", horn)
+    for s in (-1.0, 1.0):
+        b = V((0.24 * s, 1.08, -1.24))
+        c.part(spike(b, b + V((0.26 * s, 0.14, -0.62)), 0.09, sides=7, bend=b + V((0.28 * s, 0.02, -0.3))), "Head", "ram_horn", horn)
+        c.part(ellipsoid((0.2 * s, 0.98, -1.4), (0.045, 0.035, 0.03), segs=8, rings=5), "Head", "moss_glow", "9ffbe9", ao=False)
+
+    # Pillar legs on split hooves.
+    legs = []
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        for row, (hz, kz, fz) in (("F", (-0.62, -0.68, -0.64)), ("B", (0.72, 0.9, 0.74))):
+            hip = V((0.48 * s, 0.82, hz))
+            knee = V((0.54 * s, 0.44, kz))
+            foot = V((0.56 * s, 0.0, fz))
+            thigh = c.bone("Leg%s%s" % (row, side), hip, knee, "Body")
+            shin = c.bone("Foot%s%s" % (row, side), knee, foot, thigh)
+            phase = math.pi * (((0 if row == "F" else 1) + (1 if s > 0 else 0)) % 2)
+            legs.append((thigh, shin, phase))
+            c.part(tube([hip + V((0, 0.2, 0)), hip, knee], [0.24, 0.22, 0.15], sides=10, samples=3), [thigh], "ram_hide", hide)
+            c.part(tube([knee, foot + V((0, 0.08, 0))], [0.14, 0.12], sides=10, samples=2, caps=("round", "flat")), shin, "ram_hide", hide)
+            # A plate over the knee and a split hoof.
+            c.part(shell(knee + V((0, 0.02, -0.06 if row == "F" else 0.06)), (0.17, 0.16, 0.12), cover=0.5, thick=0.04, segs=12, rings=5,
+                         rot=(-80 if row == "F" else 80, 0, 0)), shin, "ram_plate", armour(30.0 + s))
+            for t in (-1.0, 1.0):
+                c.part(ellipsoid(foot + V((0.06 * t, 0.06, -0.04)), (0.075, 0.07, 0.13), segs=10, rings=6,
+                                 fn=lambda u: 1.0 - 0.3 * smooth(0.0, -1.0, u.y)), shin, "ram_horn", horn)
+    c.build()
+
+    g = Gait(c, "Body", legs)
+
+    def body(posed, extra=None, offsets=None):
+        pose, offs = posed
+        return (merge(pose, extra or {}), merge(offs, offsets or {}))
+
+    c.cycle("idle", 90, lambda ph: body(
+        g.stand((0, 0.012 * math.sin(ph), 0), (1.0 * math.sin(ph), 0, 0)),
+        {"Head": (3 * math.sin(ph * 2), 8 * math.sin(ph), 0), "Tail": (0, 20 * math.sin(ph * 3), 0)}), steps=12)
+    # Walk (0.8 s, 1.8 m), diagonal pairs.
+    c.cycle("walk", 24, lambda ph: body(
+        g.step(ph, 0.9, 0.2, (0, 0.04 * math.sin(ph * 2), 0), (0, 0, 2 * math.sin(ph))),
+        {"Head": (4 * math.sin(ph * 2), 0, 0), "Tail": (0, 16 * math.sin(ph), 0)}), steps=12)
+    # Paw: head down, the front hoof scraping back twice, tail lashing.
+    def paw(ph):
+        k = math.sin(ph * 2)
+        lift = max(0.0, math.cos(ph * 2))
+        return body(g.stand((0, -0.04, 0.04), (-4, 0, 0), feet={"LegFL": (0, 0.12 * lift, -0.25 * k)}),
+                    {"Head": (-12, 0, 0), "Tail": (10, 30 * k, 0)})
+    c.cycle("paw", 18, paw, steps=8)
+    # Charge: a bounding gallop, fronts together then backs, head driven low.
+    bound = {"LegFL": 0.0, "LegFR": 0.35, "LegBL": math.pi, "LegBR": math.pi + 0.35}
+    c.cycle("charge", 15, lambda ph: body(
+        g.step(ph, 1.1, 0.34, (0, 0.08 * abs(math.sin(ph)), 0), (-5 + 4 * math.sin(ph), 0, 0), phases=bound, duty=0.4),
+        {"Head": (-22, 0, 0), "Tail": (20, 0, 0)}), steps=10)
+    # Stunned: head hanging and swaying, legs splayed to stay up.
+    c.cycle("stunned", 18, lambda ph: body(
+        g.stand((0.04 * math.sin(ph), -0.08, 0), (0, 0, 4 * math.sin(ph)), spread=1.12),
+        {"Head": (-26, 0, 12 * math.sin(ph)), "Tail": (-10, 0, 0)}), steps=6)
+    c.clip("attack", [(0,) + body(g.stand(), {"Head": (-22, 0, 0)}),
+                      (3,) + body(g.stand((0, 0.05, -0.15), (4, 0, 0)), {"Head": (18, 0, 0)}),
+                      (10,) + body(g.stand(), {"Head": (4, 0, 0)})])
+    c.clip("hurt", [(0,) + body(g.stand()),
+                    (2,) + body(g.stand((0.03, 0, 0.04), (-3, 0, 6)), {"Head": (10, 8, 0)}),
+                    (5,) + body(g.stand((-0.02, 0, 0), (1, 0, -4))),
+                    (9,) + body(g.stand())])
+    # Die: the legs fold and it drops onto its belly (the game rolls it over).
+    fold = {}
+    for thigh, shin, _ in legs:
+        sgn = -1.0 if thigh.endswith("L") else 1.0
+        fold[thigh] = (55 if "F" in thigh[3] else -40, 0, sgn * 20)
+        fold[shin] = (-95 if "F" in thigh[3] else 90, 0, 0)
+    c.clip("die", [(0,) + body(g.stand()),
+                   (6,) + body(g.stand((0, 0.04, 0), (6, 0, 0)), {"Head": (10, 0, 0)}),
+                   (15, merge(fold, {"Body": (0, 0, 16), "Head": (-25, 0, 10), "Tail": (-20, 0, 0)}), {"Body": (0, -0.48, 0)}),
+                   (20, merge(fold, {"Body": (0, 0, 18), "Head": (-25, 0, 12), "Tail": (-20, 0, 0)}), {"Body": (0, -0.5, 0)})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter, "ram": ram}
 
 
 def main():

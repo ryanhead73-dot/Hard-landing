@@ -317,9 +317,8 @@ def warden_clips(rig):
                       {"Body": (0, -0.75, 0)})])
 
 
-# The scuttler and spitter are built by build_creatures.py now (one skinned mesh each).
-CREATURES = {"ram": ("Ram", bm.ram, ram_clips),
-             "warden": ("Warden", bm.warden, warden_clips)}
+# The scuttler, spitter and ram are built by build_creatures.py now (one skinned mesh each).
+CREATURES = {"warden": ("Warden", bm.warden, warden_clips)}
 
 
 def build(name):
