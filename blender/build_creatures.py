@@ -1666,7 +1666,183 @@ def ram():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter, "ram": ram}
+# --- Warden ------------------------------------------------------------------------------
+
+def warden():
+    """The Warden: the Loom's oldest scuttler, the size of a hauler cab. Obsidian armour veined
+    with teal, a carapace split down the spine that opens like wing cases over a glowing core,
+    a horned head, two great club-and-scythe forearms, and six spined legs."""
+    c = Creature("warden")
+    c.material("warden_shell", rough=0.35, metal=0.3)
+    c.material("warden_hide", rough=0.8)
+    c.material("warden_core", rough=0.2, emit="3fd1b5", energy=5.0)
+    c.material("moss_glow", rough=0.4, emit="3fd1b5", energy=3.0)
+
+    c.bone("Body", (0, 1.5, 0.8), (0, 1.5, -0.8))
+    c.bone("Core", (0, 1.95, -0.05), (0, 2.3, -0.05), "Body")
+    c.bone("Head", (0, 1.45, -1.75), (0, 1.3, -2.4), "Body")
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.bone("Plate" + side, (0.12 * s, 2.25, -0.9), (0.12 * s, 2.25, 1.5), "Body")
+        c.bone("Arm" + side, (1.0 * s, 1.75, -1.35), (1.3 * s, 0.95, -1.75), "Body")
+        c.bone("Fist" + side, (1.3 * s, 0.95, -1.75), (1.35 * s, 0.25, -2.15), "Arm" + side)
+
+    obsidian = mottled("0e1013", "22262b", freq=3.5, seed=11.0)
+
+    def shell_paint(seed, veins=1.0):
+        def paint(p, n):
+            col = mix(obsidian(p, n), C("3a4550"), smooth(0.5, 1.0, n.y) * 0.4)
+            crack = smooth(0.014, 0.0, abs(fbm(p, 3.5, 3, seed)))
+            return mix(col, C("2fb89e"), crack * 0.7 * veins)
+        return paint
+    hide = mottled("16191c", "262a2e", freq=6.0, seed=12.0, belly="1d2123")
+    glow = lambda p, n: mix(C("1f8f7a"), C("b0fff0"), smooth(0.4, 1.0, n.y))
+
+    trunk = ellipsoid((0, 1.5, 0.25), (1.1, 0.78, 1.65), segs=26, rings=16,
+                      fn=lambda u: 1.0 + 0.05 * math.sin(u.z * 14.0) * smooth(0.0, -0.8, u.y))
+    trunk.bumps(0.03, 3.0, 5.0)
+    c.part(trunk, "Body", "warden_hide", hide)
+    # Chest plate and shoulder mantle.
+    c.part(shell((0, 1.55, -1.1), (1.05, 0.7, 0.75), cover=0.42, thick=0.08, segs=22, rings=7, rot=(-70, 0, 0), lip=0.1),
+           "Body", "warden_shell", shell_paint(1.0), hard=45)
+    c.part(shell((0, 1.95, -0.95), (1.2, 0.5, 0.7), cover=0.4, thick=0.08, segs=22, rings=7, rot=(6, 0, 0), lip=0.12),
+           "Body", "warden_shell", shell_paint(2.0), hard=45)
+    for s in (-1.0, 1.0):
+        for k, (x, z, h) in enumerate(((0.55, -1.0, 0.9), (0.9, -0.85, 0.6))):
+            b = V((x * s, 2.25 - 0.15 * k, z))
+            c.part(spike(b, b + V((0.3 * s, h, 0.45)), 0.13 - 0.03 * k, sides=7, bend=b + V((0.1 * s, h * 0.6, 0.05))),
+                   "Body", "warden_shell", shell_paint(3.0, 0.3))
+    # The core, under the wing cases.
+    core = ellipsoid((0, 2.02, -0.05), (0.56, 0.44, 0.7), segs=18, rings=12,
+                     fn=lambda u: 1.0 + 0.06 * math.sin(u.y * 12.0) * math.cos(math.atan2(u.z, u.x) * 5.0))
+    c.part(core, "Core", "warden_core", lambda p, n: mix(C("1fb89a"), C("8ffbe6"), smooth(1.9, 2.45, p.y)), ao=False)
+    # Wing cases: one each side of the spine, hinged along it.
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        case = shell((0.5 * s, 1.9, 0.3), (0.82, 0.62, 1.55), cover=0.5, thick=0.09, segs=22, rings=8, rot=(0, 0, -18 * s), lip=0.08,
+                     fn=lambda u: 1.0 + 0.04 * math.sin(u.z * 9.0))
+        case.plates(0.015, 3.0, 6.0 + s)
+        c.part(case, "Plate" + side, "warden_shell", shell_paint(7.0 + s), hard=40)
+        for i in range(4):
+            z = -0.6 + i * 0.5
+            b = V((1.0 * s, 2.2 - 0.03 * i, z))
+            c.part(spike(b, b + V((0.32 * s, 0.38, 0.2)), 0.08, sides=6), "Plate" + side, "moss_glow", glow, ao=False)
+
+    # Head: a heavy wedge under swept-back horns, four glowing eyes and two tusks.
+    head = ellipsoid((0, 1.48, -2.05), (0.62, 0.46, 0.6), segs=20, rings=12,
+                     fn=lambda u: 1.0 - 0.25 * smooth(0.0, 1.0, -u.z) * smooth(-0.4, 0.6, u.y))
+    c.part(head, ["Head", "Body"], "warden_hide", hide, falloff=5.0)
+    c.part(shell((0, 1.5, -2.0), (0.62, 0.42, 0.6), cover=0.42, thick=0.06, segs=18, rings=6, rot=(-12, 0, 0), lip=0.14),
+           "Head", "warden_shell", shell_paint(14.0), hard=45)
+    for s in (-1.0, 1.0):
+        b = V((0.42 * s, 1.75, -1.9))
+        c.part(tube([b, b + V((0.35 * s, 0.55, 0.15)), b + V((0.45 * s, 0.95, 0.75)), b + V((0.32 * s, 1.15, 1.2))],
+                    [0.14, 0.11, 0.07, 0.01], sides=8, samples=4, caps=("round", "point")), "Head", "warden_shell", shell_paint(15.0, 0.4))
+        for x, y, z, r in ((0.25, 1.48, -2.48, 0.07), (0.14, 1.58, -2.52, 0.045)):
+            c.part(ellipsoid((x * s, y, z), (r, r, r), segs=10, rings=6), "Head", "warden_core", "c8fff4", ao=False)
+        t = V((0.2 * s, 1.15, -2.45))
+        c.part(spike(t, t + V((0.05 * s, -0.25, -0.35)), 0.06, sides=6, bend=t + V((0.06 * s, -0.02, -0.25))), "Head", "warden_shell",
+               lambda p, n: mix(C("2a2c30"), C("9a9384"), smooth(1.1, 0.95, p.y)))
+
+    # Forearms: pauldron, upper arm, and a club fist with a glowing knuckle band and a scythe.
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        sh, el, tip = V((1.0 * s, 1.75, -1.35)), V((1.3 * s, 0.95, -1.75)), V((1.35 * s, 0.25, -2.15))
+        c.part(shell(sh + V((0.05 * s, 0.1, 0)), (0.5, 0.42, 0.5), cover=0.45, thick=0.07, segs=16, rings=6, rot=(0, 0, -30 * s), lip=0.1),
+               "Arm" + side, "warden_shell", shell_paint(20.0 + s), hard=45)
+        c.part(tube([sh, sh.lerp(el, 0.5) + V((0.05 * s, 0, 0.05)), el], [0.3, 0.26, 0.22], sides=10, samples=3),
+               ["Arm" + side], "warden_hide", hide)
+        c.part(tube([el, el.lerp(tip, 0.55), tip], [0.2, 0.25, 0.22], sides=10, samples=3, caps=("round", "round")),
+               "Fist" + side, "warden_shell", shell_paint(22.0 + s), hard=0)
+        for k in (0.62, 0.78):
+            at = el.lerp(tip, k)
+            c.part(lathe([(0.2, -0.025), (0.235, 0.0), (0.2, 0.025)], at=at, segs=12,
+                         rot=(-math.degrees(math.atan2(-(tip - el).z, -(tip - el).y)), 0, 0)),
+                   "Fist" + side, "moss_glow", glow, ao=False)
+        b = el.lerp(tip, 0.3) + V((0.2 * s, 0, 0.1))
+        c.part(tube([b, b + V((0.35 * s, -0.1, -0.1)), b + V((0.45 * s, -0.6, -0.4)), b + V((0.3 * s, -0.95, -0.75))],
+                    [0.09, 0.07, 0.04, 0.005], sides=6, samples=4, caps=("round", "point")), "Fist" + side, "warden_shell",
+               lambda p, n: mix(C("15171a"), C("8a9aa0"), smooth(0.3, 1.0, n.y) * 0.5))
+
+    # Six spined legs, knees above the back.
+    legs = []
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        for row in (1, 2, 3):
+            z = (-0.6, 0.35, 1.3)[row - 1]
+            hip = V((0.95 * s, 1.2, z))
+            knee = V((2.0 * s, 2.35, z * 1.3))
+            foot = V((2.7 * s, 0.0, z * 1.7 + (0.2 if row == 1 else 0.0) * -1))
+            thigh = c.bone("Leg%s%d" % (side, row), hip, knee, "Body")
+            shin = c.bone("Foot%s%d" % (side, row), knee, foot, thigh)
+            legs.append((thigh, shin, math.pi * ((row - 1 + (1 if s > 0 else 0)) % 2)))
+            c.part(tube([hip, hip.lerp(knee, 0.5) + V((0, 0.1, 0)), knee], [0.24, 0.2, 0.16], sides=9, samples=4), thigh, "warden_shell",
+                   shell_paint(30.0 + row, 0.5))
+            c.part(ellipsoid(knee, (0.2, 0.2, 0.2), segs=10, rings=6), [thigh, shin], "warden_shell", shell_paint(40.0), falloff=2.0)
+            c.part(spike(knee + V((0, 0.1, 0)), knee + V((0.25 * s, 0.6, 0.15)), 0.1, sides=6), thigh, "warden_shell", shell_paint(41.0, 0.3))
+            mid = knee.lerp(foot, 0.5) + V((0.12 * s, 0, 0))
+            c.part(tube([knee, mid, foot + V((0, 0.3, 0)), foot], [0.17, 0.13, 0.08, 0.01], sides=8, samples=4, caps=("round", "point")),
+                   shin, "warden_shell", shell_paint(50.0 + row, 0.4))
+    c.build(ao_reach=1.2)
+
+    g = Gait(c, "Body", legs)
+
+    def body(posed, extra=None, scales=None):
+        pose, offs = posed
+        return (merge(pose, extra or {}), offs, scales or {})
+
+    def plates(deg):
+        return {"PlateL": (0, 0, -deg), "PlateR": (0, 0, deg)}
+
+    def arms(x, fist=0.0, out=0.0):
+        return {"ArmL": (x, 0, -out), "ArmR": (x, 0, out), "FistL": (fist, 0, 0), "FistR": (fist, 0, 0)}
+
+    c.cycle("idle", 90, lambda ph: body(
+        g.stand((0, 0.03 * math.sin(ph), 0), (1.5 * math.sin(ph), 0, 0)),
+        merge({"Head": (0, 10 * math.sin(ph), 0), "ArmL": (4 * math.sin(ph), 0, 0), "ArmR": (-4 * math.sin(ph), 0, 0)},
+              plates(2 + 2 * math.sin(ph))), {"Core": 1.0 + 0.04 * math.sin(ph * 2)}), steps=12)
+    # Walk (0.8 s, 2.8 m).
+    c.cycle("walk", 24, lambda ph: body(
+        g.step(ph, 1.4, 0.4, (0, 0.06 * math.sin(ph * 2), 0), (0, 2 * math.sin(ph * 2), 3 * math.sin(ph))),
+        {"ArmL": (10 * math.sin(ph), 0, 0), "ArmR": (-10 * math.sin(ph), 0, 0), "Head": (0, -4 * math.sin(ph), 0)}), steps=12)
+    # Slam wind-up: reared up on its back legs, both fists raised over its head (the game lifts it).
+    rear = {"LegL1": (0, 0.5, -0.4), "LegR1": (0, 0.5, -0.4)}
+    raised = merge(arms(125, -35, 8), {"Head": (14, 0, 0)})
+    c.cycle("slam_windup", 18, lambda ph: body(
+        g.stand((0, 0.35, 0.3), (16 + 1.0 * math.sin(ph * 2), 0, 0), feet=rear),
+        merge(raised, {"ArmL": (3 * math.sin(ph * 2), 0, 0)})), steps=6)
+    c.clip("slam", [(0,) + body(g.stand((0, 0.35, 0.3), (16, 0, 0), feet=rear), raised),
+                    (4,) + body(g.stand((0, -0.25, -0.1), (-10, 0, 0)), merge(arms(-12, 20), {"Head": (-8, 0, 0)}), {"Core": 1.2}),
+                    (9,) + body(g.stand((0, -0.2, -0.08), (-8, 0, 0)), merge(arms(-10, 15), {"Head": (-6, 0, 0)})),
+                    (13,) + body(g.stand((0, -0.1, 0), (-4, 0, 0)), arms(-5, 6))])
+    # Charge: crouched low with the arms swept back, then a pounding run.
+    crouch = merge(arms(-28, 10, 12), {"Head": (-10, 0, 0)})
+    c.cycle("charge_windup", 15, lambda ph: body(
+        g.stand((0, -0.3, 0.2 + 0.02 * math.sin(ph * 2)), (-8, 0, 0), spread=1.05), crouch), steps=4)
+    c.cycle("charge", 15, lambda ph: body(
+        g.step(ph, 1.8, 0.5, (0, 0.08 * abs(math.sin(ph)), 0), (-6, 0, 3 * math.sin(ph))),
+        merge(arms(-30, 10, 10), {"Head": (-8, 0, 0)})), steps=10)
+    # Volley wind-up: the wing cases part and the core swells.
+    c.cycle("volley_windup", 15, lambda ph: body(
+        g.stand((0, 0.05, 0), (4, 0, 0)), plates(18 + 3 * math.sin(ph * 2)), {"Core": 1.1 + 0.05 * math.sin(ph * 2)}), steps=4)
+    # Open: wing cases thrown wide, the core pulsing, head and arms dropped.
+    c.cycle("open", 30, lambda ph: body(
+        g.stand((0, -0.12, 0), (4, 0, 0)),
+        merge(plates(52 + 2 * math.sin(ph)), arms(-10, 0, 15), {"Head": (10, 0, 3 * math.sin(ph * 3))}),
+        {"Core": 1.12 + 0.1 * math.sin(ph * 4)}), steps=8)
+    c.clip("attack", [(0,) + body(g.stand()), (3,) + body(g.stand((0, 0, 0), (-4, 0, 0)), plates(10), {"Core": 1.2}),
+                      (10,) + body(g.stand())])
+    c.clip("hurt", [(0,) + body(g.stand()), (2,) + body(g.stand((0.04, 0, 0.05), (-3, 0, 4)), {"Head": (8, 6, 0)}),
+                    (5,) + body(g.stand((-0.02, 0, 0), (1, 0, -3))), (9,) + body(g.stand())])
+    curl = {}
+    for thigh, shin, _ in legs:
+        sgn = -1.0 if thigh[3] == "L" else 1.0
+        curl[thigh] = (0, 0, -sgn * 45)
+        curl[shin] = (0, 0, -sgn * 40)
+    c.clip("die", [(0,) + body(g.stand()),
+                   (8,) + body(g.step(1.0, 1.0, 0.6, (0, 0.1, 0), (6, 0, 0)), arms(40, 0)),
+                   (20, merge(curl, {"Head": (-25, 0, 0)}, arms(-30, 0, 10), plates(30)), {"Body": (0, -0.75, 0)}, {"Core": 0.7}),
+                   (26, merge(curl, {"Head": (-26, 0, 0)}, arms(-32, 0, 12), plates(34)), {"Body": (0, -0.8, 0)}, {"Core": 0.6})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden}
 
 
 def main():

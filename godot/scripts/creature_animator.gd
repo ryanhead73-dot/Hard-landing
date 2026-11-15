@@ -20,7 +20,7 @@ const KINDS := {
 	"scuttler": {"legs": "splay", "stride": 1.5, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
 	"spitter": {"legs": "hang", "stride": 1.5, "swing": 26.0, "lift": 0.0, "knee": 38.0, "bob": 0.04},
 	"ram": {"legs": "hang", "stride": 1.8, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
-	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
+	"warden": {"legs": "splay", "stride": 2.8, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
 	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
 	"skimmer": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 	"drifter": {"legs": "none", "stride": 1.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
