@@ -1842,7 +1842,260 @@ def warden():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden}
+# --- Lurker ------------------------------------------------------------------------------
+
+def lurker():
+    """Mire lurker: a long, low pool ambusher. Wet dark hide with a pale belly, a broad flat head
+    whose wide jaw is lined with bone teeth, glowing eye stalks (all that shows above the water
+    while it waits), a ridge of fin spines that glows teal, and a thick finned tail."""
+    c = Creature("lurker")
+    c.material("lurker_hide", rough=0.32, metal=0.05)
+    c.material("lurker_belly", rough=0.6)
+    c.material("ram_horn", rough=0.6)
+    c.material("lurker_gum", rough=0.5)
+    c.material("lurker_glow", rough=0.4, emit="3fd1b5", energy=2.0)
+
+    c.bone("Body", (0, 0.36, 0.6), (0, 0.36, -0.6))
+    c.bone("Head", (0, 0.4, -0.98), (0, 0.4, -1.6), "Body")
+    c.bone("Jaw", (0, 0.32, -1.0), (0, 0.28, -1.62), "Head")
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.bone("Stalk" + side, (0.2 * s, 0.52, -1.18), (0.22 * s, 0.74, -1.22), "Head")
+    c.bone("Tail", (0, 0.36, 1.0), (0, 0.33, 1.95), "Body")
+    c.bone("TailTip", (0, 0.33, 1.95), (0, 0.3, 2.95), "Tail")
+
+    spots = mottled("172019", "2b3a30", freq=5.0, seed=21.0, belly="7a7560", belly_at=-0.25)
+
+    def hide(p, n):
+        col = spots(p, n)
+        dot = smooth(0.12, 0.05, cells(p, 7.0, 22.0)[1]) * smooth(0.0, 0.6, n.y)
+        return mix(col, C("4e6a52"), dot * 0.5)
+    tooth = lambda p, n: mix(C("8a8170"), C("e2dbc6"), 0.6)
+
+    # Torso: flat and wide, the shoulders broader than the hips.
+    torso = ellipsoid((0, 0.36, 0.08), (0.5, 0.24, 1.12), segs=24, rings=14,
+                      fn=lambda u: (1.0 + 0.12 * smooth(0.0, -0.8, u.z) - 0.1 * smooth(0.2, 0.9, u.z)) * (1.0 - 0.12 * smooth(0.3, 1.0, abs(u.y))))
+    torso.plates(0.008, 8.0, 3.0, mask=lambda v: smooth(0.3, 0.5, v.y))
+    c.part(torso, ["Body", "Tail"], "lurker_hide", hide, falloff=6.0)
+    # Scutes in two rows down the back, and the glowing fin spines between them.
+    for i in range(8):
+        z = -0.78 + i * 0.24
+        for s in (-1.0, 1.0):
+            c.part(ellipsoid((0.2 * s, 0.56 - 0.006 * abs(i - 3), z), (0.06, 0.035, 0.08), segs=8, rings=5), "Body", "lurker_hide", hide)
+        h = 0.22 - abs(i - 2.5) * 0.025
+        c.part(spike((0, 0.57, z), (0, 0.57 + h, z + 0.14), 0.03, sides=5), "Body", "lurker_glow",
+               lambda p, n: mix(C("1f8f7a"), C("9ffbe9"), smooth(0.6, 0.8, p.y)), ao=False)
+
+    # Head: a broad flat skull, brow ridges, upper teeth; a hinged lower jaw with its own.
+    skull = ellipsoid((0, 0.43, -1.3), (0.38, 0.14, 0.42), segs=20, rings=12,
+                      fn=lambda u: 1.0 - 0.22 * smooth(0.0, 1.0, -u.z) * (1.0 - 0.5 * abs(u.x)) - 0.25 * smooth(-0.2, -0.9, u.y))
+    skull.plates(0.006, 10.0, 4.0, mask=lambda v: smooth(0.4, 0.5, v.y))
+    c.part(skull, ["Head", "Body"], "lurker_hide", hide, falloff=6.0)
+    for s in (-1.0, 1.0):
+        c.part(tube([(0.14 * s, 0.53, -1.0), (0.2 * s, 0.55, -1.18), (0.16 * s, 0.53, -1.42)], [0.05, 0.045, 0.02], sides=6, samples=3),
+               "Head", "lurker_hide", hide)
+    for k in range(9):
+        a = -0.85 + 1.7 * k / 8
+        at = V((0.3 * math.sin(a), 0.33, -1.3 - 0.36 * math.cos(a)))
+        c.part(spike(at + V((0, 0.02, 0)), at + V((0, -0.08, 0)), 0.02, sides=4), "Head", "ram_horn", tooth)
+    jaw = ellipsoid((0, 0.29, -1.3), (0.36, 0.08, 0.4), segs=18, rings=10,
+                    fn=lambda u: 1.0 - 0.2 * smooth(0.0, 1.0, -u.z) * (1.0 - 0.5 * abs(u.x)))
+    c.part(jaw, "Jaw", "lurker_belly", lambda p, n: mix(C("5c5a4a"), C("8a8570"), smooth(-0.5, 0.5, -n.y)))
+    c.part(ellipsoid((0, 0.34, -1.3), (0.26, 0.03, 0.3), segs=14, rings=6), "Jaw", "lurker_gum", "6a2427", ao=False)
+    for k in range(8):
+        a = -0.8 + 1.6 * k / 7
+        at = V((0.28 * math.sin(a), 0.33, -1.3 - 0.33 * math.cos(a)))
+        c.part(spike(at - V((0, 0.02, 0)), at + V((0, 0.07, 0)), 0.018, sides=4), "Jaw", "ram_horn", tooth)
+    # Eye stalks.
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.part(tube([(0.2 * s, 0.5, -1.18), (0.22 * s, 0.63, -1.2), (0.22 * s, 0.72, -1.22)], [0.04, 0.032, 0.03], sides=6, samples=2),
+               "Stalk" + side, "lurker_hide", hide)
+        c.part(ellipsoid((0.22 * s, 0.76, -1.23), (0.05, 0.05, 0.05), segs=10, rings=6), "Stalk" + side, "lurker_glow", "b6fff0", ao=False)
+
+    # Tail: thick at the root, finned along the tip.
+    c.part(tube([(0, 0.36, 0.95), (0, 0.35, 1.5), (0, 0.33, 2.05), (0, 0.32, 2.55), (0, 0.3, 3.0)],
+                [(0.3, 0.2), (0.22, 0.16), (0.15, 0.12), (0.08, 0.08), 0.02], sides=10, samples=4, caps=("flat", "point")),
+           ["Body", "Tail", "TailTip"], "lurker_hide", hide, falloff=4.0)
+    fa = [(0, 0.42, 1.9), (0, 0.4, 2.3), (0, 0.37, 2.7), (0, 0.33, 2.98)]
+    fb = [(0, 0.5, 1.95), (0, 0.62, 2.35), (0, 0.55, 2.72), (0, 0.4, 2.98)]
+    c.part(sheet(fa, fb, nv=3, thick=0.02), "TailTip", "lurker_hide",
+           lambda p, n: mix(C("16241f"), C("2f8f7c"), smooth(0.45, 0.6, p.y) * 0.7), ao=False)
+
+    # Four sprawled legs on webbed paws.
+    legs = []
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        for row, (hz, fz) in ((1, (-0.58, -0.78)), (2, (0.62, 0.72))):
+            hip = V((0.42 * s, 0.3, hz))
+            knee = V((0.78 * s, 0.4, hz + (-0.04 if row == 1 else 0.08)))
+            foot = V((0.92 * s, 0.0, fz))
+            thigh = c.bone("Leg%s%d" % (side, row), hip, knee, "Body")
+            shin = c.bone("Foot%s%d" % (side, row), knee, foot, thigh)
+            legs.append((thigh, shin, math.pi * ((row - 1 + (1 if s > 0 else 0)) % 2)))
+            c.part(tube([hip, hip.lerp(knee, 0.5) + V((0, 0.03, 0)), knee], [0.14, 0.11, 0.09], sides=8, samples=3), [thigh], "lurker_hide", hide)
+            c.part(tube([knee, foot + V((0, 0.06, 0))], [0.085, 0.065], sides=8, samples=1), shin, "lurker_hide", hide)
+            paw = ellipsoid(foot + V((0.03 * s, 0.03, -0.02)), (0.13, 0.04, 0.12), segs=10, rings=6)
+            c.part(paw, shin, "lurker_belly", "5c5a4a")
+            for t in (-1.0, 0.0, 1.0):
+                b = foot + V((0.03 * s + 0.07 * t, 0.02, -0.08))
+                c.part(spike(b, b + V((0.05 * t, -0.01, -0.1)), 0.018, sides=4), shin, "ram_horn", tooth)
+    c.build()
+
+    g = Gait(c, "Body", legs)
+
+    def body(posed, extra=None, offsets=None):
+        pose, offs = posed
+        return (merge(pose, extra or {}), merge(offs, offsets or {}))
+
+    def jaw(deg):
+        return {"Jaw": (-deg, 0, 0)}
+
+    def tail(ph, amp, lift=0.0):
+        return {"Tail": (lift, amp * math.sin(ph), 0), "TailTip": (0, amp * 1.3 * math.sin(ph - 0.9), 0)}
+
+    def stalks(deg):
+        return {"StalkL": (deg, 0, 0), "StalkR": (-deg, 0, 0)}
+
+    c.cycle("idle", 80, lambda ph: body(
+        g.stand((0, 0.01 * math.sin(ph), 0), (0.8 * math.sin(ph), 0, 0)),
+        merge({"Head": (2 * math.sin(ph * 2), 8 * math.sin(ph), 0)}, jaw(3 + 3 * math.sin(ph * 2)), tail(ph, 8.0), stalks(8 * math.sin(ph * 2)))), steps=12)
+    # Walk (0.8 s, 1.4 m): a sprawling, side-to-side crawl.
+    c.cycle("walk", 24, lambda ph: body(
+        g.step(ph, 0.7, 0.14, (0, 0.01 * math.sin(ph * 2), 0), (0, -9 * math.sin(ph), 0)),
+        merge({"Head": (0, 12 * math.sin(ph), 0)}, jaw(2), tail(ph + 1.2, 22.0))), steps=12)
+    # Submerged: legs folded, only the eye stalks moving, the tail stirring the water.
+    tuck = {"LegL1": (0.08, 0.1, 0.12), "LegR1": (-0.08, 0.1, 0.12), "LegL2": (0.08, 0.1, -0.1), "LegR2": (-0.08, 0.1, -0.1)}
+    c.cycle("submerged", 90, lambda ph: body(
+        g.stand((0, -0.06, 0), feet=tuck),
+        merge({"Head": (6, 0, 0)}, tail(ph, 10.0), stalks(12 * math.sin(ph * 2)))), steps=8)
+    # Emerging: rearing out of the water, jaw coming open.
+    c.cycle("emerge", 30, lambda ph: body(
+        g.stand((0, 0.04, 0), (5, 0, 0)), merge({"Head": (10, 0, 0)}, jaw(30 + 2 * math.sin(ph * 2)), tail(ph, 12.0))), steps=4)
+    # Wind-up: head raised, the jaw gaping and trembling.
+    c.cycle("windup", 12, lambda ph: body(
+        g.stand((0, 0.06, 0.08), (8, 0, 0), spread=1.06),
+        merge({"Head": (14, 0, 0)}, jaw(50 + 3 * math.sin(ph * 2)), tail(ph, 6.0, 6))), steps=4)
+    c.clip("attack", [(0,) + body(g.stand((0, 0.06, 0.08), (8, 0, 0), 1.06), merge({"Head": (14, 0, 0)}, jaw(52))),
+                      (3,) + body(g.stand((0, -0.04, -0.4), (-6, 0, 0), 1.06), merge({"Head": (-10, 0, 0)}, jaw(-2))),
+                      (10,) + body(g.stand((0, 0, -0.2), (-3, 0, 0)), merge({"Head": (-4, 0, 0)}, jaw(6)))])
+    # Diving: the head goes under first, legs fold.
+    c.cycle("dive", 20, lambda ph: body(
+        g.stand((0, -0.08, -0.1), (-12, 0, 0), feet=tuck), merge({"Head": (-18, 0, 0)}, tail(ph, 18.0, 8), stalks(-20))), steps=4)
+    c.clip("hurt", [(0,) + body(g.stand()),
+                    (2,) + body(g.stand((0.04, 0, 0.05), (-4, 6, 7)), merge({"Head": (12, 10, 0)}, jaw(18))),
+                    (5,) + body(g.stand((-0.02, 0, 0), (2, -3, -4)), jaw(6)),
+                    (9,) + body(g.stand())])
+    # Die: a thrash, then it rolls onto its side, jaw slack.
+    limp = {"LegL1": (0, 40, -30), "LegR1": (0, -40, 30), "LegL2": (0, -30, -30), "LegR2": (0, 30, 30),
+            "FootL1": (0, 0, -40), "FootR1": (0, 0, 40), "FootL2": (0, 0, -40), "FootR2": (0, 0, 40)}
+    c.clip("die", [(0,) + body(g.stand()),
+                   (4,) + body(g.stand((0, 0.05, 0), (6, 14, 10)), merge({"Head": (20, -20, 0)}, jaw(35), tail(1.5, 30.0))),
+                   (12, merge(limp, {"Body": (0, 0, 70), "Head": (-10, 10, 0)}, jaw(26), tail(0.5, 20.0)), {"Body": (0, -0.04, 0)}),
+                   (18, merge(limp, {"Body": (0, 0, 78), "Head": (-14, 12, 0)}, jaw(24), tail(0.4, 22.0)), {"Body": (0, -0.06, 0)})])
+    c.export()
+
+
+# --- Skimmer -----------------------------------------------------------------------------
+
+def skimmer():
+    """Basin skimmer: a lean glider on wide veined membrane wings, all neck and tail, with a
+    glowing belly sac (its soft spot) that lights up before it dives, and hooked talons it rakes
+    with on the way past."""
+    c = Creature("skimmer")
+    c.material("skimmer_hide", rough=0.55, metal=0.05)
+    c.material("skimmer_web", rough=0.7, alpha=0.88)
+    c.material("ram_horn", rough=0.6)
+    c.material("skimmer_glow", rough=0.4, emit="3fd1b5", energy=2.5)
+
+    c.bone("Body", (0, 0.0, 0.4), (0, 0.0, -0.4))
+    c.bone("Core", (0, -0.14, 0.05), (0, -0.3, 0.05), "Body")
+    c.bone("Head", (0, 0.03, -0.42), (0, 0.04, -0.95), "Body")
+    c.bone("Tail", (0, 0.0, 0.42), (0, 0.0, 1.1), "Body")
+    c.bone("TailTip", (0, 0.0, 1.1), (0, 0.0, 1.75), "Tail")
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        c.bone("Wing" + side, (0.12 * s, 0.06, -0.12), (0.62 * s, 0.1, -0.2), "Body")
+        c.bone("WingTip" + side, (0.62 * s, 0.1, -0.2), (1.35 * s, 0.05, 0.05), "Wing" + side)
+        c.bone("Claw" + side, (0.1 * s, -0.12, -0.05), (0.1 * s, -0.32, -0.1), "Body")
+
+    hide = mottled("1c2223", "343d3e", freq=8.0, seed=31.0, belly="6b6a5c", belly_at=-0.3)
+    tooth = lambda p, n: mix(C("8a8170"), C("d8d0bc"), 0.5)
+
+    torso = ellipsoid((0, 0.0, 0.0), (0.2, 0.17, 0.5), segs=18, rings=12,
+                      fn=lambda u: 1.0 + 0.15 * smooth(0.4, 1.0, u.y) * smooth(0.5, -0.3, u.z) - 0.2 * smooth(0.2, 1.0, u.z))
+    c.part(torso, "Body", "skimmer_hide", hide)
+    c.part(tube([(0, 0.14, -0.3), (0, 0.2, 0.0), (0, 0.15, 0.3)], [0.04, 0.05, 0.03], sides=6, samples=3), "Body", "skimmer_hide", "151a1b")
+    sac = ellipsoid((0, -0.15, 0.05), (0.12, 0.09, 0.18), segs=14, rings=8,
+                    fn=lambda u: 1.0 + 0.06 * math.sin(u.z * 18.0))
+    c.part(sac, "Core", "skimmer_glow", lambda p, n: mix(C("1f8f7a"), C("b6fff0"), smooth(-0.1, -0.24, p.y)), ao=False)
+    # Neck and a long beaked head with a crest.
+    c.part(tube([(0, 0.03, -0.38), (0, 0.06, -0.55), (0, 0.06, -0.7)], [0.08, 0.065, 0.06], sides=8, samples=3), ["Body", "Head"],
+           "skimmer_hide", hide, falloff=3.0)
+    head = ellipsoid((0, 0.06, -0.78), (0.08, 0.075, 0.14), segs=12, rings=8)
+    c.part(head, "Head", "skimmer_hide", hide)
+    c.part(tube([(0, 0.05, -0.88), (0, 0.03, -1.02), (0, 0.0, -1.14)], [0.04, 0.025, 0.004], sides=6, samples=3, caps=("round", "point")),
+           "Head", "ram_horn", tooth)
+    c.part(spike((0, 0.11, -0.76), (0, 0.2, -0.5), 0.035, sides=5), "Head", "skimmer_hide", "151a1b")
+    for s in (-1.0, 1.0):
+        c.part(ellipsoid((0.065 * s, 0.09, -0.84), (0.022, 0.022, 0.022), segs=8, rings=5), "Head", "skimmer_glow", "b6fff0", ao=False)
+    # Tail with a glowing diamond fin.
+    c.part(tube([(0, 0.0, 0.4), (0, 0.0, 0.9), (0, 0.0, 1.35), (0, 0.0, 1.75)], [0.08, 0.05, 0.03, 0.01], sides=7, samples=4),
+           ["Body", "Tail", "TailTip"], "skimmer_hide", hide, falloff=3.0)
+    for s in (-1.0, 1.0):
+        f = sheet([(0, 0.0, 1.5), (0, 0.0, 1.62), (0, 0.0, 1.78)], [(0, 0, 1.52), (0.13 * s, 0.0, 1.66), (0, 0.0, 1.82)], nv=2, thick=0.012)
+        c.part(Geo_flip(f) if s > 0 else f, "TailTip", "skimmer_glow", "3fd1b5", ao=False)
+
+    def web_paint(p, n):
+        ang = math.atan2(p.z + 0.1, abs(p.x) - 0.1)
+        vein = smooth(0.85, 1.0, abs(math.sin(ang * 7.0)))
+        base = mix(C("3a3530"), C("7a6a58"), smooth(0.0, 0.6, p.z + 0.1))
+        return mix(base, C("3fd1b5"), vein * 0.55)
+
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        membrane_wing(c, s, [(0.12, 0.06, -0.12), (0.62, 0.1, -0.2), (1.0, 0.08, -0.08), (1.35, 0.05, 0.05)],
+                      [0.6, 0.62, 0.42, 0.12], ["Wing" + side, "WingTip" + side], "skimmer_web", web_paint,
+                      "skimmer_hide", "1f2526", arm_r=0.035)
+        # Talons.
+        c.part(tube([(0.1 * s, -0.12, -0.05), (0.1 * s, -0.24, -0.08), (0.1 * s, -0.32, -0.1)], [0.025, 0.02, 0.018], sides=6, samples=2),
+               "Claw" + side, "skimmer_hide", hide)
+        for t in (-1.0, 1.0):
+            b = V((0.1 * s + 0.025 * t, -0.32, -0.1))
+            c.part(spike(b, b + V((0.02 * t, -0.04, -0.1)), 0.012, sides=4, bend=b + V((0.01 * t, -0.06, -0.04))), "Claw" + side, "ram_horn", tooth)
+    c.build()
+
+    def wings(up, tip=0.0, sweep=0.0, fold=0.0):
+        return {"WingL": (0, sweep, -up), "WingR": (0, -sweep, up), "WingTipL": (0, fold, -tip), "WingTipR": (0, -fold, tip)}
+
+    def tailw(ph, amp, droop=0.0):
+        return {"Tail": (droop + 0.3 * amp * math.sin(ph), amp * math.sin(ph), 0), "TailTip": (0, amp * 1.4 * math.sin(ph - 0.9), 0)}
+
+    def claws(deg):
+        return {"ClawL": (deg, 0, 0), "ClawR": (deg, 0, 0)}
+
+    def beat(ph, amp, claw=-40.0, extra=None):
+        return (merge(wings(amp * math.sin(ph) + 6, amp * 0.35 * math.sin(ph - 0.3)), tailw(ph, 10.0), claws(claw), extra or {}),
+                {"Body": (0, -0.04 * math.sin(ph) * amp / 40.0, 0)})
+
+    # Gliding: wings out, a lazy beat now and then.
+    c.cycle("idle", 60, lambda ph: beat(ph, 10.0), steps=8)
+    c.cycle("walk", 40, lambda ph: beat(ph, 14.0, extra={"Head": (0, 10 * math.sin(ph), 0)}), steps=8)
+    c.cycle("circle", 60, lambda ph: beat(ph, 10.0, extra={"Head": (0, 12 * math.sin(ph), 0)}), steps=8)
+    c.cycle("climb", 17, lambda ph: beat(ph, 42.0, extra={"Head": (-10, 0, 0)}), steps=8)
+    # Hanging in the air screaming, talons out, sac lit.
+    c.cycle("windup", 12, lambda ph: (beat(ph, 48.0, 30.0, {"Head": (28, 0, 0), "Body": (20, 0, 0)})[0],
+                                      beat(ph, 48.0)[1], {"Core": 1.2 + 0.08 * math.sin(ph * 2)}), steps=8)
+    # The dive: wings swept back and half folded, talons thrown forward.
+    c.cycle("dive", 12, lambda ph: merge(wings(3 * math.sin(ph) + 4, 0, 55, 35), tailw(ph, 4.0), claws(75), {"Head": (6, 0, 0)}), steps=4)
+    # Grounded: flailing to get up.
+    c.cycle("grounded", 10, lambda ph: (merge(wings(22 * math.sin(ph) + 20, 8 * math.sin(ph), 0, 30), tailw(ph, 18.0), claws(0),
+                                              {"Head": (-10, 15 * math.sin(ph * 2), 0)}),), steps=6)
+    c.clip("attack", [(0, merge(wings(4, 0, 55, 35), claws(75))), (3, merge(wings(10, 0, 40, 20), claws(110))),
+                      (10, merge(wings(20, 6, 10, 0), claws(-20)))])
+    c.clip("hurt", [(0, {}), (2, merge(wings(-20, -20), {"Body": (-10, 0, 14), "Head": (15, 0, 0)})), (6, wings(16, 8)), (9, {})])
+    c.clip("die", [(0, wings(10)), (5, merge(wings(40, 30), {"Body": (-25, 0, 30), "Head": (25, 0, 0)}, claws(20))),
+                   (14, merge(wings(-25, -40, 0, 60), tailw(0.0, 20.0, 10), claws(20), {"Body": (-10, 0, 10), "Head": (-20, 0, 0)}),
+                    {}, {"Core": 0.7})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter, "ram": ram, "warden": warden, "lurker": lurker, "skimmer": skimmer}
 
 
 def main():

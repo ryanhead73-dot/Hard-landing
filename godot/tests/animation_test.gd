@@ -278,8 +278,7 @@ func _lurker_emerge() -> void:
 
 
 func _jaw(e: Enemy) -> float:
-	var j: Node3D = e.anim.pose.node("Jaw")
-	return rad_to_deg(j.rotation.x) if j else 0.0
+	return e.anim.pose.rot_of("Jaw").x
 
 
 func _ship() -> void:

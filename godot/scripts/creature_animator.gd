@@ -21,7 +21,7 @@ const KINDS := {
 	"spitter": {"legs": "hang", "stride": 1.5, "swing": 26.0, "lift": 0.0, "knee": 38.0, "bob": 0.04},
 	"ram": {"legs": "hang", "stride": 1.8, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
 	"warden": {"legs": "splay", "stride": 2.8, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
-	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
+	"lurker": {"legs": "splay", "stride": 1.4, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
 	"skimmer": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 	"drifter": {"legs": "none", "stride": 1.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 	"veilwing": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
@@ -245,6 +245,8 @@ func _drive_tree(st: String, hv: float) -> void:
 	var dead := st == "dead"
 	if dead != (tree.get("parameters/alive/current_state") == "dead"):
 		tree.set("parameters/alive/transition_request", "dead" if dead else "alive")
+	if kind == "skimmer" and pose.has("WingR"):
+		wing_beat = pose.rot_of("WingR").z
 	# Swelling the acid sac and pulsing the Warden's core stay procedural (scale, on top of the clips).
 	var t := shot_progress()
 	var punch := sin(clampf(t, 0.0, 1.0) * PI) if t >= 0.0 else 0.0
