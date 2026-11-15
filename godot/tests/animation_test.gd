@@ -186,8 +186,11 @@ func _wildlife() -> void:
 	# swing about one axis; the IK legs of the skinned models about a slanted one).
 	var lo := {}
 	var hi := {}
-	for f in 50:
+	# Over a full stride or so (the IK legs turn less per step but keep at it all cycle).
+	var t := 0.0
+	while t < 1.2:
 		await get_tree().process_frame
+		t += get_process_delta_time()
 		for kind in made:
 			var e: Enemy = made[kind]
 			var leg: String = e.anim.legs[0][0]

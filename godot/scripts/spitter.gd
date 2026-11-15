@@ -63,7 +63,6 @@ func _physics_process(delta: float) -> void:
 			if _target_alive():
 				_face(target.global_position, delta * 6.0)
 			_sac.emission_energy_multiplier = 1.0 + 6.0 * (1.0 - _timer / windup_time)
-			_visual.position.y = 0.25 * (1.0 - _timer / windup_time)
 			if _timer <= 0.0:
 				_spit()
 		State.RECOVER:
@@ -72,8 +71,6 @@ func _physics_process(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, flat_vel.x, 20.0 * delta)
 	velocity.z = move_toward(velocity.z, flat_vel.z, 20.0 * delta)
 	move_and_slide()
-	if state != State.WINDUP:
-		_visual.position.y = move_toward(_visual.position.y, 0.0, delta)
 
 
 func _wander_step() -> Vector3:

@@ -1404,7 +1404,120 @@ def scuttler():
     c.export()
 
 
-CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler}
+# --- Spitter -----------------------------------------------------------------------------
+
+def spitter():
+    """Spitter: a stilt-legged acid lobber. A small armoured thorax slung between four tall
+    legs, a long arched neck ending in a ringed spout, and a swollen yellow-green acid sac on its
+    back (the weak spot) that glows brighter as it draws up a shot."""
+    c = Creature("spitter")
+    c.material("spitter_hide", rough=0.75)
+    c.material("spitter_plate", rough=0.5, metal=0.2)
+    c.material("acid_sac", rough=0.3, emit="b4e05a", energy=2.0)
+    c.material("moss_glow", rough=0.4, emit="3fd1b5", energy=3.0)
+
+    c.bone("Body", (0, 0.9, 0.2), (0, 0.9, -0.3))
+    c.bone("Sac", (0, 1.22, 0.32), (0, 1.5, 0.32), "Body")
+    c.bone("Neck", (0, 1.0, -0.32), (0, 1.32, -0.58), "Body")
+    c.bone("Head", (0, 1.34, -0.6), (0, 1.32, -0.88), "Neck")
+
+    hide = mottled("23281f", "39402f", freq=7.0, seed=5.0, belly="5a5a48", belly_at=-0.3)
+    plate = basalt_shell(6.0, rim=0.8)
+
+    # Thorax and a short segmented abdomen under the sac.
+    c.part(ellipsoid((0, 0.9, -0.05), (0.3, 0.24, 0.36), segs=18, rings=12), "Body", "spitter_hide", hide)
+    c.part(ellipsoid((0, 0.92, 0.38), (0.26, 0.22, 0.3), segs=16, rings=10,
+                     fn=lambda u: 1.0 + 0.05 * math.sin(u.z * 16.0)), "Body", "spitter_hide", hide)
+    for i, z in enumerate((-0.28, -0.08, 0.12)):
+        pl = shell((0, 0.94, z), (0.32, 0.22, 0.17), cover=0.42, thick=0.04, segs=16, rings=6, rot=(8, 0, 0), lip=0.1)
+        c.part(pl, "Body", "spitter_plate", plate, hard=50)
+    # The sac: a swollen bladder in a cradle of ribs.
+    sac = ellipsoid((0, 1.28, 0.34), (0.3, 0.26, 0.36), segs=20, rings=14,
+                    fn=lambda u: 1.0 + 0.04 * math.sin(math.atan2(u.z, u.x) * 6.0) * (1.0 - abs(u.y)))
+
+    def sac_paint(p, n):
+        vein = smooth(0.08, 0.0, abs(fbm(p, 6.0, 2, 4.0)))
+        return mix(mix(C("8fbf2e"), C("e6ff8a"), smooth(1.15, 1.5, p.y)), C("3d5a12"), vein * 0.7)
+    c.part(sac, "Sac", "acid_sac", sac_paint, ao=False)
+    for k in range(5):
+        a = math.pi * (0.15 + 0.7 * k / 4)
+        x = math.cos(a)
+        c.part(tube([(0.2 * x, 1.06, 0.34 + 0.32 * x * 0), (0.33 * x, 1.24, 0.34 - 0.24 * (k - 2) / 2),
+                     (0.18 * x, 1.48, 0.34 - 0.3 * (k - 2) / 2)], [0.025, 0.022, 0.012], sides=5, samples=3),
+               ["Body", "Sac"], "spitter_plate", "2b2a22", falloff=2.0)
+    # Neck: arched and ringed, thick at the shoulders.
+    neck_pts = [(0, 0.98, -0.3), (0, 1.16, -0.42), (0, 1.3, -0.56)]
+    c.part(tube(neck_pts, [0.15, 0.11, 0.09], sides=10, samples=4,
+                profile=lambda a, t: 1.0 + 0.1 * max(0.0, math.sin(t * 28.0))), ["Body", "Neck", "Head"], "spitter_hide", hide, falloff=3.0)
+    # Head: narrow, with a ringed spout and eyes set back on the sides.
+    head = ellipsoid((0, 1.33, -0.68), (0.13, 0.11, 0.17), segs=14, rings=9,
+                     fn=lambda u: 1.0 - 0.2 * smooth(0.0, 1.0, -u.z) * abs(u.x))
+    c.part(head, "Head", "spitter_hide", hide)
+    c.part(shell((0, 1.36, -0.68), (0.15, 0.1, 0.19), cover=0.4, thick=0.03, segs=14, rings=5, lip=0.12), "Head", "spitter_plate", plate, hard=50)
+    spout = hollow([(0.06, 0.0), (0.075, 0.08), (0.065, 0.16), (0.075, 0.2), (0.05, 0.2), (0.045, 0.1), (0.04, 0.0)],
+                   at=(0, 1.31, -0.8), segs=12, rot=(-90, 0, 0))
+    c.part(spout, "Head", "spitter_plate", lambda p, n: mix(C("2c2a22"), C(OXIDE), smooth(-0.9, -1.0, p.z)), hard=60)
+    c.part(ellipsoid((0, 1.31, -0.98), (0.045, 0.045, 0.02), segs=10, rings=5), "Head", "acid_sac", "e6ff8a", ao=False)
+    for s in (-1.0, 1.0):
+        c.part(ellipsoid((0.1 * s, 1.38, -0.74), (0.03, 0.03, 0.03), segs=8, rings=5), "Head", "moss_glow", "9ffbe9", ao=False)
+        c.part(ellipsoid((0.07 * s, 1.41, -0.8), (0.018, 0.018, 0.018), segs=6, rings=4), "Head", "moss_glow", "9ffbe9", ao=False)
+
+    # Four stilt legs, knees out and up.
+    legs = []
+    for side, s in (("L", -1.0), ("R", 1.0)):
+        for row in (1, 2):
+            hip = V((0.24 * s, 0.84, -0.2 if row == 1 else 0.2))
+            knee = V((0.66 * s, 1.3, -0.5 if row == 1 else 0.55))
+            foot = V((0.92 * s, 0.0, -0.78 if row == 1 else 0.86))
+            thigh = c.bone("Leg%s%d" % (side, row), hip, knee, "Body")
+            shin = c.bone("Foot%s%d" % (side, row), knee, foot, thigh)
+            legs.append((thigh, shin, math.pi * ((row - 1 + (1 if s > 0 else 0)) % 2)))
+            c.part(tube([hip, hip.lerp(knee, 0.5) + V((0, 0.05, 0)), knee], [0.07, 0.055, 0.045], sides=8, samples=4),
+                   thigh, "spitter_hide", hide)
+            c.part(ellipsoid(knee, (0.06, 0.07, 0.06), segs=10, rings=6), [thigh, shin], "spitter_plate",
+                   lambda p, n: mix(C("3a2a20"), C(OXIDE), smooth(0.0, 1.0, n.y) * 0.8), falloff=2.0)
+            c.part(tube([knee, knee.lerp(foot, 0.5) + V((0.05 * s, 0, 0)), foot + V((0, 0.1, 0)), foot], [0.045, 0.034, 0.022, 0.004],
+                        sides=7, samples=4, caps=("round", "point")), shin, "spitter_plate",
+                   lambda p, n: mix(C("22251e"), C("8a5a36"), smooth(0.3, 0.0, p.y) * 0.7))
+            c.part(spike(knee + V((0, 0.03, 0)), knee + V((0.06 * s, 0.16, 0.05 if row == 2 else -0.05)), 0.03, sides=5),
+                   thigh, "spitter_plate", "2a2220")
+    c.build()
+
+    g = Gait(c, "Body", legs)
+
+    def body(posed, extra=None, scales=None):
+        pose, offs = posed
+        return (merge(pose, extra or {}), offs, scales or {})
+
+    c.cycle("idle", 60, lambda ph: body(
+        g.stand((0, 0.015 * math.sin(ph), 0), (2 * math.sin(ph), 0, 0)),
+        {"Neck": (3 * math.sin(ph), 6 * math.sin(ph), 0), "Head": (-2 * math.sin(ph), 10 * math.sin(ph * 2), 0)},
+        {"Sac": 1.0 + 0.05 * math.sin(ph * 2)}), steps=8)
+    c.cycle("walk", 24, lambda ph: body(
+        g.step(ph, 0.75, 0.22, (0, 0.03 * math.sin(ph * 2), 0), (0, 0, 3 * math.sin(ph))),
+        {"Neck": (4 * math.sin(ph * 2), 0, 0)}, {"Sac": 1.0 + 0.04 * math.sin(ph * 2)}), steps=12)
+    # Wind-up: up on its toes, neck drawn back, head kept level to aim, the sac swelling.
+    brace = {"LegL1": (0, 0, -0.12), "LegR1": (0, 0, -0.12)}
+    c.cycle("windup", 18, lambda ph: body(
+        g.stand((0, 0.16, 0.06), (8, 0, 0), feet=brace),
+        {"Neck": (32 + 2 * math.sin(ph * 2), 0, 0), "Head": (-14, 0, 0)}, {"Sac": 1.3 + 0.05 * math.sin(ph * 3)}), steps=6)
+    # Attack: the neck whips forward and spits; the sac empties.
+    c.clip("attack", [(0,) + body(g.stand((0, 0.16, 0.06), (8, 0, 0), feet=brace), {"Neck": (34, 0, 0), "Head": (-14, 0, 0)}, {"Sac": 1.32}),
+                      (3,) + body(g.stand((0, 0.05, -0.1), (-6, 0, 0), feet=brace), {"Neck": (-40, 0, 0), "Head": (8, 0, 0)}, {"Sac": 0.75}),
+                      (10,) + body(g.stand((0, 0.0, -0.04), (-3, 0, 0)), {"Neck": (-18, 0, 0), "Head": (4, 0, 0)}, {"Sac": 0.9})])
+    c.clip("hurt", [(0,) + body(g.stand()),
+                    (2,) + body(g.stand((0.04, 0, 0.05), (-5, 0, 8)), {"Neck": (10, 0, 0), "Head": (10, 6, 0)}, {"Sac": 0.9}),
+                    (5,) + body(g.stand((-0.02, 0, 0), (2, 0, -5))),
+                    (9,) + body(g.stand())])
+    # Die: the legs splay and the body drops between them, neck sagging (the game tips it over).
+    c.clip("die", [(0,) + body(g.stand()),
+                   (5,) + body(g.stand((0, 0.08, 0), (-10, 0, 0)), {"Neck": (20, 0, 0)}, {"Sac": 1.2}),
+                   (13,) + body(g.stand((0, -0.62, 0), (4, 0, 6), spread=1.35), {"Neck": (-25, 0, 0), "Head": (-25, 0, 0)}, {"Sac": 0.85}),
+                   (19,) + body(g.stand((0, -0.66, 0), (5, 0, 7), spread=1.38), {"Neck": (-30, 0, 0), "Head": (-25, 0, 0)}, {"Sac": 0.8})])
+    c.export()
+
+
+CREATURES = {"drifter": drifter, "veilwing": veilwing, "ridge_diver": ridge_diver, "pinweaver": pinweaver, "chord_singer": chord_singer, "patience_guardian": patience_guardian, "cantor": cantor, "scuttler": scuttler, "spitter": spitter}
 
 
 def main():
