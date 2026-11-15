@@ -23,6 +23,11 @@ const KINDS := {
 	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
 	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
 	"skimmer": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"drifter": {"legs": "none", "stride": 1.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"veilwing": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"ridge_diver": {"legs": "none", "stride": 2.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"pinweaver": {"legs": "none", "stride": 1.8, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"chord_singer": {"legs": "none", "stride": 1.5, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 }
 const SHOTS := {"attack": 0.35, "slam": 0.45, "hurt": 0.3}
 

@@ -488,6 +488,9 @@ func _load_rig(model: String, parent: Node3D) -> Node3D:
 	_rig = Rig.spawn(model, parent)
 	if weak_joint != "":
 		_weak = Rig.joint(_rig, weak_joint)
+		if _weak == null:
+			# A skinned model: follow the bone.
+			_weak = Rig.attach(_rig, weak_joint)
 	_flash_rig(_rig)
 	anim = CreatureAnimator.new()
 	anim.name = "Animator"

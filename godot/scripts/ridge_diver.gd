@@ -68,6 +68,7 @@ func _init() -> void:
 	alert_radius = 0.0
 	drops = Vector2i(1, 2)
 	death_puff = 0.8
+	weak_joint = "Gill"
 	weak_radius = 0.5
 
 
@@ -102,49 +103,9 @@ func _build() -> void:
 	add_child(_mound)
 	_body = Node3D.new()
 	add_child(_body)
-	var plate := StandardMaterial3D.new()
-	plate.albedo_color = PLATE
-	plate.roughness = 0.45
-	plate.metallic = 0.2
-	_flashes(plate)
-	var trunk := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.36
-	cm.height = 2.0
-	cm.radial_segments = 10
-	cm.rings = 6
-	trunk.mesh = cm
-	trunk.material_override = plate
-	trunk.position = Vector3(0.0, 0.9, 0.0)
-	trunk.rotation.x = -0.25
-	_body.add_child(trunk)
-	# The blunt shovel snout.
-	var snout := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.62, 0.22, 0.7)
-	snout.mesh = bm
-	snout.material_override = plate
-	snout.position = Vector3(0.0, 1.95, -0.32)
-	snout.rotation.x = -0.6
-	_body.add_child(snout)
+	_load_rig("ridge_diver", _body)
 	# The gill ring under the neck: the weak spot, bright while it inhales.
-	_gill_mat = StandardMaterial3D.new()
-	_gill_mat.albedo_color = GILL.darkened(0.4)
-	_gill_mat.emission_enabled = true
-	_gill_mat.emission = GILL
-	_gill_mat.emission_energy_multiplier = 0.5
-	var gill := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 0.3
-	tm.outer_radius = 0.44
-	tm.rings = 14
-	tm.ring_segments = 6
-	gill.mesh = tm
-	gill.material_override = _gill_mat
-	gill.position = Vector3(0.0, 1.45, -0.1)
-	gill.rotation.x = -0.25
-	_body.add_child(gill)
-	_weak = gill
+	_gill_mat = Rig.own_material(_rig, "diver_gill")
 	# The grit ring that marks where it will come up.
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.albedo_color = MARK
@@ -309,6 +270,12 @@ func _erupt() -> void:
 	_mound.position.x = 0.0
 	_bury(false)
 	_body.position.y = -2.0
+	# It comes up facing what it heard, stretched straight, and whips forward.
+	if _target_alive():
+		var to: Vector3 = target.global_position - global_position
+		if _flat(to).length() > 0.2:
+			_body.rotation.y = atan2(-to.x, -to.z)
+	_anim("attack")
 	Sfx.play("diver_erupt", global_position, 0.0, 0.1)
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 0.3, DUST, 18, 4.0, 0.1, 0.8, Vector3.UP, 50.0, -9.0)

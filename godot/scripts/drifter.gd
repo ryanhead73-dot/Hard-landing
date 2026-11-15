@@ -35,9 +35,11 @@ var _ground_y := 0.0
 var _ground_timer := 0.0
 var _wander := Vector3.ZERO
 var _visual: Node3D
-var _sac: MeshInstance3D
+var _tilt: Node3D
 var _sac_mat: StandardMaterial3D
 var _core_mat: StandardMaterial3D
+var _sac_glow := 0.1
+var _core_glow := 1.3
 
 
 func _init() -> void:
@@ -48,6 +50,7 @@ func _init() -> void:
 	alert_radius = 10.0
 	drops = Vector2i(0, 1)
 	death_puff = 0.5
+	weak_joint = "Core"
 	weak_offset = Vector3.ZERO
 	weak_radius = 0.26
 
@@ -68,61 +71,18 @@ func _setup() -> void:
 
 
 func _build() -> void:
+	# The tilt node leans into the drift; the visual under it turns slowly on its own axis.
+	_tilt = Node3D.new()
+	add_child(_tilt)
 	_visual = Node3D.new()
-	add_child(_visual)
-	_sac_mat = StandardMaterial3D.new()
-	_sac_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_sac_mat.albedo_color = Color(VIOLET, 0.78)
-	_sac_mat.roughness = 0.25
-	_sac_mat.rim_enabled = true
-	_sac_mat.rim = 0.8
-	_sac_mat.rim_tint = 0.2
-	_sac_mat.emission_enabled = true
-	_sac_mat.emission = VIOLET
-	_sac_mat.emission_energy_multiplier = 0.9
-	_flashes(_sac_mat)
-	_sac = MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.72
-	sphere.height = 1.3
-	sphere.radial_segments = 14
-	sphere.rings = 7
-	_sac.mesh = sphere
-	_sac.material_override = _sac_mat
-	_visual.add_child(_sac)
-	_core_mat = StandardMaterial3D.new()
-	_core_mat.albedo_color = CORE.darkened(0.4)
-	_core_mat.emission_enabled = true
-	_core_mat.emission = CORE
-	_core_mat.emission_energy_multiplier = 2.0
-	var core := MeshInstance3D.new()
-	var cs := SphereMesh.new()
-	cs.radius = 0.22
-	cs.height = 0.44
-	cs.radial_segments = 10
-	cs.rings = 5
-	core.mesh = cs
-	core.material_override = _core_mat
-	_visual.add_child(core)
-	_weak = core
-	# Tendrils trailing under it.
-	var tendril_mat := StandardMaterial3D.new()
-	tendril_mat.albedo_color = Color("4a3a78")
-	tendril_mat.roughness = 0.7
-	for i in 5:
-		var a := TAU * i / 5.0
-		var t := MeshInstance3D.new()
-		var c := CylinderMesh.new()
-		c.top_radius = 0.05
-		c.bottom_radius = 0.015
-		c.height = 1.3 + 0.25 * (i % 2)
-		c.radial_segments = 4
-		c.rings = 1
-		t.mesh = c
-		t.material_override = tendril_mat
-		t.position = Vector3(cos(a) * 0.3, -0.45 - c.height * 0.5, sin(a) * 0.3)
-		t.rotation = Vector3(sin(a) * 0.15, 0.0, -cos(a) * 0.15)
-		_visual.add_child(t)
+	_tilt.add_child(_visual)
+	_load_rig("drifter", _visual)
+	_sac_mat = Rig.own_material(_rig, "drifter_membrane")
+	_core_mat = Rig.own_material(_rig, "drifter_core")
+	if _sac_mat:
+		_sac_glow = _sac_mat.emission_energy_multiplier
+	if _core_mat:
+		_core_glow = _core_mat.emission_energy_multiplier
 
 
 func _physics_process(delta: float) -> void:
@@ -159,9 +119,11 @@ func _physics_process(delta: float) -> void:
 			if _target_alive():
 				want = _toward(target.global_position + Vector3.UP * 1.2, speed * 0.4)
 			var k := 1.0 - clampf(_timer / swell_time, 0.0, 1.0)
-			_visual.scale = Vector3.ONE * (1.0 + k * 0.6)
-			_core_mat.emission_energy_multiplier = 2.0 + k * 8.0
-			_sac_mat.emission_energy_multiplier = 0.9 + k * 2.5
+			# The swell clip balloons the bladder; the glow climbs with it.
+			if _core_mat:
+				_core_mat.emission_energy_multiplier = _core_glow + k * 7.0
+			if _sac_mat:
+				_sac_mat.emission_energy_multiplier = _sac_glow + k * 1.6
 			if _timer <= 0.0:
 				_burst(1.0)
 				return
@@ -171,6 +133,10 @@ func _physics_process(delta: float) -> void:
 	velocity = velocity.move_toward(want, 6.0 * delta)
 	move_and_slide()
 	_visual.rotation.y += delta * 0.4
+	# It tips into its drift, like a bladder dragged by its skirt.
+	var lean := Vector3(velocity.z, 0.0, -velocity.x) * 0.07
+	_tilt.rotation.x = lerp_angle(_tilt.rotation.x, clampf(lean.x, -0.3, 0.3), delta * 3.0)
+	_tilt.rotation.z = lerp_angle(_tilt.rotation.z, clampf(lean.z, -0.3, 0.3), delta * 3.0)
 
 
 func _toward(point: Vector3, spd: float) -> Vector3:
