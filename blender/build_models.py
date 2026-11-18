@@ -499,58 +499,7 @@ def skimmer():
     export("skimmer")
 
 
-def rifle():
-    metal = mat("gun_metal", "24282b", 0.45, 0.6)
-    stripe = mat("oxide", OXIDE, 0.6)
-    steel = mat("steel", STEEL, 0.35, 0.8)
-    root = pivot("Rifle")
-    box("receiver", (0.08, 0.11, 0.42), (0, 0, 0.02), root, metal)
-    cyl("barrel", 0.018, 0.4, (0, 0.02, -0.38), root, steel, axis="z", verts=8)
-    box("handguard", (0.075, 0.08, 0.26), (0, 0.0, -0.28), root, metal, taper=(0.9, 0.85))
-    box("stripe", (0.082, 0.025, 0.24), (0, 0.06, -0.06), root, stripe)
-    box("grip", (0.05, 0.14, 0.07), (0, -0.11, 0.08), root, metal, rot=(-15, 0, 0))
-    box("mag", (0.045, 0.16, 0.08), (0, -0.12, -0.06), root, steel, rot=(10, 0, 0))
-    box("stock", (0.06, 0.1, 0.22), (0, -0.02, 0.32), root, metal, taper=(1.0, 0.8))
-    box("sight", (0.03, 0.04, 0.08), (0, 0.08, 0.04), root, steel)
-    pivot("Muzzle", (0, 0.02, -0.58), root)
-    export("rifle")
-
-
-def scattergun():
-    metal = mat("gun_metal", "24282b", 0.45, 0.6)
-    stripe = mat("oxide", OXIDE, 0.6)
-    steel = mat("steel", STEEL, 0.35, 0.8)
-    wood = mat("grip_polymer", "5a4636", 0.7)
-    root = pivot("Scattergun")
-    box("receiver", (0.11, 0.13, 0.3), (0, 0, 0.05), root, metal)
-    cyl("barrel", 0.035, 0.46, (0, 0.03, -0.32), root, steel, axis="z", verts=10)
-    cyl("tube", 0.025, 0.4, (0, -0.04, -0.28), root, steel, axis="z", verts=8)
-    pump = pivot("Pump", (0, -0.04, -0.25), root)
-    box("pump", (0.09, 0.07, 0.16), (0, 0, 0), pump, wood)
-    box("stripe", (0.112, 0.03, 0.18), (0, 0.075, 0.04), root, stripe)
-    box("grip", (0.06, 0.15, 0.07), (0, -0.12, 0.15), root, wood, rot=(-15, 0, 0))
-    box("stock", (0.07, 0.11, 0.2), (0, -0.03, 0.3), root, metal, taper=(1.0, 0.85))
-    pivot("Muzzle", (0, 0.03, -0.56), root)
-    export("scattergun")
-
-
-def arc_lance():
-    steel = mat("steel", STEEL, 0.35, 0.8)
-    metal = mat("gun_metal", "24282b", 0.45, 0.6)
-    arc = mat("arc_glow", "7fd6ff", 0.2, 0.0, 4.0)
-    cream = mat("plate", CREAM, 0.55)
-    root = pivot("ArcLance")
-    box("body", (0.1, 0.13, 0.5), (0, 0, 0.0), root, cream)
-    box("spine", (0.06, 0.05, 0.6), (0, 0.08, -0.1), root, metal)
-    for i, z in enumerate((-0.38, -0.26, -0.14)):
-        cyl("coil%d" % i, 0.07, 0.04, (0, 0.0, z), root, arc, axis="z", verts=12)
-    cyl("emitter", 0.03, 0.42, (0, 0.0, -0.3), root, steel, axis="z", verts=8)
-    box("prong_l", (0.02, 0.02, 0.16), (-0.04, 0.0, -0.56), root, steel)
-    box("prong_r", (0.02, 0.02, 0.16), (0.04, 0.0, -0.56), root, steel)
-    box("grip", (0.06, 0.15, 0.07), (0, -0.12, 0.1), root, metal, rot=(-15, 0, 0))
-    box("cell", (0.08, 0.1, 0.12), (0, -0.04, 0.24), root, arc)
-    pivot("Muzzle", (0, 0.0, -0.64), root)
-    export("arc_lance")
+# Juno's weapons are built by build_weapons.py.
 
 
 # --- Components and props ------------------------------------------------------------------
@@ -633,12 +582,10 @@ def components():
 # Juno is built by build_juno.py (a skinned rig with keyframed clips) from juno() above, and the
 # wildlife by build_creatures.py (one skinned mesh each, with clips); the rigid-part creature
 # builders above are kept only for reference.
-BUILDERS = {
-    "rifle": rifle, "scattergun": scattergun, "arc_lance": arc_lance,
-}
-
-
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from build_weapons import BUILDERS
+
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     names = args or list(BUILDERS) + ["components"]
     for name in names:
