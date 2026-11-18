@@ -22,8 +22,8 @@ const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "Han
 	"ArmR", "ForearmR", "HandR", "FingersR", "ThumbR", "WeaponMount"]
 const LOOPS := ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim"]
 ## Metres the walk, run and crouch-walk clips cover per cycle at normal speed (0.8 s each).
-const WALK_CYCLE := 1.76
-const RUN_CYCLE := 2.64
+const WALK_CYCLE := 2.72
+const RUN_CYCLE := 4.32
 const CROUCH_CYCLE := 1.4
 const CYCLE_TIME := 0.8
 ## Elbow to the middle of the glove: where the hands are, for tests and effects.

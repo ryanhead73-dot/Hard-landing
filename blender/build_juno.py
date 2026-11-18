@@ -976,19 +976,25 @@ AIM = {"Chest": (0, -24, 0), "Neck": (0, 10, 0), "Head": (-8, 13, -6), "_poleR":
 FREE = {"_w": None, "_ikL": None, "_ikR": None}
 
 
-def _foot_path(t, side, distance, stance, lift):
+def _foot_path(t, side, distance, stance, lift, heel=14, toe=29, long_stride=False):
     # z increases behind the moving body. Roll about the heel and toe tread,
     # keeping the active point stationary in the ground frame.
     if t <= stance:
         u = t / stance
         z = distance * (t - stance/2)
         height = 0
-        pitch = 14 * (1 - smooth(0, .22, u)) - 29 * smooth(.68, 1, u)
+        pitch = heel * (1 - smooth(0, .35 if long_stride else .22, u)) - toe * smooth(.55 if long_stride else .68, 1, u)
     else:
         u = (t - stance) / (1 - stance)
         z = distance * (t - stance/2 - smooth(0, 1, u))
+        if long_stride:
+            # Match ground velocity at release and contact, braking quickly in swing.
+            carry = u*(1-u)**18 - (1-u)*u**18
+            z = distance * (stance*(.5 - smooth(0, 1, u)) + (1-stance)*carry)
         height = lift * math.sin(math.pi*u)**1.4
-        pitch = -29 + 43 * smooth(.08, .86, u)
+        pitch = -toe + (toe + heel) * smooth(.08, .86, u)
+    if long_stride:
+        z += .065  # Toe roll permits a longer reach behind the hip.
     pivot = bm.g(0, -.105, .073 if pitch >= 0 else -.17)
     ankle = bm.g(side*.108, .105 + height, z) + pivot - _godot_rot((pitch, 0, 0)) @ pivot
     return ankle, pitch
@@ -1010,23 +1016,53 @@ def build_actions(arm):
         keys.append((1+i*120/32, pose, {"Hips": (.033*shift, -.035+.007*breath, 0)}))
     action(arm, "idle", keys)
 
-    for name, distance, stance, lift, drop, bob, lean in (
-            ("walk", 1.76, .54, .11, .15, .046, -4),
-            ("run", 2.64, .375, .23, .18, .065, -12),
-            ("crouch_walk", 1.4, .58, .075, .405, .022, -19)):
+    leg, shin, foot = (arm.data.bones[name+"L"] for name in ("Leg", "Shin", "Foot"))
+    thigh = (shin.head_local - leg.head_local).length
+    calf = (foot.head_local - shin.head_local).length
+    reach = math.sqrt(thigh**2 + calf**2 + 2*thigh*calf*math.cos(math.radians(10)))
+    pelvis = arm.data.bones["Hips"].head_local
+    sockets = {side: arm.data.bones["Leg"+side].head_local - pelvis for side in ("L","R")}
+    for name, distance, stance, lift, heel, toe in (
+            ("walk", 2.72, .52, .16, 29, 54),
+            ("run", 4.32, .25, .39, 18, 57),
+            ("crouch_walk", 1.4, .58, .075, 14, 29)):
         keys = []
         for i in range(49):
             t = i % 48 / 48
             shift = math.sin(TAU*t)
             twist = math.cos(TAU*t)
-            rise = -math.cos(2*TAU*t) if name != "run" else -math.cos(2*TAU*(t-.18))
+            feet = {side: _foot_path((t+offset)%1, sign, distance, stance, lift, heel, toe, name != "crouch_walk")
+                    for side, sign, offset in (("L",-1,0),("R",1,.5))}
+            if name == "crouch_walk":
+                hip = (-2, -7*twist, 3*shift)
+                lean, counter, head_pitch = -19, 5, 15.2
+                height = -.405 - .022*math.cos(2*TAU*t)
+            else:
+                running = name == "run"
+                hip = (0, -(15 if running else 18)*twist, 2*shift)
+                lean, counter = (-8 if running else -2), -hip[1]*.65
+                head_pitch = -lean
+                # Walk vaults over the support leg. Allow the pelvis to descend
+                # into the long split at exchange, using the actual ankle reach.
+                # Running compresses at loading and rises through toe-off.
+                if running:
+                    height = -.066 - .060*math.cos(2*TAU*(t-.08))
+                else:
+                    height = -.101 - .103*math.cos(2*TAU*(t-.01))
+                for side, offset in (("L",0), ("R",.5)):
+                    if (t + offset) % 1 > stance:
+                        continue
+                    socket = _godot_rot(hip) @ sockets[side]
+                    ankle = feet[side][0]
+                    dx = ankle.x - (socket.x - .024*shift)
+                    dy = ankle.y - socket.y
+                    ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
+                    height = min(height, ceiling - (pelvis.z + socket.z))
             pose = _merge(HOLD, {
-                "_feet": {side: _foot_path((t+offset)%1, sign, distance, stance, lift)
-                          for side, sign, offset in (("L",-1,0),("R",1,.5))},
-                "Hips": (-2, -7*twist, 3*shift), "Spine": (lean, 5*twist, -2*shift),
-                "Chest": (0, 6*twist, -shift), "Head": (-lean*.8, -4*twist, 0),
+                "_feet": feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
+                "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
                 "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
-            keys.append((i/2, pose, {"Hips": (-.024*shift, -drop+bob*rise, 0)}))
+            keys.append((i/2, pose, {"Hips": (-.024*shift, height, 0)}))
         # Keep the GLB duration, with its extra frame after the gameplay loop.
         keys.append((25, *keys[-1][1:]))
         action(arm, name, keys)
