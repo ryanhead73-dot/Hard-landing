@@ -1099,7 +1099,8 @@ def build_actions(arm):
     action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
                            (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
                            (61, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)})])
-    low = _merge(HOLD, crouch) | free_arms(22, 20, 5)
+    # The retained torso turn puts the right shoulder farther outside its knee.
+    low = _merge(HOLD, crouch) | free_arms(24, 14, 0) | {"ArmR": (22, 0, -17)}
     action(arm, "crouch_free", [(1, low, {"Hips": (0, -.42, 0)}),
                                 (31, _merge(low, {"Spine": (-2,0,0)}), {"Hips": (0, -.43, 0)}),
                                 (61, low, {"Hips": (0, -.42, 0)})])
