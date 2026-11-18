@@ -882,11 +882,11 @@ def solve(arm, pose, offsets):
         rots[b.name] = _godot_rot(pose.get(b.name, (0, 0, 0)))
         locs[b.name] = bm.g(*(offsets or {}).get(b.name, (0, 0, 0)))
     w = pose.get("_w", HOLD_W)
-    if w is None:
-        return rots, locs
     posed = _fk(arm, rots, locs)
     for side, (ankle, pitch) in pose.get("_feet", {}).items():
         _plant(arm, posed, rots, side, ankle, pitch)
+    if w is None:
+        return rots, locs
     spine = posed["Spine"] @ arm.data.bones["Spine"].matrix_local.inverted()
     frame = spine @ Matrix.Translation(bm.g(*w[0])) @ _godot_rot(w[1]).to_4x4()
     # The WeaponMount bone (parented to the chest) is turned and moved to put the rifle there.
@@ -1000,6 +1000,15 @@ def _foot_path(t, side, distance, stance, lift, heel=14, toe=29, long_stride=Fal
     return ankle, pitch
 
 
+def free_arms(swing, elbow, spread, counter=0, flex=0):
+    pose = dict(FREE)
+    for side, sign in (("L", -1), ("R", 1)):
+        pose["Arm" + side] = (swing + sign*counter, 0, sign*spread)
+        pose["Forearm" + side] = (elbow + sign*flex, 0, 0)
+        pose["Fingers" + side] = (0, 0, -6*sign)
+    return pose
+
+
 def build_actions(arm):
     bpy.context.scene.render.fps = FPS * 2
     keys = []
@@ -1015,6 +1024,13 @@ def build_actions(arm):
             "PackMount": (-1.1*math.sin(2*t-.5), -shift, 0)})
         keys.append((1+i*120/32, pose, {"Hips": (.033*shift, -.035+.007*breath, 0)}))
     action(arm, "idle", keys)
+    free_keys = []
+    for frame, pose, offsets in keys:
+        phase = TAU*(frame-1)/120
+        fidget = max(0, -math.cos(phase))**4
+        arms = free_arms(-6, 15, 5, 2*math.sin(phase), 4*fidget)
+        free_keys.append((frame, pose | arms, offsets))
+    action(arm, "idle_free", free_keys)
 
     leg, shin, foot = (arm.data.bones[name+"L"] for name in ("Leg", "Shin", "Foot"))
     thigh = (shin.head_local - leg.head_local).length
@@ -1066,6 +1082,16 @@ def build_actions(arm):
         # Keep the GLB duration, with its extra frame after the gameplay loop.
         keys.append((25, *keys[-1][1:]))
         action(arm, name, keys)
+        if name in ("walk", "run"):
+            free_keys = []
+            for frame, pose, offsets in keys[:-1]:
+                # Left heel strikes at phase zero; the right arm leads then.
+                lead = math.cos(TAU*(frame/24 - (.11 if running else .02)))
+                arms = free_arms(-23 if running else -8, 85 if running else 23,
+                                 7 if running else 5, (40 if running else 25)*lead,
+                                 (5 if running else 8)*lead)
+                free_keys.append((frame, pose | arms, offsets))
+            action(arm, name + "_free", free_keys)
 
     # Keep the soles down as the crouched torso breathes.
     crouch = {"_feet": feet,
@@ -1073,6 +1099,11 @@ def build_actions(arm):
     action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
                            (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
                            (61, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)})])
+    # The retained torso turn puts the right shoulder farther outside its knee.
+    low = _merge(HOLD, crouch) | free_arms(24, 14, 0) | {"ArmR": (22, 0, -17)}
+    action(arm, "crouch_free", [(1, low, {"Hips": (0, -.42, 0)}),
+                                (31, _merge(low, {"Spine": (-2,0,0)}), {"Hips": (0, -.43, 0)}),
+                                (61, low, {"Hips": (0, -.42, 0)})])
     # Preserve the original two-frame jump take. The air blend carries the tuck
     # into flight while the one-shot landing takes the weight on fixed soles.
     brace = _merge(HOLD, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
@@ -1090,6 +1121,10 @@ def build_actions(arm):
     balance = _merge(HOLD, {"_ikL": None, "ArmL": (18,0,-53), "ForearmL": (35,0,-9),
                             "_poleR": (.9,-.5,.2)})
     action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
+
+    balance_a = _merge(HOLD, fall_a, free_arms(10, 24, 53, 5))
+    balance_b = _merge(HOLD, fall_b, free_arms(14, 30, 60, -4))
+    action(arm, "fall_free", [(1, balance_a, {}), (13, balance_b, {}), (25, balance_a, {})])
 
     # Aim: an upper-body hold, layered over the legs in the game.
     sight = _merge(AIM, {"_feet": {side: (bm.g(sign*.15, .105, sign*.12), 0)
