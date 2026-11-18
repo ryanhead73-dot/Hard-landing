@@ -18,6 +18,10 @@ silhouette, in a new script `blender/build_weapons.py` (move the three functions
   exposed coil rings that glow teal-blue (emissive) along an open emitter spine, twin prongs at
   the tip, a glowing cell at the back, cable runs between cell and coils.
 
+Before modelling, generate prompt 3 from `/mnt/project-files/hard-landing-juno/image_prompts.md`
+(you have image generation), save it to `/mnt/project-files/hard-landing-juno/refs/`, and model
+against it.
+
 Shared style: gunmetal, worn ivory, oxide orange accents, edge wear and AO baked into vertex
 colour (same approach as `blender/creature_kit.py`), bevels on every hard edge. 3-4 materials
 per gun, 2,500-5,000 triangles each.
@@ -35,16 +39,17 @@ per gun, 2,500-5,000 triangles each.
 
 ## Files
 - May edit: `blender/build_weapons.py` (new), `blender/build_models.py` (remove the three
-  functions, pointer comment), the three GLBs, `godot/tests/rig_shots.gd` only if needed,
-  `README.md`, `ASSETS.md` if anything new is sourced.
-- Must not edit: `blender/build_juno.py` and Juno's GLB (J1/J3), creature files, gameplay
-  numbers in `weapon.gd`.
+  functions, pointer comment), the three GLBs. Put any README wording in your summary instead
+  (J1 owns README.md this round).
+- Must not edit: `blender/build_juno.py` and Juno's GLB (J1/J3), `godot/tests/rig_shots.gd`,
+  `README.md`, creature files, gameplay numbers in `weapon.gd`.
 
 ## How to build and test
 - `~/tools/bpyenv/bin/python blender/build_weapons.py`, then re-import
   (`cd godot && timeout 600 godot --headless --path . --import`).
 - Tests (wrap in `timeout 900`, at most two at once): `visuals_test`, `mechanics_test`,
-  `feel_test`, `animation_test` (`godot --headless --path godot res://tests/<name>.tscn`).
+  `feel_test`, `animation_test` (`godot --headless --path godot res://tests/<name>.tscn`). Run one at a time
+  (another agent shares this machine).
 - Renders: `xvfb-run -a godot --path godot --rendering-driver opengl3 res://tests/rig_shots.tscn --
   /mnt/project-files/hard-landing-juno/j2 <rifle|scattergun|arc_lance>` for each gun. Look at
   them and fix anything that reads as a plain box.

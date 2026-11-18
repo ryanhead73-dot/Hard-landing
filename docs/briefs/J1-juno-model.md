@@ -8,6 +8,11 @@ hard-shell EVA suit, at third-person camera distance (2.5-5 m), in the game's st
 armour, oxide orange accents, slate-teal suit fabric, gunmetal hardware, warm amber visor, one
 small teal status lamp.
 
+## Step 0: concept reference
+You have image generation. Before modelling, generate prompts 1 and 2 from
+`/mnt/project-files/hard-landing-juno/image_prompts.md`, save them to
+`/mnt/project-files/hard-landing-juno/refs/`, look at them, and model against them.
+
 ## What "done" looks like
 - Proportions: an athletic adult woman in a bulky suit, ~1.78 m to the top of the helmet (keep the
   current joint heights within 3 cm so clips and the camera still fit). Narrower waist than chest
@@ -68,7 +73,7 @@ small teal status lamp.
 - Tests (all must pass; wrap each in `timeout 900`):
   `godot --headless --path godot res://tests/animation_test.tscn`,
   `res://tests/visuals_test.tscn`, `res://tests/feel_test.tscn`, `res://tests/smoke_test.tscn`.
-  Run at most two at once.
+  Run one test at a time (another agent shares this machine).
 - Renders: `xvfb-run -a godot --path godot --rendering-driver opengl3 res://tests/rig_shots.tscn --
   /mnt/project-files/hard-landing-juno/j1 juno_rigged` (rest pose, four sides) and
   `... juno_rigged "idle:0.3:front,run:0.25:side,aim:0.5:front,reload:0.5:front"`.
