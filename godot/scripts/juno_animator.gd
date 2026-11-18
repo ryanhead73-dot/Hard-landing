@@ -311,7 +311,11 @@ func _arm_mix(bt: AnimationNodeBlendTree, body: String, arms: String) -> String:
 	var blend := AnimationNodeBlend2.new()
 	blend.sync = true  # Both gait clocks follow the same time scale through equip changes.
 	var mix_name := body + "_arms"
-	_node(bt, mix_name, _filtered(blend, ARM_BONES))
+	# The forward grip turns the chest and counterturns the neck. When
+	# unequipped, take those joints from the matching free clip as well.
+	# Landing borrows idle hands and has its own impact pose.
+	var bones := ARM_BONES if body == "land_clip" else ARM_BONES + ["Chest", "Neck"]
+	_node(bt, mix_name, _filtered(blend, bones))
 	bt.connect_node(mix_name, 0, body)
 	bt.connect_node(mix_name, 1, arms)
 	_arm_blends.append("parameters/%s/blend_amount" % mix_name)
