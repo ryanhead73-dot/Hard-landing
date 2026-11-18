@@ -1187,15 +1187,17 @@ def build_actions(arm):
                          (12, HOLD, {})], loop=False)
 
     # Dodge roll (0.5 s): tuck the rifle in, roll forward over the shoulder, come up.
+    # Carry the long axis across the belly with the stock angled down toward the hip.
+    roll_hold = {"_w": ((.015, 1.24, -.245), (10, 85, 0))}
     tuck = {"LegL": (100, 0, 0), "LegR": (100, 0, 0), "ShinL": (-130, 0, 0), "ShinR": (-130, 0, 0),
             "Spine": (-25, 0, 0), "Chest": (0, -18, 0), "Head": (-9, 0, 0),
-            "_w": LOW_READY}
+            **roll_hold}
     action(arm, "roll", [
-        (1, ready, {}),
+        (1, HOLD | roll_hold, {}),
         (4, _merge(tuck, {"Hips": (-60, 12, 21)}), {"Hips": (0, -0.4, 0)}),
         (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.36, 0)}),
         (12, _merge(tuck, {"Hips": (-300, -8, 16)}), {"Hips": (.03, -0.4, 0)}),
-        (16, _merge(ready, crouch, {"_w": LOW_READY}), {"Hips": (0,-.34,.035)}),
+        (16, _merge(HOLD, crouch, roll_hold), {"Hips": (0,-.34,.035)}),
     ], loop=False)
 
     # Interact (0.8 s): the rifle drops to the right hand, the left reaches out and works a panel.
