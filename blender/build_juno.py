@@ -1023,7 +1023,7 @@ def build_actions(arm):
     pelvis = arm.data.bones["Hips"].head_local
     sockets = {side: arm.data.bones["Leg"+side].head_local - pelvis for side in ("L","R")}
     for name, distance, stance, lift, heel, toe in (
-            ("walk", 2.72, .52, .16, 29, 54),
+            ("walk", 2.72, 13/24, .16, 29, 54),
             ("run", 4.32, .25, .39, 18, 57),
             ("crouch_walk", 1.4, .58, .075, 14, 29)):
         keys = []

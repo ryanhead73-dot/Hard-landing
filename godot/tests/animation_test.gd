@@ -41,7 +41,7 @@ func _juno_contacts() -> void:
 	var rig := Rig.spawn("juno_rigged", self)
 	var sk := rig.find_child("Skeleton3D", true, false) as Skeleton3D
 	var ap := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	for gait in [["walk", JunoAnimator.WALK_CYCLE, .54], ["run", JunoAnimator.RUN_CYCLE, .375],
+	for gait in [["walk", JunoAnimator.WALK_CYCLE, 13.0 / 24.0], ["run", JunoAnimator.RUN_CYCLE, .25],
 			["crouch_walk", JunoAnimator.CROUCH_CYCLE, .58]]:
 		var distance := float(gait[1])
 		var stance := float(gait[2])
@@ -52,7 +52,7 @@ func _juno_contacts() -> void:
 			var b := sk.find_bone("Foot" + side)
 			var rest := sk.get_bone_global_rest(b)
 			var offset := 0.0 if side == "L" else .5
-			var first := Vector3.ZERO
+			var footprint_samples := PackedVector3Array()
 			for i in 121:
 				var u := i / 120.0
 				var phase := stance * u + offset
@@ -63,11 +63,34 @@ func _juno_contacts() -> void:
 				floor_error = maxf(floor_error, absf(tread.y))
 				# Both pivot locations are specified relative to the same flat footprint.
 				var footprint := tread - pivot
-				if i == 0:
-					first = footprint
-				worst = maxf(worst, footprint.distance_to(first))
+				for previous in footprint_samples:
+					worst = maxf(worst, footprint.distance_to(previous))
+				footprint_samples.append(footprint)
 		_check("%s planted tread slide" % gait[0], worst <= .04 and floor_error <= .04,
 			"max %.2f cm, floor error %.2f cm" % [100*worst, 100*floor_error])
+		if gait[0] == "walk":
+			for side in ["L", "R"]:
+				var phase := stance * .5 + (0.0 if side == "L" else .5)
+				ap.seek(phase * JunoAnimator.CYCLE_TIME, true)
+				var hip := sk.get_bone_global_pose(sk.find_bone("Leg" + side)).origin
+				var knee := sk.get_bone_global_pose(sk.find_bone("Shin" + side)).origin
+				var ankle := sk.get_bone_global_pose(sk.find_bone("Foot" + side)).origin
+				var bend := rad_to_deg((knee - hip).angle_to(ankle - knee))
+				_check("walk %s knee extends at mid-stance" % side, bend >= 5 and bend <= 15,
+					"%.1f degrees" % bend)
+		if gait[0] == "run":
+			for phase in [.375, .875]:
+				ap.seek(phase * JunoAnimator.CYCLE_TIME, true)
+				var clearance := INF
+				for side in ["L", "R"]:
+					var b := sk.find_bone("Foot" + side)
+					var rest := sk.get_bone_global_rest(b)
+					var pose := sk.get_bone_global_pose(b)
+					for z in [.073, -.17]:
+						var tread := pose * (rest.basis.inverse() * Vector3(0, -.105, z))
+						clearance = minf(clearance, tread.y)
+				_check("run flight at phase %.3f clears both boots" % phase, clearance > .02,
+					"lowest tread %.2f cm" % (100 * clearance))
 	rig.queue_free()
 
 
