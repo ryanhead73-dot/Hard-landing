@@ -18,7 +18,8 @@ const ACTIONS := {"install": 1.4, "interact": 0.8, "stim": 0.9, "throw": 0.75}
 const TWO_HANDED := ["install"]
 ## Actions that need the whole body; the others play on the upper body over her legs.
 const FULL_BODY := ["install"]
-const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "ArmR", "ForearmR", "WeaponMount"]
+const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "HandL", "FingersL", "ThumbL",
+	"ArmR", "ForearmR", "HandR", "FingersR", "ThumbR", "WeaponMount"]
 const LOOPS := ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim"]
 ## Metres the walk, run and crouch-walk clips cover per cycle at normal speed (0.8 s each).
 const WALK_CYCLE := 2.6

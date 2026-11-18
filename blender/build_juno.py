@@ -359,8 +359,9 @@ def apply_atlas(c):
         tile = coords[0][0]
         wrap = [tile==1 and max(q[i] for q in coords)-min(q[i] for q in coords)>.5 for i in (1,2)]
         for loop,(_,u,v) in zip(poly.loop_indices,coords):
-            if wrap[0] and u<.5: u+=1
-            if wrap[1] and v<.5: v+=1
+            # Centre a crossing face on an interior repeat of the quilt.
+            if wrap[0]: u += .5 if u < .5 else -.5
+            if wrap[1]: v += 2/3 if v < .5 else -1/3
             def axis(x,cell):
                 return (cell*TILE_SIZE+TILE_PAD+.5+x*(TILE_SIZE-2*TILE_PAD-1))/(4*TILE_SIZE)
             uv.data[loop].uv = (axis(u,tile%4),axis(v,tile//4))
