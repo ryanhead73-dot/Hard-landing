@@ -36,9 +36,9 @@ FPS = 30
 IVORY = C("dbcfaf")
 OXIDE = C("b85b32")
 PRIMER = C("716d61")
-THREAD = C("293a3c")
-TEAL = C("506467")
-WEB = "645847"
+THREAD = C("202a2a")
+TEAL = C("344342")
+WEB = "46432e"
 IRON = "414542"
 STEEL = "858779"
 RUBBER = "343936"
@@ -252,15 +252,15 @@ def make_atlas(styles):
     def seam(x):
         return abs((x+.5)%1-.5)
     d = np.minimum(seam(6*u+3*v),seam(6*u-3*v))
-    quilting = 246-64*np.exp(-(d/.034)**2)-21*np.exp(-(d/.1)**2)
-    quilting += 24*(abs(d-.045)<.012)*(np.sin(v*TAU*81)>.05)
+    quilting = 209-54*np.exp(-(d/.034)**2)-21*np.exp(-(d/.1)**2)
+    quilting += 14*(abs(d-.045)<.012)*(np.sin(v*TAU*81)>.05)
     quilting += 3*np.sin(u*TAU*95)*np.sin(v*TAU*79)
     store_tile(1,np.repeat(quilting[:,:,None],3,axis=2))
 
     glyphs = {"K":["101","110","100","110","101"],"0":["111","101","101","101","111"],
               "7":["111","001","010","010","010"],"E":["111","100","110","100","111"]}
     for style,index in styles.items():
-        rgb = np.zeros((n,n,3)) + [224,214,193]
+        rgb = np.zeros((n,n,3)) + [216,199,165]
         stripe = np.zeros((n,n),dtype=bool)
         if style in ("long stripe","shoulder"):
             stripe = abs(u-(.26+.26*v)) < (.085 if style=="shoulder" else .072)
@@ -311,22 +311,26 @@ def make_atlas(styles):
             rgb[(u>.56)&(u<.74)&(abs(v-(vy-.045))<.006)&((u*126)%1>.43)] = [111,105,92]
         grain = rng.random(u.shape)
         grime = .55*noise(12)+.3*noise(42)+.15*grain
-        # Broken primer follows edge abrasion; occasional fine scratches cross
-        # the enamel away from the edge. Both are baked into this tiny tile.
-        wear = noise(50)*.53 + noise(17)*.25 + grain*.22
-        threshold = .79-.39*np.exp(-edge/.025)-.06*stripe
+        # Broad patches of primer follow the exposed lip, especially at corners.
+        corners = np.minimum(u,1-u) + np.minimum(v,1-v)
+        wear = .64*noise(12) + .28*noise(32) + .08*grain
+        threshold = .88-.47*np.exp(-edge/.066)-.20*np.exp(-corners/.13)
+        if style in ("boot","knee"):
+            # Kneeling and toe strikes abrade the forward face in short, raked streaks.
+            rub = np.exp(-((u-.5)/.35)**2-((v-.40)/.31)**2)
+            threshold -= rub*(.23+.10*np.cos(TAU*(8*v+2*u)))
         chip = wear>threshold
-        rgb[chip] = [113,110,99]
-        rgb[wear>threshold+.105] = [84,86,82]
+        rgb[chip] = [101,101,94]
+        rgb[wear>threshold+.105] = [72,75,73]
         for _ in range(14):
             x,y = rng.uniform(.02,.96,2)
             slope = rng.uniform(-1.4,1.4)
             cut = (abs(v-y-(u-x)*slope)<.0018)&(u>x)&(u<x+rng.uniform(.018,.12))
             rgb[cut & (grain>.32)] = [142,138,125]
-        rgb *= (.91+.12*grime-.10*np.exp(-edge/.035))[:,:,None]
+        rgb *= (.88+.16*grime-.24*np.exp(-abs(edge-rim)/.025))[:,:,None]
         store_tile(index,rgb)
 
-    img = bpy.data.images.new("Juno | enamel and stitch patterns",width=atlas.shape[1],height=atlas.shape[0],alpha=False)
+    img = bpy.data.images.new("juno_atlas",width=atlas.shape[1],height=atlas.shape[0],alpha=False)
     img.colorspace_settings.name = "sRGB"
     img.pixels.foreach_set(atlas.ravel())
     img.pack()
@@ -482,11 +486,11 @@ def torso_plates(c):
         path = [(.115*s,1.008,-.112),(.127*s,1.156,-.068),(.144*s,1.285,-.083),
                 (.153*s,1.35,-.118),(.166*s,1.425,-.116),(.148*s,1.49,-.099),
                 (.134*s,1.531,-.044),(.134*s,1.536,.04),(.154*s,1.491,.111)]
-        strap = tube(path,[(.018,.008)]*len(path),sides=8,samples=3,up=(0,0,1),caps=("flat","flat"))
+        strap = tube(path,[(.026,.009)]*len(path),sides=8,samples=3,up=(0,0,1),caps=("flat","flat"))
         c.part(strap,["Hips","Spine","Chest"],"Textile",WEB)
         for x,y,z,angle in [(.146,1.33,-.108,-12),(.152,1.482,-.103,14)]:
-            block(c,"Chest",(s*x,y,z),(.044,.029,.017),STEEL,rot=(angle,0,-8*s))
-            block(c,"Chest",(s*x,y,z-.009),(.03,.012,.009),WEB,"Textile",rot=(angle,0,-8*s))
+            block(c,"Chest",(s*x,y,z),(.058,.032,.019),STEEL,rot=(angle,0,-8*s))
+            block(c,"Chest",(s*x,y,z-.009),(.041,.014,.009),WEB,"Textile",rot=(angle,0,-8*s))
     # A small three-bar salvage tally stamped into the breast.
     for i in range(3):
         block(c,"Chest",(-.064+i*.012,1.417,-.159-i*.0018),(.006,.021,.004),
@@ -560,13 +564,15 @@ def limb_plates(c,side,s):
         return (l,r) if s==1 else (-r,-l)
     # Scalloped outside thigh lets the quilt and the strap show at the inner thigh.
     x = s*.103
-    for y,rx,rz in ((.621,.091,.103),(.79,.104,.12)):
-        band(c,leg,(x,y,0),rx,rz,.032,WEB)
+    for y,rx,rz in ((.621,.101,.115),(.79,.111,.128)):
+        band(c,leg,(x,y,0),rx,rz,.041,WEB)
+        block(c,leg,(x,y,rz),(.046,.043,.010),STEEL,bevel=.003)
+        block(c,leg,(x,y,rz+.006),(.031,.027,.008),WEB,"Textile",bevel=.002)
     panel(c,leg,(x,0,0),[(.55,.078,.085),(.567,.086,.096),(.69,.1,.111),
           (.79,.105,.118),(.835,.10,.113)],arc(-22,115),tilt=clipped,pattern="long stripe",
           shape=lambda u,v:.004*(1-abs(u)))
     panel(c,shin,(x,0,-.012),[(.405,.054,.081),(.423,.074,.092),(.46,.085,.10),
-          (.495,.082,.095),(.517,.064,.084)],(-75,75),tilt=clipped,cols=14,
+          (.495,.082,.095),(.517,.064,.084)],(-75,75),tilt=clipped,cols=14,pattern="knee",
           shape=lambda u,v:.007*max(0,1-2*abs(u)))
     for y,rx,rz in ((.203,.067,.077),(.361,.081,.086)):
         band(c,shin,(x,y,0),rx,rz,.027,WEB)
@@ -651,7 +657,14 @@ def boots(c,side,s):
                 geo.faces.append((k-9,k-8,k,k-1))
     # The cap curves back to a shallow flange below the lacing.
     geo.faces.append(tuple(range(32,40)))
-    c.part(geo,foot,"Enamel","beaf93",hard=38)
+    tile = c.tiles.setdefault("boot",len(c.tiles)+2)
+    for k,p in enumerate(geo.verts):
+        # Sidewall rises into the scuffed toe box; project its top across the instep.
+        row,col = divmod(k,8)
+        u = col/7
+        v = row/4 * (.6 + .4*(1 + p.z/toe[row][2])/.6)
+        c.shell_uv[tuple(p)] = tile,u,min(1,v)
+    c.part(geo,foot,"Enamel","d0c5ac",hard=38)
     panel(c,foot,(x,0,0),[(.106,.056,.09),(.123,.061,.084),(.155,.066,.073),
           (.169,.064,.075)],(-130,130),cols=12,tilt=clipped)
     band(c,foot,(x,.147,.003),.059,.067,.021,WEB)
@@ -667,9 +680,9 @@ def pockets(c):
         for rear in (-1,1):
             x,z = .145*s,rear*.093
             ang = (-34 if rear<0 else -146)*s
-            block(c,"Hips",(x,.986,z),(.076,.106,.054),WEB,"Textile",rot=(0,ang,5*s),bevel=.011)
-            block(c,"Hips",(x+s*.012,1.007,z+rear*.025),(.08,.045,.023),
-                  "82735a","Textile",rot=(0,ang,5*s),bevel=.007)
+            block(c,"Hips",(x,.986,z),(.086,.117,.061),WEB,"Textile",rot=(0,ang,5*s),bevel=.011)
+            block(c,"Hips",(x+s*.012,1.007,z+rear*.025),(.088,.052,.026),
+                  "686041","Textile",rot=(0,ang,5*s),bevel=.007)
             block(c,"Hips",(x+s*.017,.995,z+rear*.034),(.015,.025,.009),IRON,rot=(0,ang,5*s))
     # Sheathed cable spanner, clipped aft of the left hip.
     block(c,"Hips",(-.19,.919,.045),(.045,.12,.055),WEB,"Textile",rot=(12,0,-7))
@@ -677,8 +690,8 @@ def pockets(c):
     c.part(tube(path,[.013,.014,.012],sides=8,samples=1),"Hips","Hardware","a59978")
     for s in (-1,1):
         block(c,"Hips",(-.192+s*.012,1.082,.072),(.012,.033,.023),STEEL,rot=(14,0,-s*22))
-    block(c,"LegR",(.195,.737,.012),(.045,.128,.09),"5c5142","Textile",rot=(8,0,-4),bevel=.01)
-    block(c,"LegR",(.218,.771,.015),(.015,.053,.096),"84775d","Textile",rot=(8,0,-4))
+    block(c,"LegR",(.195,.737,.012),(.045,.128,.09),"48432e","Textile",rot=(8,0,-4),bevel=.01)
+    block(c,"LegR",(.218,.771,.015),(.015,.053,.096),"706548","Textile",rot=(8,0,-4))
     block(c,"LegR",(.226,.744,.012),(.009,.031,.022),IRON)
     # Two field repairs on the pressure garment: umber tape with a stitched-over end.
     for y in (1.381,1.395):
