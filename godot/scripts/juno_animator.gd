@@ -22,8 +22,8 @@ const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "Han
 	"ArmR", "ForearmR", "HandR", "FingersR", "ThumbR", "WeaponMount"]
 const LOOPS := ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim"]
 ## Metres the walk, run and crouch-walk clips cover per cycle at normal speed (0.8 s each).
-const WALK_CYCLE := 2.6
-const RUN_CYCLE := 3.6
+const WALK_CYCLE := 1.76
+const RUN_CYCLE := 2.64
 const CROUCH_CYCLE := 1.4
 const CYCLE_TIME := 0.8
 ## Elbow to the middle of the glove: where the hands are, for tests and effects.
@@ -50,6 +50,7 @@ var _carry := 0.0
 var _down := 0.0
 var _was_reloading := false
 var _was_rolling := false
+var _was_falling := false
 var _was_dead := false
 var _weapon_rest := Vector3.ZERO
 
@@ -110,6 +111,9 @@ func _process(delta: float) -> void:
 	state = _state_name(hv, grounded)
 	if tree:
 		_drive_tree(hv)
+		if grounded and _was_falling and not player.dead and not player.is_rolling():
+			tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	_was_falling = not grounded and player.velocity.y < 0.0 and not player.dead
 	var w := player.weapon
 	w.position = _weapon_rest + Vector3(0.0, 0.0, 0.06 * _recoil)
 	w.visible = player.armed and not (action in TWO_HANDED) and _down < 0.5
@@ -159,7 +163,7 @@ func _drive_tree(hv: float) -> void:
 	if player.dead != _was_dead:
 		t.set("parameters/alive/transition_request", "dead" if player.dead else "alive")
 		if player.dead:
-			for shot in ["reload", "upper_act", "full_act", "roll"]:
+			for shot in ["reload", "upper_act", "full_act", "roll", "land"]:
 				t.set("parameters/%s/request" % shot, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
 	_was_dead = player.dead
 
@@ -175,7 +179,9 @@ func _build_tree() -> void:
 		for i in a.get_track_count():
 			if a.track_get_key_count(i) > 0:
 				last = maxf(last, a.track_get_key_time(i, a.track_get_key_count(i) - 1))
-		if last > 0.0:
+		if clip in ["walk", "run", "crouch_walk"]:
+			a.length = CYCLE_TIME
+		elif last > 0.0:
 			a.length = last
 	var bt := AnimationNodeBlendTree.new()
 	_node(bt, "idle", _clip("idle"))
@@ -197,6 +203,8 @@ func _build_tree() -> void:
 	_node(bt, "fall", _clip("fall"))
 	_node(bt, "air", AnimationNodeBlend2.new())
 	_node(bt, "body", AnimationNodeBlend2.new())
+	_node(bt, "land_clip", _clip("land"))
+	_node(bt, "land", _shot(.025, .10))
 	_node(bt, "aim_clip", _clip("aim"))
 	_node(bt, "aim", _upper(AnimationNodeBlend2.new()))
 	_node(bt, "reload_clip", _clip("reload"))
@@ -234,7 +242,9 @@ func _build_tree() -> void:
 	bt.connect_node("air", 1, "fall")
 	bt.connect_node("body", 0, "ground")
 	bt.connect_node("body", 1, "air")
-	bt.connect_node("aim", 0, "body")
+	bt.connect_node("land", 0, "body")
+	bt.connect_node("land", 1, "land_clip")
+	bt.connect_node("aim", 0, "land")
 	bt.connect_node("aim", 1, "aim_clip")
 	bt.connect_node("reload_speed", 0, "reload_clip")
 	bt.connect_node("reload", 0, "aim")
