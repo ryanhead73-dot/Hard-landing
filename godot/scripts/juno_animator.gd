@@ -27,8 +27,6 @@ const WALK_CYCLE := 2.72
 const RUN_CYCLE := 4.32
 const CROUCH_CYCLE := 1.4
 const CYCLE_TIME := 0.8
-## Elbow to the middle of the glove: where the hands are, for tests and effects.
-const HAND := 0.35
 
 var player: Player
 var model: Node3D
@@ -313,7 +311,11 @@ func _arm_mix(bt: AnimationNodeBlendTree, body: String, arms: String) -> String:
 	var blend := AnimationNodeBlend2.new()
 	blend.sync = true  # Both gait clocks follow the same time scale through equip changes.
 	var mix_name := body + "_arms"
-	_node(bt, mix_name, _filtered(blend, ARM_BONES))
+	# The forward grip turns the chest and counterturns the neck. When
+	# unequipped, take those joints from the matching free clip as well.
+	# Landing borrows idle hands and has its own impact pose.
+	var bones := ARM_BONES if body == "land_clip" else ARM_BONES + ["Chest", "Neck"]
+	_node(bt, mix_name, _filtered(blend, bones))
 	bt.connect_node(mix_name, 0, body)
 	bt.connect_node(mix_name, 1, arms)
 	_arm_blends.append("parameters/%s/blend_amount" % mix_name)
@@ -390,10 +392,11 @@ func bone_pos(bone: String) -> Vector3:
 
 ## The middle of a hand ("L" or "R"), in the model's space.
 func hand(side: String) -> Vector3:
-	var b := skeleton.find_bone("Forearm" + side) if skeleton else -1
+	var b := skeleton.find_bone("Hand" + side) if skeleton else -1
 	if b < 0:
 		return Vector3.ZERO
-	return _pose(b) * Vector3(0.0, HAND, 0.0)
+	var knuckles := skeleton.find_bone("Fingers" + side)
+	return _pose(b) * (skeleton.get_bone_rest(knuckles).origin * 0.5)
 
 
 ## A point given in the weapon's own frame, in the model's space.

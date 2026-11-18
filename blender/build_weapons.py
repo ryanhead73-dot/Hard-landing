@@ -25,7 +25,7 @@ import build_models as bm
 import creature_kit as kit
 
 GRIP_R = (0, -0.12, 0.17)
-GRIP_L = (0, -0.06, -0.12)
+GRIP_L = (0, -0.118, -0.27)
 MUZZLE = (0, 0.01, -0.48)
 
 IRON = "45525a"
@@ -200,6 +200,14 @@ class Casting:
             # Pieces were drawn together in model space, including the moving pump.
             obj.location = -parent.location
         bm.export(asset)
+
+
+def foregrip(g):
+    # A narrow angled strut from the lower rail to the rubber palm rest.
+    g.plate([(0.290, 0.003), (0.312, 0.003), (0.292, -0.089),
+             (0.268, -0.101), (0.253, -0.088)], 0.040, IRON, "metal")
+    g.plate([(0.228, -0.086), (0.294, -0.080), (0.306, -0.095),
+             (0.292, -0.105), (0.226, -0.109)], 0.052, RUBBER, "soft")
 
 
 def pistol_grip(g, tape=WRAP):
@@ -395,6 +403,7 @@ def rifle():
         rims=(0, 2, 4, 6, 7),
     )
     g.screws([(-0.181, 0.041), (-0.040, 0.003)], 0.057, 0.006)
+    foregrip(g)
     g.export("rifle")
 
 
@@ -520,13 +529,13 @@ def scattergun():
     g.parent = pump
     g.plate(
         [
-            (-0.012, -0.067),
-            (0.015, -0.031),
-            (0.211, -0.029),
-            (0.235, -0.049),
-            (0.207, -0.105),
-            (0.025, -0.113),
-            (-0.005, -0.095),
+            (0.118, -0.067),
+            (0.145, -0.031),
+            (0.341, -0.029),
+            (0.365, -0.049),
+            (0.337, -0.105),
+            (0.155, -0.113),
+            (0.125, -0.095),
         ],
         0.100,
         "594b45",
@@ -534,7 +543,7 @@ def scattergun():
         bevel=0.009,
     )
     for j in range(6):
-        f = 0.003 + 0.034 * j
+        f = 0.133 + 0.034 * j
         g.plate(
             [(f, -0.091), (f + 0.010, -0.106), (f + 0.034, -0.050), (f + 0.023, -0.042)], 0.107, RUBBER, "soft", bevel=0.004
         )
@@ -789,6 +798,7 @@ def arc_lance():
         g.plate(jaw(sign, [(0.391, 0.022), (0.461, 0.033), (0.441, 0.035), (0.405, 0.033)]), 0.058, TEAL, "lamp", bevel=0.001)
     g.collar((0, 0.288, 0.023), 0.037, 0.056, IRON, sides=8)
     g.screws([(-0.277, 0.076), (-0.262, -0.035), (-0.130, 0.073)], 0.0585, 0.0065)
+    foregrip(g)
     g.export("arc_lance")
 
 
