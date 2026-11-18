@@ -77,12 +77,14 @@ func _juno_grips() -> void:
 			grip != null and model.to_local(grip.global_position).distance_to(GRIP_L) < .002)
 		var fore_end := Rig.joint(model, "Pump") if id == "scattergun" else model
 		var meshes := fore_end.find_children("*", "MeshInstance3D", true, false)
-		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim", "reload"]:
+		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim", "jump", "land", "roll", "reload"]:
 			a._clips.play(clip)
 			a._clips.pause()
 			var length := a._clips.get_animation(clip).length
 			var steps := ceili(length * 60)
 			var worst := Vector2.ZERO
+			var elbow_min := INF
+			var check_elbow: bool = clip in ["idle", "walk", "run", "aim"]
 			var surface_max := 0.0
 			var yaw_max := 0.0
 			var pitch_min := 90.0
@@ -92,6 +94,8 @@ func _juno_grips() -> void:
 					continue
 				a._clips.seek(length * i / steps, true)
 				await get_tree().process_frame
+				if check_elbow:
+					elbow_min = minf(elbow_min, a.bone_pos("ArmR").y - a.bone_pos("ForearmR").y)
 				worst.x = maxf(worst.x, _grip_gap("R"))
 				worst.y = maxf(worst.y, _grip_gap("L"))
 				var forward := player.rig.global_basis.inverse() * -muzzle.global_basis.z.normalized()
@@ -105,6 +109,9 @@ func _juno_grips() -> void:
 					pitch_max = maxf(pitch_max, pitch)
 			_check("%s %s max grip gap" % [id, clip], worst.x < .06 and worst.y < .08,
 				"R %.4f m, L %.4f m" % [worst.x, worst.y])
+			if check_elbow:
+				_check("%s %s right elbow drop" % [id, clip], elbow_min >= (0.0 if clip == "aim" else .12),
+					"%.4f m min" % elbow_min)
 			if clip in ["idle", "walk"]:
 				_check("%s %s muzzle yaw" % [id, clip], yaw_max <= 15, "%.2f degrees max" % yaw_max)
 			if clip == "idle":
