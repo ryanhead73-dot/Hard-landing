@@ -28,13 +28,11 @@ var state := State.ROOST
 var passes := 0
 var hits := 0
 var _timer := 0.0
-var _flap := 0.0
 var _dir := Vector3.FORWARD
 var _hit_this_pass := false
 var _closest := INF
 var _circle_at := Vector3.ZERO
 var _visual: Node3D
-var _wings: Array[Node3D] = []
 var _gill_mat: StandardMaterial3D
 
 
@@ -45,6 +43,7 @@ func _init() -> void:
 	alert_radius = 12.0
 	drops = Vector2i(0, 1)
 	death_puff = 0.6
+	weak_joint = "Gill"
 	weak_offset = Vector3.ZERO
 	weak_radius = 0.3
 
@@ -58,85 +57,25 @@ func _setup() -> void:
 	shape.shape = s
 	add_child(shape)
 	_build()
-	_flap = randf() * TAU
 	_timer = randf_range(0.0, 1.0)
 
 
 func _build() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = BODY
-	body_mat.roughness = 0.6
-	_flashes(body_mat)
-	var body := MeshInstance3D.new()
-	var bm := SphereMesh.new()
-	bm.radius = 0.35
-	bm.height = 1.3
-	bm.radial_segments = 10
-	bm.rings = 5
-	body.mesh = bm
-	body.rotation.x = PI * 0.5
-	body.material_override = body_mat
-	_visual.add_child(body)
+	_load_rig("veilwing", _visual)
 	# The gill-strip along its belly: the weak spot, glowing brighter when it flares.
-	_gill_mat = StandardMaterial3D.new()
-	_gill_mat.albedo_color = GILL.darkened(0.4)
-	_gill_mat.emission_enabled = true
-	_gill_mat.emission = GILL
-	_gill_mat.emission_energy_multiplier = 1.2
-	var gill := MeshInstance3D.new()
-	var gm := BoxMesh.new()
-	gm.size = Vector3(0.22, 0.08, 0.8)
-	gill.mesh = gm
-	gill.material_override = _gill_mat
-	gill.position = Vector3(0.0, -0.3, 0.0)
-	_visual.add_child(gill)
-	_weak = gill
-	var membrane := StandardMaterial3D.new()
-	membrane.albedo_color = MEMBRANE
-	membrane.roughness = 0.5
-	membrane.cull_mode = BaseMaterial3D.CULL_DISABLED
-	membrane.rim_enabled = true
-	membrane.rim = 0.6
-	_flashes(membrane)
-	for side in [-1.0, 1.0]:
-		var pivot := Node3D.new()
-		pivot.position = Vector3(side * 0.25, 0.05, 0.0)
-		_visual.add_child(pivot)
-		var wing := MeshInstance3D.new()
-		var wm := BoxMesh.new()
-		wm.size = Vector3(1.3, 0.04, 0.9)
-		wing.mesh = wm
-		wing.material_override = membrane
-		wing.position = Vector3(side * 0.65, 0.0, 0.1)
-		pivot.add_child(wing)
-		_wings.append(pivot)
-	var tail := MeshInstance3D.new()
-	var tm := CylinderMesh.new()
-	tm.top_radius = 0.08
-	tm.bottom_radius = 0.01
-	tm.height = 0.9
-	tm.radial_segments = 5
-	tail.mesh = tm
-	tail.material_override = body_mat
-	tail.rotation.x = PI * 0.5
-	tail.position = Vector3(0.0, 0.0, 0.95)
-	_visual.add_child(tail)
+	_gill_mat = Rig.own_material(_rig, "veilwing_gill")
 
 
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
 		return
 	_timer -= delta
-	var flap_rate := 2.0
-	var flap_amp := 0.25
 	match state:
 		State.ROOST:
 			# Hangs folded at its roost, swaying a little.
 			velocity = (home - global_position) * 2.0
-			flap_amp = 0.08
-			flap_rate = 1.0
 			if _target_alive() and _timer <= 0.0:
 				_timer = 0.3
 				if _can_see_target():
@@ -144,13 +83,11 @@ func _physics_process(delta: float) -> void:
 					_start_flare()
 		State.FLARE:
 			velocity = velocity.move_toward(Vector3.ZERO, 8.0 * delta)
-			flap_rate = 7.0
-			flap_amp = 0.9
-			_gill_mat.emission_energy_multiplier = 4.0
+			if _gill_mat:
+				_gill_mat.emission_energy_multiplier = 4.0
 			if _timer <= 0.0:
 				_start_swoop()
 		State.SWOOP:
-			flap_amp = 0.05
 			if _target_alive():
 				var chest: Vector3 = target.global_position + Vector3.UP * 1.2
 				var to := chest - global_position
@@ -172,8 +109,6 @@ func _physics_process(delta: float) -> void:
 				_start_climb()
 			velocity = _dir * swoop_speed
 		State.CLIMB:
-			flap_rate = 5.0
-			flap_amp = 0.6
 			var to := _circle_at - global_position
 			velocity = velocity.move_toward(to.normalized() * speed * 1.4 if to.length() > 0.5 else Vector3.ZERO, 10.0 * delta)
 			if _timer <= 0.0 or to.length() < 1.0:
@@ -183,9 +118,6 @@ func _physics_process(delta: float) -> void:
 					calm()
 					state = State.ROOST
 	move_and_slide()
-	_flap += delta * flap_rate * TAU
-	for i in _wings.size():
-		_wings[i].rotation.z = sin(_flap) * flap_amp * (-1.0 if i == 0 else 1.0)
 	# Faces the way it flies (or Juno, while it flares).
 	var face := velocity
 	if state == State.FLARE and _target_alive():
@@ -193,7 +125,7 @@ func _physics_process(delta: float) -> void:
 	if Vector2(face.x, face.z).length() > 0.1:
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(-face.x, -face.z), clampf(8.0 * delta, 0.0, 1.0))
 	_visual.rotation.x = lerpf(_visual.rotation.x, -0.5 if state == State.SWOOP else 0.0, clampf(6.0 * delta, 0.0, 1.0))
-	if state != State.FLARE:
+	if state != State.FLARE and _gill_mat:
 		_gill_mat.emission_energy_multiplier = lerpf(_gill_mat.emission_energy_multiplier, 1.2, clampf(4.0 * delta, 0.0, 1.0))
 
 
@@ -266,8 +198,11 @@ func _die() -> void:
 	super._die()
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position, GILL, 12, 2.5, 0.08, 0.6, Vector3.UP, 180.0, -3.0)
+	# It crumples out of the air (the die clip), then is gone.
+	velocity = Vector3.ZERO
 	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3.ONE * 0.01, 0.4)
+	tween.tween_property(_visual, "position:y", -1.2, 0.45).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(_visual, "scale", Vector3.ONE * 0.01, 0.3)
 	tween.tween_callback(queue_free)
 
 

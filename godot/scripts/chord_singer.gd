@@ -53,7 +53,6 @@ var _ring_hit := false
 var _pull_t := 0.0
 var _drone_t := 0.0
 var _visual: Node3D
-var _legs: Array[Node3D] = []
 var _membrane_mat: StandardMaterial3D
 var _ring: MeshInstance3D
 var _ring_mat: StandardMaterial3D
@@ -67,6 +66,7 @@ func _init() -> void:
 	alert_radius = 0.0
 	drops = Vector2i(2, 4)
 	death_puff = 1.4
+	weak_joint = "Membrane"
 	weak_radius = 0.45
 
 
@@ -87,82 +87,9 @@ func _setup() -> void:
 func _build() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = SKIN
-	skin.roughness = 0.6
-	_flashes(skin)
-	var leg_mesh := BoxMesh.new()
-	leg_mesh.size = Vector3(0.14, 1.0, 0.14)
-	for i in 3:
-		var pivot := Node3D.new()
-		pivot.position = Vector3(0.0, 2.4, 0.0)
-		pivot.rotation.y = i * TAU / 3.0
-		_visual.add_child(pivot)
-		var leg := MeshInstance3D.new()
-		leg.mesh = leg_mesh
-		leg.material_override = skin
-		pivot.add_child(leg)
-		_legs.append(pivot)
-	# The fluted chest: an open-ended tube.
-	var chest := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.45
-	cm.bottom_radius = 0.3
-	cm.height = 1.0
-	cm.radial_segments = 10
-	cm.cap_top = false
-	cm.cap_bottom = false
-	chest.mesh = cm
-	var hollow := skin.duplicate() as StandardMaterial3D
-	hollow.cull_mode = BaseMaterial3D.CULL_DISABLED
-	chest.material_override = hollow
-	chest.position = Vector3(0.0, 2.6, 0.0)
-	_visual.add_child(chest)
-	# The bell throat, glassy, and the membrane inside it.
-	var bell := MeshInstance3D.new()
-	var bm := SphereMesh.new()
-	bm.radius = 0.45
-	bm.height = 0.8
-	bm.radial_segments = 12
-	bm.rings = 6
-	bell.mesh = bm
-	var glass := StandardMaterial3D.new()
-	glass.albedo_color = Color(BELL, 0.35)
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.roughness = 0.1
-	glass.rim_enabled = true
-	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
-	bell.material_override = glass
-	bell.position = Vector3(0.0, 3.2, -0.15)
-	_visual.add_child(bell)
-	_membrane_mat = StandardMaterial3D.new()
-	_membrane_mat.albedo_color = MEMBRANE.darkened(0.4)
-	_membrane_mat.emission_enabled = true
-	_membrane_mat.emission = MEMBRANE
-	_membrane_mat.emission_energy_multiplier = 0.3
-	_membrane_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var membrane := MeshInstance3D.new()
-	var mm := CylinderMesh.new()
-	mm.top_radius = 0.32
-	mm.bottom_radius = 0.32
-	mm.height = 0.03
-	mm.radial_segments = 12
-	membrane.mesh = mm
-	membrane.material_override = _membrane_mat
-	membrane.position = Vector3(0.0, 3.2, -0.2)
-	membrane.rotation.x = PI * 0.5
-	_visual.add_child(membrane)
-	_weak = membrane
-	# The tuning fork of rib fins over its head.
-	for side in [-1.0, 1.0]:
-		var fin := MeshInstance3D.new()
-		var fm := BoxMesh.new()
-		fm.size = Vector3(0.1, 1.4, 0.3)
-		fin.mesh = fm
-		fin.material_override = skin
-		fin.position = Vector3(side * 0.28, 4.1, 0.05)
-		fin.rotation.z = -side * 0.12
-		_visual.add_child(fin)
+	_load_rig("chord_singer", _visual)
+	# The membrane inside the bell: the weak spot, bright while it draws breath.
+	_membrane_mat = Rig.own_material(_rig, "singer_membrane")
 	# The song's ring on the ground: a wide jagged band for dissonance, a thin double one for
 	# the pull (drawn closing in).
 	_ring_mat = StandardMaterial3D.new()
@@ -224,7 +151,8 @@ func _physics_process(delta: float) -> void:
 					state = State.REST
 					_timer = REST_TIME
 		State.INHALE:
-			_membrane_mat.emission_energy_multiplier = lerpf(0.6, 4.0, clampf(1.0 - _timer / INHALE_TIME, 0.0, 1.0))
+			if _membrane_mat:
+				_membrane_mat.emission_energy_multiplier = lerpf(0.6, 4.0, clampf(1.0 - _timer / INHALE_TIME, 0.0, 1.0))
 			if _target_alive():
 				_face(target.global_position, clampf(3.0 * delta, 0.0, 1.0))
 			if _timer <= 0.0:
@@ -244,7 +172,8 @@ func _physics_process(delta: float) -> void:
 				_next_patch(false)
 				state = State.WALK
 	if state != State.INHALE:
-		_membrane_mat.emission_energy_multiplier = lerpf(_membrane_mat.emission_energy_multiplier, 0.3, clampf(5.0 * delta, 0.0, 1.0))
+		if _membrane_mat:
+			_membrane_mat.emission_energy_multiplier = lerpf(_membrane_mat.emission_energy_multiplier, 0.3, clampf(5.0 * delta, 0.0, 1.0))
 	if want != Vector3.ZERO:
 		var dir := _steer_around_walls(want, delta)
 		velocity.x = dir.x * WALK_SPEED
@@ -257,7 +186,6 @@ func _physics_process(delta: float) -> void:
 	_tick_ring(delta)
 	_tick_pull(delta)
 	_flare.light_energy = maxf(_flare.light_energy - delta * 3.0, 0.0)
-	_animate()
 	_drone_t -= delta
 	if _drone_t <= 0.0:
 		_drone_t = 4.0
@@ -319,7 +247,7 @@ func _sing() -> void:
 func sheltered() -> bool:
 	if not _target_alive() or not is_inside_tree():
 		return true
-	var from := global_position + Vector3.UP * 3.2
+	var from := global_position + Vector3.UP * 3.55
 	var to: Vector3 = target.global_position + Vector3.UP * 1.2
 	var q := PhysicsRayQueryParameters3D.create(from, to, Game.LAYER_WORLD)
 	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
@@ -391,19 +319,6 @@ func _on_hurt(_dir_hit: Vector3) -> void:
 		Sfx.play("singer_chord", global_position + Vector3.UP * 3.0, -8.0, 0.6)
 
 
-func _animate() -> void:
-	var walking := _flat(velocity).length() > 0.2
-	var t := Time.get_ticks_msec() * 0.003
-	for i in _legs.size():
-		var pivot := _legs[i]
-		var leg := pivot.get_child(0) as Node3D
-		var lift := maxf(sin(t * 2.0 + i * TAU / 3.0), 0.0) * 0.4 if walking else 0.0
-		var spread := 1.3 if state in [State.PLANT, State.INHALE, State.SING] else 1.0
-		var foot := Vector3(0.0, -2.4 + lift, -spread)
-		leg.position = foot * 0.5
-		leg.basis = Basis(Quaternion(Vector3.UP, -foot.normalized())).scaled(Vector3(1.0, foot.length(), 1.0))
-
-
 func _die() -> void:
 	state = State.DEAD
 	_ring.visible = false
@@ -411,8 +326,12 @@ func _die() -> void:
 	super._die()
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 3.0, MEMBRANE, 16, 3.0, 0.08, 0.8, Vector3.UP, 180.0, -3.0)
+	# The die clip topples it; it lies a moment, then sinks into the weave.
+	if _membrane_mat:
+		_membrane_mat.emission_energy_multiplier = 0.0
 	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3(1.0, 0.05, 1.0), 0.8)
+	tween.tween_interval(2.6)
+	tween.tween_property(_visual, "position:y", -1.4, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 

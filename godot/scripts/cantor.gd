@@ -44,9 +44,7 @@ var interrupts := 0
 var waves := 0
 var _sung := [false, false, false]
 var _petal_done := false
-var _heart: MeshInstance3D
 var _heart_mat: StandardMaterial3D
-var _petals: Array[Node3D] = []
 var _cage: Node3D
 var _drone: Node
 
@@ -62,6 +60,9 @@ func _init() -> void:
 	# A little over the heart's own radius: a hit lands on its surface, and at exactly the radius
 	# rounding would decide whether it counted.
 	weak_radius = 1.75
+	# The heart-node: the middle of its bone (which runs up through it from its bottom).
+	weak_joint = "Heart"
+	weak_offset = Vector3(0.0, 1.0, 0.0)
 
 
 func display_name() -> String:
@@ -89,64 +90,8 @@ func _setup() -> void:
 func _build() -> void:
 	_cage = Node3D.new()
 	add_child(_cage)
-	var cable := StandardMaterial3D.new()
-	cable.albedo_color = CABLE
-	cable.roughness = 0.8
-	if PbrSet.exists("shatterlands", "living_fibre"):
-		# Its own copy: the hit flash tints it.
-		cable = PbrSet.material("shatterlands", "living_fibre", 1.4, false, Color(0.7, 0.6, 0.56)).duplicate()
-	_flashes(cable)
-	# The rib cage: hooped ribs round the heart, top to bottom.
-	for i in 8:
-		var a := i * TAU / 8.0
-		var rib := MeshInstance3D.new()
-		var tm := TorusMesh.new()
-		tm.inner_radius = 3.6
-		tm.outer_radius = 4.0
-		tm.rings = 16
-		tm.ring_segments = 5
-		rib.mesh = tm
-		rib.material_override = cable
-		rib.position = Vector3(0.0, HEART_Y, 0.0)
-		rib.rotation = Vector3(PI * 0.5, a, 0.0)
-		rib.scale = Vector3(1.0, 1.0, 1.4)
-		_cage.add_child(rib)
-	_heart_mat = StandardMaterial3D.new()
-	_heart_mat.albedo_color = TEAL.darkened(0.5)
-	_heart_mat.emission_enabled = true
-	_heart_mat.emission = TEAL
-	_heart_mat.emission_energy_multiplier = 1.0
-	_heart = MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 1.1
-	sm.height = 2.2
-	sm.radial_segments = 14
-	sm.rings = 8
-	_heart.mesh = sm
-	_heart.material_override = _heart_mat
-	_heart.position = Vector3(0.0, HEART_Y, 0.0)
-	add_child(_heart)
-	_weak = _heart
-	var petal_mat := StandardMaterial3D.new()
-	petal_mat.albedo_color = Color("8a6a5a")
-	petal_mat.roughness = 0.7
-	for i in 3:
-		var hinge := Node3D.new()
-		hinge.position = Vector3(0.0, HEART_Y, 0.0)
-		hinge.rotation.y = i * TAU / 3.0
-		add_child(hinge)
-		var petal := MeshInstance3D.new()
-		var pm := SphereMesh.new()
-		pm.radius = 1.6
-		pm.height = 3.2
-		pm.radial_segments = 10
-		pm.rings = 6
-		petal.mesh = pm
-		petal.material_override = petal_mat
-		petal.scale = Vector3(0.9, 1.1, 0.35)
-		petal.position = Vector3(0.0, 0.0, -0.9)
-		hinge.add_child(petal)
-		_petals.append(hinge)
+	_load_rig("cantor", _cage)
+	_heart_mat = Rig.own_material(_rig, "cantor_heart")
 
 
 ## The heart can be hurt now.
@@ -208,10 +153,8 @@ func _physics_process(delta: float) -> void:
 		Sfx.play("thread_snap", global_position + Vector3.UP * HEART_Y, 0.0, 0.0)
 	open_t = maxf(open_t - delta, 0.0)
 	var opening := 1.0 if heart_open() or (phase == Phase.RESOLVE and petals > 0) else 0.0
-	for i in _petals.size():
-		var want := 1.2 if (heart_open() or (phase == Phase.RESOLVE and i < petals)) else 0.0
-		_petals[i].rotation.x = lerpf(_petals[i].rotation.x, want, clampf(6.0 * delta, 0.0, 1.0))
-	_heart_mat.emission_energy_multiplier = 4.0 if heart_open() else 1.0 + opening
+	if _heart_mat:
+		_heart_mat.emission_energy_multiplier = 4.0 if heart_open() else 1.0 + opening
 	# It sways on its cables.
 	_cage.rotation.y += delta * 0.1
 	position.y = sin(Time.get_ticks_msec() * 0.0008) * 0.3
@@ -275,10 +218,16 @@ func _die() -> void:
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * HEART_Y, TEAL, 30, 6.0, 0.1, 1.0, Vector3.UP, 180.0, -4.0)
 	var tween := create_tween()
+	tween.tween_interval(1.6)
 	tween.tween_property(_cage, "scale", Vector3(1.0, 0.2, 1.0), 2.0)
-	tween.parallel().tween_property(_heart, "position:y", 1.0, 2.0)
 	tween.tween_callback(queue_free)
 
 
+## The petals fold open (the open clip) while the heart is bare, and in the last phase once all
+## three have unfurled.
 func anim_state() -> String:
+	if dead:
+		return "dead"
+	if heart_open() or (phase == Phase.RESOLVE and petals >= 3):
+		return "open"
 	return String(Phase.find_key(phase)).to_lower()

@@ -14,11 +14,14 @@ func _name() -> String:
 func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
+	_juno_contacts()
 	await _juno_locomotion()
+	await _juno_landings()
 	await _juno_upper_body()
 	await _juno_down()
 	await _wildlife()
 	await _lurker_emerge()
+	await _skinned_wildlife()
 	await _ship()
 	await _intro()
 	finished = true
@@ -31,6 +34,65 @@ func _rot(joint: String) -> Vector3:
 func _grip_gap(side: String) -> float:
 	var a := player.anim
 	return a.hand(side).distance_to(a.weapon_point(Vector3(0.0, -0.12, 0.17) if side == "R" else Vector3(0.0, -0.06, -0.12)))
+
+
+## Sample both boots through heel strike, flat support and toe-off on the imported rig.
+## Advance the rig by gameplay distance so a planted tread stays at one world point.
+func _juno_contacts() -> void:
+	var rig := Rig.spawn("juno_rigged", self)
+	var sk := rig.find_child("Skeleton3D", true, false) as Skeleton3D
+	var ap := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	for gait in [["walk", JunoAnimator.WALK_CYCLE, 13.0 / 24.0], ["run", JunoAnimator.RUN_CYCLE, .25],
+			["crouch_walk", JunoAnimator.CROUCH_CYCLE, .58]]:
+		var distance := float(gait[1])
+		var stance := float(gait[2])
+		var worst := 0.0
+		var floor_error := 0.0
+		ap.play(gait[0])
+		for side in ["L", "R"]:
+			var b := sk.find_bone("Foot" + side)
+			var rest := sk.get_bone_global_rest(b)
+			var offset := 0.0 if side == "L" else .5
+			var footprint_samples := PackedVector3Array()
+			for i in 121:
+				var u := i / 120.0
+				var phase := stance * u + offset
+				ap.seek(fmod(phase, 1.0) * JunoAnimator.CYCLE_TIME, true)
+				var pose := sk.get_bone_global_pose(b)
+				var pivot := Vector3(0, -.105, .073 if u < .5 else -.17)
+				var tread := pose * (rest.basis.inverse() * pivot) + Vector3.FORWARD * distance * phase
+				floor_error = maxf(floor_error, absf(tread.y))
+				# Both pivot locations are specified relative to the same flat footprint.
+				var footprint := tread - pivot
+				for previous in footprint_samples:
+					worst = maxf(worst, footprint.distance_to(previous))
+				footprint_samples.append(footprint)
+		_check("%s planted tread slide" % gait[0], worst <= .04 and floor_error <= .04,
+			"max %.2f cm, floor error %.2f cm" % [100*worst, 100*floor_error])
+		if gait[0] == "walk":
+			for side in ["L", "R"]:
+				var phase := stance * .5 + (0.0 if side == "L" else .5)
+				ap.seek(phase * JunoAnimator.CYCLE_TIME, true)
+				var hip := sk.get_bone_global_pose(sk.find_bone("Leg" + side)).origin
+				var knee := sk.get_bone_global_pose(sk.find_bone("Shin" + side)).origin
+				var ankle := sk.get_bone_global_pose(sk.find_bone("Foot" + side)).origin
+				var bend := rad_to_deg((knee - hip).angle_to(ankle - knee))
+				_check("walk %s knee extends at mid-stance" % side, bend >= 5 and bend <= 15,
+					"%.1f degrees" % bend)
+		if gait[0] == "run":
+			for phase in [.375, .875]:
+				ap.seek(phase * JunoAnimator.CYCLE_TIME, true)
+				var clearance := INF
+				for side in ["L", "R"]:
+					var b := sk.find_bone("Foot" + side)
+					var rest := sk.get_bone_global_rest(b)
+					var pose := sk.get_bone_global_pose(b)
+					for z in [.073, -.17]:
+						var tread := pose * (rest.basis.inverse() * Vector3(0, -.105, z))
+						clearance = minf(clearance, tread.y)
+				_check("run flight at phase %.3f clears both boots" % phase, clearance > .02,
+					"lowest tread %.2f cm" % (100 * clearance))
+	rig.queue_free()
 
 
 func _juno_locomotion() -> void:
@@ -75,7 +137,62 @@ func _juno_locomotion() -> void:
 	await _press("jump")
 	await _frames(4)
 	_check("jumping tucks her legs", (a.state == "jump" or a.state == "fall") and _rot("LegL").x > 10.0, "%s leg=%.0f" % [a.state, _rot("LegL").x])
-	await _frames(60)
+	var landed := false
+	var low_hips := 2.0
+	for i in 90:
+		await get_tree().physics_frame
+		if a.tree.get("parameters/land/active"):
+			landed = true
+			low_hips = minf(low_hips, a.bone_pos("Hips").y)
+	_check("touchdown absorbs weight and recovers", landed and low_hips < .81 and a.bone_pos("Hips").y > .86
+		and is_equal_approx(a._clips.get_animation("land").length, .35), "lowest hips %.2f" % low_hips)
+
+
+func _juno_landings() -> void:
+	var a := player.anim
+	for approach in ["running", "crouched", "slow"]:
+		_place(ARENA, 0.0)
+		await _frames(20)
+		if approach == "running":
+			Input.action_press("move_forward")
+			Input.action_press("sprint")
+			await _frames(30)
+		await _press("jump")
+		var airborne := not player.is_on_floor()
+		if approach == "crouched":
+			Input.action_press("crouch")
+		var landed := false
+		var touchdown_speed := 0.0
+		var touchdown_crouched := false
+		var impact_speed := 0.0
+		var recovery := false
+		for i in 75:
+			await get_tree().physics_frame
+			if not landed and airborne and player.is_on_floor():
+				landed = true
+				touchdown_speed = Vector2(player.velocity.x, player.velocity.z).length()
+				touchdown_crouched = player.crouching
+				impact_speed = -player._airborne_speed
+			recovery = recovery or bool(a.tree.get("parameters/land/active"))
+			if approach == "slow" and landed and recovery:
+				break
+		Input.action_release("move_forward")
+		Input.action_release("sprint")
+		Input.action_release("crouch")
+		var real_landing := landed and impact_speed > 3.0
+		match approach:
+			"running":
+				_check("running touchdown skips landing recovery", real_landing and touchdown_speed > player.walk_speed + 0.5
+					and not touchdown_crouched and not recovery)
+			"crouched":
+				_check("crouched touchdown skips landing recovery", real_landing and touchdown_crouched
+					and touchdown_speed < player.walk_speed * 0.5 and not recovery)
+			"slow":
+				_check("slow standing touchdown starts landing recovery", real_landing and not touchdown_crouched
+					and touchdown_speed < player.walk_speed * 0.5 and recovery)
+				await _press("jump")
+				_check("jumping during landing recovery aborts it", recovery and not player.is_on_floor()
+					and player.velocity.y > 0.0 and not a.tree.get("parameters/land/active"))
 
 
 func _juno_upper_body() -> void:
@@ -181,21 +298,29 @@ func _wildlife() -> void:
 	for kind in made:
 		var e: Enemy = made[kind]
 		e.velocity = Vector3(2.5, 0.0, 0.0)
-	var ranges := {}
-	for f in 50:
+	# How far the first leg's hip turns, about whichever axis it turns most (the procedural legs
+	# swing about one axis; the IK legs of the skinned models about a slanted one).
+	var lo := {}
+	var hi := {}
+	# Over a full stride or so (the IK legs turn less per step but keep at it all cycle).
+	var t := 0.0
+	var frames := 0
+	while t < 1.2 and frames < 600:
+		frames += 1
 		await get_tree().process_frame
+		t += get_process_delta_time()
 		for kind in made:
 			var e: Enemy = made[kind]
 			var leg: String = e.anim.legs[0][0]
 			var r: Vector3 = e.anim.pose.rot_of(leg)
-			var v := r.y if e.anim._cfg["legs"] == "splay" else r.x
-			var span: Vector2 = ranges.get(kind, Vector2(999.0, -999.0))
-			ranges[kind] = Vector2(minf(span.x, v), maxf(span.y, v))
+			lo[kind] = (lo.get(kind, r) as Vector3).min(r)
+			hi[kind] = (hi.get(kind, r) as Vector3).max(r)
 	var detail := ""
-	for kind in ranges:
-		var span: Vector2 = ranges[kind]
-		detail += "%s=%.0f " % [kind, span.y - span.x]
-		swing_ok = swing_ok and span.y - span.x > 10.0
+	for kind in lo:
+		var span: Vector3 = hi[kind] - lo[kind]
+		var most := maxf(span.x, maxf(span.y, span.z))
+		detail += "%s=%.0f " % [kind, most]
+		swing_ok = swing_ok and most > 10.0
 	_check("every creature's legs walk", swing_ok, detail)
 	for kind in made:
 		(made[kind] as Enemy).velocity = Vector3.ZERO
@@ -228,6 +353,32 @@ func _wildlife() -> void:
 
 
 ## A lurker bursting out of its pool eases its jaw open over a few frames instead of snapping it.
+## The creatures modelled as one skinned mesh (blender/build_creatures.py): each has its clips,
+## a weak spot that follows its bone, and the clip for the state it is in plays.
+func _skinned_wildlife() -> void:
+	var clips := {"drifter": ["idle", "walk", "swell", "die"], "veilwing": ["roost", "flare", "swoop", "climb", "die"],
+		"ridge_diver": ["surfaced", "attack", "dive", "die"], "pinweaver": ["idle", "walk", "anchor", "spool", "recover", "die"],
+		"chord_singer": ["idle", "walk", "plant", "inhale", "sing", "stagger", "die"],
+		"patience_guardian": ["idle", "walk", "dormant", "brace", "charge", "pinned", "die"], "cantor": ["listen", "open", "die"]}
+	for kind in clips:
+		var e := main.spawn_enemy("guardian" if kind == "patience_guardian" else kind, ARENA + Vector3(0.0, 0.5, -6.0), "") as Enemy
+		await _frames(3)
+		var player_clips := e.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		var missing: Array = []
+		for c in clips[kind]:
+			if player_clips == null or not player_clips.has_animation(c):
+				missing.append(c)
+		var meshes := 0
+		for n in e.find_children("*", "MeshInstance3D", true, false):
+			if (n as MeshInstance3D).skeleton != NodePath():
+				meshes += 1
+		_check("%s: one skinned mesh with its clips" % kind, missing.is_empty() and meshes == 1 and e.anim and e.anim.tree != null,
+			"missing %s, skinned meshes %d" % [missing, meshes])
+		_check("%s: its weak spot follows a bone" % kind, e._weak != null and is_instance_valid(e._weak), e.weak_joint)
+		e.queue_free()
+		await _frames(2)
+
+
 func _lurker_emerge() -> void:
 	var lk: Enemy = main.spawn_enemy("lurker", ARENA + Vector3(0.0, 0.0, -20.0))
 	lk.target = null
@@ -245,8 +396,7 @@ func _lurker_emerge() -> void:
 
 
 func _jaw(e: Enemy) -> float:
-	var j: Node3D = e.anim.pose.node("Jaw")
-	return rad_to_deg(j.rotation.x) if j else 0.0
+	return e.anim.pose.rot_of("Jaw").x
 
 
 func _ship() -> void:

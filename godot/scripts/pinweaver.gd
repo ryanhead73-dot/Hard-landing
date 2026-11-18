@@ -147,9 +147,7 @@ var _timer := 0.0
 var _goal := Vector3.INF
 var _pair: Array = []
 var _pending: TripThread
-var _gait := 0.0
 var _visual: Node3D
-var _legs: Array[Node3D] = []
 var _valve_mat: StandardMaterial3D
 var _was_near := {}
 var _click_t := 0.0
@@ -162,6 +160,7 @@ func _init() -> void:
 	alert_radius = 10.0
 	drops = Vector2i(1, 3)
 	death_puff = 0.9
+	weak_joint = "Valve"
 	weak_radius = 0.35
 
 
@@ -182,64 +181,9 @@ func _setup() -> void:
 func _build() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
-	var frame := StandardMaterial3D.new()
-	frame.albedo_color = FRAME
-	frame.roughness = 0.5
-	frame.metallic = 0.3
-	_flashes(frame)
-	var body := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.5
-	sm.height = 0.6
-	sm.radial_segments = 10
-	sm.rings = 5
-	body.mesh = sm
-	body.material_override = frame
-	body.position = Vector3(0.0, 1.5, 0.0)
-	body.scale = Vector3(1.0, 0.8, 1.5)
-	_visual.add_child(body)
-	# Back-spools, asymmetric: the left one bigger, with the valve at its base.
-	for side in [-1.0, 1.0]:
-		var spool := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.2 if side < 0.0 else 0.14
-		cm.bottom_radius = cm.top_radius
-		cm.height = 0.5 if side < 0.0 else 0.36
-		cm.radial_segments = 8
-		spool.mesh = cm
-		spool.material_override = frame
-		spool.position = Vector3(side * 0.28, 1.95, 0.35)
-		spool.rotation.z = PI * 0.5
-		_visual.add_child(spool)
-	_valve_mat = StandardMaterial3D.new()
-	_valve_mat.albedo_color = VALVE.darkened(0.5)
-	_valve_mat.emission_enabled = true
-	_valve_mat.emission = VALVE
-	_valve_mat.emission_energy_multiplier = 0.2
-	var valve := MeshInstance3D.new()
-	var vm := SphereMesh.new()
-	vm.radius = 0.14
-	vm.height = 0.28
-	vm.radial_segments = 8
-	vm.rings = 4
-	valve.mesh = vm
-	valve.material_override = _valve_mat
-	valve.position = Vector3(-0.3, 1.74, 0.5)
-	_visual.add_child(valve)
-	_weak = valve
-	# Six caliper legs: one long thin strut each, from the hip down and out to the foot.
-	var leg_mesh := BoxMesh.new()
-	leg_mesh.size = Vector3(0.07, 1.0, 0.07)
-	for i in 6:
-		var pivot := Node3D.new()
-		var side := -1.0 if i < 3 else 1.0
-		pivot.position = Vector3(side * 0.35, 1.5, (i % 3 - 1) * 0.45)
-		_visual.add_child(pivot)
-		var leg := MeshInstance3D.new()
-		leg.mesh = leg_mesh
-		leg.material_override = frame
-		pivot.add_child(leg)
-		_legs.append(pivot)
+	_load_rig("pinweaver", _visual)
+	# The tension valve at the base of the left spool: the weak spot, bright while it anchors.
+	_valve_mat = Rig.own_material(_rig, "weaver_valve")
 
 
 func _physics_process(delta: float) -> void:
@@ -499,23 +443,8 @@ func _on_calm() -> void:
 
 
 func _animate(delta: float) -> void:
-	var moving := _flat(velocity).length() > 0.2
-	_gait += delta * (9.0 if moving else 0.0)
-	var planted := state in [State.ANCHOR, State.SPOOL, State.RECOVER]
-	_valve_mat.emission_energy_multiplier = lerpf(_valve_mat.emission_energy_multiplier, 3.5 if _weak_open() else 0.2, clampf(8.0 * delta, 0.0, 1.0))
-	for i in _legs.size():
-		var side := -1.0 if i < 3 else 1.0
-		var row := float(i % 3 - 1)
-		var lift := maxf(sin(_gait + (i % 2) * PI), 0.0) * 0.35 if moving else 0.0
-		var spread := 1.9 if planted else 1.5
-		var foot := Vector3(side * spread, -1.5 + lift, row * 0.9)
-		var hip := Vector3.ZERO
-		var mid := (hip + foot) * 0.5 + Vector3(side * 0.2, 0.55, 0.0)
-		# A caliper: one strut up to the knee, shown as the line hip-to-foot bowed out.
-		var leg := _legs[i].get_child(0) as Node3D
-		var dir := foot - hip
-		leg.position = mid * 0.9
-		leg.basis = Basis(Quaternion(Vector3.UP, dir.normalized())).scaled(Vector3(1.0, dir.length() * 1.05, 1.0))
+	if _valve_mat:
+		_valve_mat.emission_energy_multiplier = lerpf(_valve_mat.emission_energy_multiplier, 3.5 if _weak_open() else 0.2, clampf(8.0 * delta, 0.0, 1.0))
 
 
 func _die() -> void:
@@ -526,8 +455,12 @@ func _die() -> void:
 	super._die()
 	if is_inside_tree():
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.4, VALVE, 12, 2.5, 0.08, 0.6, Vector3.UP, 180.0, -3.0)
+	# The die clip drops it between its knees; it lies a moment, then sinks into the weave.
+	if _valve_mat:
+		_valve_mat.emission_energy_multiplier = 0.0
 	var tween := create_tween()
-	tween.tween_property(_visual, "scale", Vector3(1.4, 0.05, 1.4), 0.5)
+	tween.tween_interval(2.4)
+	tween.tween_property(_visual, "position:y", -1.2, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 

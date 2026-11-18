@@ -48,7 +48,7 @@ const LOOKOUT := Vector3(-13.6, 1.6, 0.0)
 const SURVIVORS := [
 	["Okafor", HEATER + Vector3(1.0, 0.0, -0.6), -1.03, "ferro", "idle"],
 	["Brandt", HEATER + Vector3(-1.1, 0.0, 0.4), 1.9, "ferro", "crouch"],
-	["Haddad", LOOKOUT, -PI * 0.5, "expedition", "idle"],
+	["Haddad", LOOKOUT, -PI * 0.5, "expedition", "watch"],
 	["Teo", Vector3(-1.0, FOOTING, -3.5), -PI * 0.5, "expedition", "crouch"],
 ]
 ## Where Reyes stands, inside the gate under its lamp (local).
@@ -458,10 +458,10 @@ func _gate() -> void:
 	intercom_pos = to_global(Vector3(-GATE_WIDTH * 0.5 - 0.3, 0.0, z + 1.4))
 
 
-## Lt. Sana Reyes: Juno's own suit model in Ferro-9's colours (slate with an amber stripe), standing
-## easy inside the gate. Hidden until the gate opens.
+## Lt. Sana Reyes: her own model (officer's jacket in Ferro-9 slate with amber boards), standing
+## at ease inside the gate. Hidden until the gate opens.
 func _reyes() -> void:
-	reyes = _person("Reyes", REYES_AT, 0.0, FERRO, "idle")
+	reyes = _person("Reyes", REYES_AT, 0.0, FERRO, "at_ease")
 
 
 ## Some of the eleven, about the compound: around the heater by the gate, on the west wall's
@@ -510,13 +510,19 @@ func _camp() -> void:
 		survivors.append(p)
 
 
-## A person on Juno's rig, recoloured: `palette` is [suit, trim]; `clip` is the loop they hold.
+## A survivor: their own model (blender/build_people.py: face, hair, clothes, build) holding the
+## loop `clip`. Anyone without a model of their own wears Juno's rig, recoloured: `palette` is
+## [suit, trim].
 func _person(who: String, at: Vector3, yaw: float, palette: Array, clip: String) -> Node3D:
 	var n := Node3D.new()
 	n.name = who
 	n.position = at
 	n.rotation.y = yaw
 	add_child(n)
+	var own := "person_" + who.to_lower()
+	if Rig.exists(own):
+		_loop_clip(Rig.spawn(own, n), clip)
+		return n
 	var rig := Rig.spawn("juno_rigged", n)
 	for mi in Rig.meshes(rig):
 		var mesh := mi.mesh
@@ -537,13 +543,17 @@ func _person(who: String, at: Vector3, yaw: float, palette: Array, clip: String)
 					m.albedo_color = palette[1]
 				_mats[key] = m
 			mi.set_surface_override_material(i, _mats[key])
+	_loop_clip(rig, clip if clip in ["idle", "crouch"] else "idle")
+	return n
+
+
+func _loop_clip(rig: Node3D, clip: String) -> void:
 	var clips := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if clips and clips.has_animation(clip):
 		clips.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 		clips.play(clip)
 		# Not all in step.
 		clips.seek(randf() * clips.current_animation_length, true)
-	return n
 
 
 ## A ramp rising north to `rise` over `run` metres, its top edge at `edge` (local, ground level).

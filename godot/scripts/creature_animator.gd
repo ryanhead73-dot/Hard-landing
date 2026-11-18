@@ -17,12 +17,19 @@ extends Node
 ## one-shots; and the die clip at the end.
 
 const KINDS := {
-	"scuttler": {"legs": "splay", "stride": 1.1, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
+	"scuttler": {"legs": "splay", "stride": 1.5, "swing": 24.0, "lift": 22.0, "knee": 0.0, "bob": 0.0},
 	"spitter": {"legs": "hang", "stride": 1.5, "swing": 26.0, "lift": 0.0, "knee": 38.0, "bob": 0.04},
-	"ram": {"legs": "hang", "stride": 2.6, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
-	"warden": {"legs": "splay", "stride": 3.2, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
-	"lurker": {"legs": "splay", "stride": 1.7, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
+	"ram": {"legs": "hang", "stride": 1.8, "swing": 28.0, "lift": 0.0, "knee": 45.0, "bob": 0.06},
+	"warden": {"legs": "splay", "stride": 2.8, "swing": 16.0, "lift": 14.0, "knee": 0.0, "bob": 0.07},
+	"lurker": {"legs": "splay", "stride": 1.4, "swing": 34.0, "lift": 16.0, "knee": 0.0, "bob": 0.0},
 	"skimmer": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"drifter": {"legs": "none", "stride": 1.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"veilwing": {"legs": "none", "stride": 4.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"ridge_diver": {"legs": "none", "stride": 2.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"pinweaver": {"legs": "none", "stride": 1.8, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"chord_singer": {"legs": "none", "stride": 1.5, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"patience_guardian": {"legs": "none", "stride": 2.4, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
+	"cantor": {"legs": "none", "stride": 1.0, "swing": 0.0, "lift": 0.0, "knee": 0.0, "bob": 0.0},
 }
 const SHOTS := {"attack": 0.35, "slam": 0.45, "hurt": 0.3}
 
@@ -238,7 +245,10 @@ func _drive_tree(st: String, hv: float) -> void:
 	var dead := st == "dead"
 	if dead != (tree.get("parameters/alive/current_state") == "dead"):
 		tree.set("parameters/alive/transition_request", "dead" if dead else "alive")
-	# Swelling the acid sac and pulsing the Warden's core stay procedural (scale, on top of the clips).
+	if kind == "skimmer" and pose.has("WingR"):
+		wing_beat = pose.rot_of("WingR").z
+	# The rigid-part models swell the acid sac and pulse the Warden's core here; the skinned ones
+	# have it in their clips (pose.node() is null for a bone).
 	var t := shot_progress()
 	var punch := sin(clampf(t, 0.0, 1.0) * PI) if t >= 0.0 else 0.0
 	var sac := pose.node("Sac")
@@ -271,7 +281,7 @@ func _build_tree(clips: AnimationPlayer) -> void:
 	bt.connect_node("move", 0, "idle")
 	bt.connect_node("move", 1, "walk_speed")
 	var state := AnimationNodeTransition.new()
-	state.xfade_time = 0.2
+	state.xfade_time = 0.25
 	state.add_input("base")
 	bt.add_node("state", state)
 	bt.connect_node("state", 0, "move")

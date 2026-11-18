@@ -22,6 +22,7 @@ static func spawn(model: String, parent: Node) -> Node3D:
 		n = Node3D.new()
 	n.name = model.to_pascal_case()
 	parent.add_child(n)
+	CreatureLook.apply(n)
 	return n
 
 

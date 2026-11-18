@@ -150,8 +150,10 @@ func _models() -> void:
 			missing.append(model)
 			continue
 		var rig := Rig.spawn(model, holder)
+		var pose := RigPose.new(rig)
 		for j in MODELS[model]:
-			if Rig.joint(rig, j) == null:
+			# A pivot node, or a bone of a skinned model.
+			if Rig.joint(rig, j) == null and not pose.has(j):
 				missing.append("%s/%s" % [model, j])
 		if Rig.meshes(rig).is_empty():
 			missing.append(model + " has no meshes")
@@ -211,7 +213,7 @@ func _wildlife() -> void:
 	a.target = null
 	b.target = null
 	await _frames(3)
-	_check("wildlife wear their models", a._rig != null and Rig.joint(a._rig, "LegL1") != null)
+	_check("wildlife wear their models", a._rig != null and RigPose.new(a._rig).has("LegL1"))
 	a._glow_mat.emission_energy_multiplier = 9.0
 	_check("one scuttler's glow doesn't light the pack", b._glow_mat != a._glow_mat and b._glow_mat.emission_energy_multiplier < 9.0)
 	a._flash()

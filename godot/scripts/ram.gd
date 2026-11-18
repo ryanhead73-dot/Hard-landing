@@ -83,7 +83,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if state == State.CHARGE and get_slide_collision_count() > 0:
 		_check_wall()
-	_visual.rotation.z = sin(Time.get_ticks_msec() * 0.03) * 0.08 if state == State.STUNNED else 0.0
+	# The stunned sway is in its clip.
 
 
 func _wander_step() -> Vector3:

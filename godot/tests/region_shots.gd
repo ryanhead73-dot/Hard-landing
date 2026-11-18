@@ -226,8 +226,8 @@ func _gillwood(out: String, r: RegionScene) -> void:
 	await _frames(5)
 	for v in flyers:
 		v.set_physics_process(false)
-	flyers[1]._wings[0].rotation.z = -0.7
-	flyers[1]._wings[1].rotation.z = 0.7
+	# The second one flares (its state picks the flare clip).
+	flyers[1].state = Veilwing.State.FLARE
 	flyers[1]._gill_mat.emission_energy_multiplier = 4.0
 	await _shot(out, "gillwood_veilwing", vw_at + Vector3(1.0, -2.9, 6.0), vw_at + Vector3(1.0, -0.4, 0.0))
 	for v in flyers:

@@ -25,7 +25,6 @@ var state := State.IDLE
 
 var _timer := 0.0
 var _wander := Vector3.ZERO
-var _gait := 0.0
 var _visual: Node3D
 var _glow_mat: StandardMaterial3D
 var _shell: StandardMaterial3D
@@ -220,15 +219,10 @@ func _die() -> void:
 	tween.tween_callback(queue_free)
 
 
-func _animate(delta: float) -> void:
+func _animate(_delta: float) -> void:
 	if state == State.DEAD:
 		return
-	var moving := Vector2(velocity.x, velocity.z).length()
-	_gait += delta * (4.0 + moving * 3.0)
-	var crouch := 0.0
-	if state == State.WINDUP:
-		crouch = -0.18 * (1.0 - _timer / windup_time)
-	_visual.position.y = absf(sin(_gait)) * 0.06 * minf(moving, 1.0) + crouch
+	# The clips carry the bob and the wind-up crouch (feet stay planted).
 	_glow_mat.emission_energy_multiplier = 4.0 if state == State.WINDUP else (2.0 if state != State.IDLE else 0.8)
 
 

@@ -66,7 +66,8 @@ func _physics_process(delta: float) -> void:
 		State.APPROACH:
 			flat_vel = _approach(delta)
 		State.SLAM_WINDUP:
-			_visual.position.y = 1.2 * (1.0 - _timer / 1.1)
+			# The clip rears it up; this lifts it off its feet for the leap.
+			_visual.position.y = 0.6 * (1.0 - _timer / 1.1)
 			_core.emission_energy_multiplier = 1.0 + 5.0 * (1.0 - _timer / 1.1)
 			if _timer <= 0.0:
 				_slam()
