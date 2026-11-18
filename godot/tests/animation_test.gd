@@ -61,8 +61,10 @@ func _surface_gap(model: Node3D, meshes: Array[Node], palm: Vector3) -> float:
 func _juno_grips() -> void:
 	var a := player.anim
 	var w := player.weapon
-	_place(ARENA, 0.0)
+	# The clear ground east of the ship is flat at world Y = 0.
+	_place(Vector3(22.0, 0.5, 0.0), 0.0)
 	await _frames(30)
+	_check("roll sweep starts on flat ground", player.is_on_floor() and absf(player.global_position.y) < .005)
 	a.tree.active = false
 	for id in ["rifle", "scattergun", "arc_lance"]:
 		if id != "rifle":
@@ -76,6 +78,7 @@ func _juno_grips() -> void:
 		_check("%s forward support marker" % id,
 			grip != null and model.to_local(grip.global_position).distance_to(GRIP_L) < .002)
 		var fore_end := Rig.joint(model, "Pump") if id == "scattergun" else model
+		var gun_meshes := model.find_children("*", "MeshInstance3D", true, false)
 		var meshes := fore_end.find_children("*", "MeshInstance3D", true, false)
 		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim", "jump", "land", "roll", "reload"]:
 			a._clips.play(clip)
@@ -83,6 +86,7 @@ func _juno_grips() -> void:
 			var length := a._clips.get_animation(clip).length
 			var steps := ceili(length * 60)
 			var worst := Vector2.ZERO
+			var lowest := INF
 			var elbow_min := INF
 			var check_elbow: bool = clip in ["idle", "walk", "run", "aim"]
 			var surface_max := 0.0
@@ -94,6 +98,11 @@ func _juno_grips() -> void:
 					continue
 				a._clips.seek(length * i / steps, true)
 				await get_tree().process_frame
+				if clip == "roll":
+					for node in gun_meshes:
+						var part := node as MeshInstance3D
+						var bounds := part.global_transform * part.get_aabb()
+						lowest = minf(lowest, bounds.position.y)
 				if check_elbow:
 					elbow_min = minf(elbow_min, a.bone_pos("ArmR").y - a.bone_pos("ForearmR").y)
 				worst.x = maxf(worst.x, _grip_gap("R"))
@@ -109,6 +118,9 @@ func _juno_grips() -> void:
 					pitch_max = maxf(pitch_max, pitch)
 			_check("%s %s max grip gap" % [id, clip], worst.x < .06 and worst.y < .08,
 				"R %.4f m, L %.4f m" % [worst.x, worst.y])
+			if clip == "roll":
+				_check("%s roll gun clearance" % id, is_finite(lowest) and lowest >= -.05,
+					"%.4f m above floor" % lowest)
 			if check_elbow:
 				_check("%s %s right elbow drop" % [id, clip], elbow_min >= (0.0 if clip == "aim" else .12),
 					"%.4f m min" % elbow_min)
