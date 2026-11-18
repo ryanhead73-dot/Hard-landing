@@ -786,8 +786,8 @@ def build_model():
 # The rifle: where it sits in the hold and when aiming, as (position, Godot degrees) in the
 # spine's frame (so it rides the hips, lean and crouch, but not the chest's twist).
 HOLD_W = ((0.13, 1.27, -0.40), (-10, 0, 0))
-LOW_READY = ((.075, 1.39, -.22), (-19, 0, 0))
-AIM_W = ((0.095, 1.51, -0.30), (0, 0, 0))
+LOW_READY = ((.205, 1.405, -.33), (-19, 5, 0))
+AIM_W = ((0.19, 1.54, -0.34), (0, 0, 0))
 # Where the hands go on the rifle, in the weapon's own frame (-z is the muzzle).
 GRIP_R = (0.0, -0.12, 0.17)
 GRIP_L = (0.0, -0.118, -0.27)
@@ -888,6 +888,12 @@ def solve(arm, pose, offsets):
         rots[b.name] = _godot_rot(pose.get(b.name, (0, 0, 0)))
         locs[b.name] = bm.g(*(offsets or {}).get(b.name, (0, 0, 0)))
     w = pose.get("_w", HOLD_W)
+    if w is not None and w[0] in (LOW_READY[0], AIM_W[0]):
+        # Blade the shoulders so the trigger arm clears the ribs while the
+        # opposite shoulder reaches forward. Keep her gaze along her heading.
+        turn = _godot_rot((0, -34, 0))
+        rots["Chest"] = rots["Chest"] @ turn
+        rots["Neck"] = turn.inverted() @ rots["Neck"]
     posed = _fk(arm, rots, locs)
     for side, (ankle, pitch) in pose.get("_feet", {}).items():
         _plant(arm, posed, rots, side, ankle, pitch)
@@ -1086,7 +1092,7 @@ def build_actions(arm):
                     ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
                     height = min(height, ceiling - (pelvis.z + socket.z))
             pose = _merge(HOLD, {
-                "_w": (LOW_READY[0], (LOW_READY[1][0] - lean, 0, 0)),
+                "_w": (LOW_READY[0], (LOW_READY[1][0] - lean, LOW_READY[1][1], 0)),
                 "_feet": gait_feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
                 "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
                 "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
@@ -1108,7 +1114,7 @@ def build_actions(arm):
     # Keep the soles down as the crouched torso breathes.
     crouch = {"_feet": feet,
               "Spine": (-20, 0, 0), "Chest": (-4, 0, 0), "Head": (18, 0, 0), "_w": ((0.13, 1.27, -0.40), (14, 0, 0))}
-    low_hold = _merge(HOLD, crouch, {"_w": (LOW_READY[0], (1, 0, 0))})
+    low_hold = _merge(HOLD, crouch, {"_w": (LOW_READY[0], (1, LOW_READY[1][1], 0))})
     action(arm, "crouch", [(1, low_hold, {"Hips": (0, -0.42, 0)}),
                            (31, _merge(low_hold, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
                            (61, low_hold, {"Hips": (0, -0.42, 0)})])
@@ -1148,15 +1154,15 @@ def build_actions(arm):
 
     # Reload (1.6 s): tilt the rifle, the left hand drops to the belt, pulls a cell, slaps it into
     # the magazine well, racks the bolt, back to the hold.
-    tilt = {"_w": ((0.1, 1.22, -0.36), (-16, 18, 30)), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
-    belt = {"_ikL": (-.44, -.24, .24)}
+    tilt = {"_w": ((0.1, 1.25, -0.43), (-16, 18, 30)), "_poleL": (-1, -.7, -.45), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
+    belt = {"_ikL": (-.58, -.18, .07)}
     insert = {"_ikL": (0.0, -0.24, 0.06)}
     slap = {"_ikL": (0.0, -0.17, 0.05)}
     rack = {"_ikL": (0.07, 0.03, 0.12)}
     action(arm, "reload", [
         (1, HOLD | {"_w": LOW_READY}, {}), (7, _merge(HOLD, tilt, slap), {}),
         (11, _merge(HOLD, tilt, insert), {}), (18, _merge(HOLD, tilt, belt), {}),
-        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.42, -.25, .20)}), {}),
+        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.56, -.20, .04)}), {}),
         (31, _merge(HOLD, tilt, insert), {}), (35, _merge(HOLD, tilt, slap, {"Chest": (2, 0, 0)}), {}),
         (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (.04,.015,.22)}), {}), (49, HOLD | {"_w": LOW_READY}, {}),
     ], loop=False)
