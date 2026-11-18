@@ -174,7 +174,21 @@ func _juno_unarmed() -> void:
 		left_leads = left_leads or (hands < -.20 and feet > .25)
 		right_leads = right_leads or (hands > .20 and feet < -.25)
 	_check("unarmed walking swings both arms opposite the legs", a.state == "walk" and left_leads and right_leads)
+	Input.action_press("sprint")
+	await _frames(40)
+	var elbow_l := _rot("ForearmL").x
+	var elbow_r := _rot("ForearmR").x
+	_check("unarmed running keeps both elbows bent", a.state == "run" and absf(elbow_l - 85) < 10
+		and absf(elbow_r - 85) < 10, "L %.1f, R %.1f degrees" % [elbow_l, elbow_r])
+	Input.action_release("sprint")
 	Input.action_release("move_forward")
+	await _frames(30)
+	a.play("interact")
+	var reach := 0.0
+	for i in 60:
+		await get_tree().physics_frame
+		reach = minf(reach, a.hand("L").z)
+	_check("unarmed interact reaches forward over the idle arms", reach < -.45, "hand z %.2f m" % reach)
 	player.armed = true
 	await _frames(36)
 	_check("equipping returns both hands to the rifle", _grip_gap("R") < .06 and _grip_gap("L") < .08,
