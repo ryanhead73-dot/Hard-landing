@@ -4,6 +4,7 @@ extends "res://tests/test_base.gd"
 ## sweep and the crash intro. Run:
 ##   godot --headless --path . res://tests/animation_test.tscn
 
+const GRIP_L := Vector3(0, -0.118, -0.27)
 const ARENA := Vector3(45.0, 0.5, 45.0)
 
 
@@ -43,6 +44,19 @@ func _grip_gap(side: String) -> float:
 	return a.hand(side).distance_to(a.skeleton.to_local(grip.global_position))
 
 
+## Cast from the palm towards the underside, against imported render triangles.
+func _surface_gap(model: Node3D, meshes: Array[Node], palm: Vector3) -> float:
+	var nearest := INF
+	var end := palm + model.global_basis.y.normalized() * 0.04
+	for node in meshes:
+		var part := node as MeshInstance3D
+		var triangles := part.mesh.generate_triangle_mesh()
+		var hit := triangles.intersect_segment(part.to_local(palm), part.to_local(end))
+		if not hit.is_empty():
+			nearest = minf(nearest, palm.distance_to(part.to_global(hit.position)))
+	return nearest
+
+
 ## Seek the equipped player's imported clips at 60 Hz, including the entire four-second idle.
 func _juno_grips() -> void:
 	var a := player.anim
@@ -58,28 +72,44 @@ func _juno_grips() -> void:
 		_check("%s equipped for grip checks" % id, w.shown_model() == id and w.current == id)
 		var model: Node3D = w._models[id]
 		var muzzle := Rig.joint(model, "Muzzle")
-		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall"]:
+		var grip := Rig.joint(model, "GripL")
+		_check("%s forward support marker" % id,
+			grip != null and model.to_local(grip.global_position).distance_to(GRIP_L) < .002)
+		var fore_end := Rig.joint(model, "Pump") if id == "scattergun" else model
+		var meshes := fore_end.find_children("*", "MeshInstance3D", true, false)
+		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim", "reload"]:
 			a._clips.play(clip)
 			a._clips.pause()
 			var length := a._clips.get_animation(clip).length
 			var steps := ceili(length * 60)
 			var worst := Vector2.ZERO
+			var surface_max := 0.0
+			var yaw_max := 0.0
 			var pitch_min := 90.0
 			var pitch_max := -90.0
 			for i in range(steps + 1):
+				if clip == "reload" and i != 0 and i != steps:
+					continue
 				a._clips.seek(length * i / steps, true)
 				await get_tree().process_frame
 				worst.x = maxf(worst.x, _grip_gap("R"))
 				worst.y = maxf(worst.y, _grip_gap("L"))
+				var forward := player.rig.global_basis.inverse() * -muzzle.global_basis.z.normalized()
+				if clip in ["idle", "walk"]:
+					yaw_max = maxf(yaw_max, absf(rad_to_deg(atan2(forward.x, -forward.z))))
 				if clip == "idle":
-					var forward := -muzzle.global_basis.z.normalized()
+					var palm := a.skeleton.to_global(a.hand("L"))
+					surface_max = maxf(surface_max, _surface_gap(model, meshes, palm))
 					var pitch := rad_to_deg(asin(-forward.y))
 					pitch_min = minf(pitch_min, pitch)
 					pitch_max = maxf(pitch_max, pitch)
 			_check("%s %s max grip gap" % [id, clip], worst.x < .06 and worst.y < .08,
 				"R %.4f m, L %.4f m" % [worst.x, worst.y])
+			if clip in ["idle", "walk"]:
+				_check("%s %s muzzle yaw" % [id, clip], yaw_max <= 15, "%.2f degrees max" % yaw_max)
 			if clip == "idle":
-				_check("%s idle muzzle pitch" % id, pitch_min >= 10 and pitch_max <= 30,
+				_check("%s idle palm to surface" % id, surface_max <= .04, "%.4f m max" % surface_max)
+				_check("%s idle muzzle pitch" % id, pitch_min >= 15 and pitch_max <= 25,
 					"%.2f to %.2f degrees down" % [pitch_min, pitch_max])
 	a._clips.stop()
 	a.tree.active = true
