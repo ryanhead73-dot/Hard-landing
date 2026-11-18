@@ -18,11 +18,12 @@ const ACTIONS := {"install": 1.4, "interact": 0.8, "stim": 0.9, "throw": 0.75}
 const TWO_HANDED := ["install"]
 ## Actions that need the whole body; the others play on the upper body over her legs.
 const FULL_BODY := ["install"]
-const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "ArmR", "ForearmR", "WeaponMount"]
+const UPPER_BONES := ["Spine", "Chest", "Neck", "Head", "ArmL", "ForearmL", "HandL", "FingersL", "ThumbL",
+	"ArmR", "ForearmR", "HandR", "FingersR", "ThumbR", "WeaponMount"]
 const LOOPS := ["idle", "walk", "run", "crouch", "crouch_walk", "fall", "aim"]
 ## Metres the walk, run and crouch-walk clips cover per cycle at normal speed (0.8 s each).
-const WALK_CYCLE := 2.6
-const RUN_CYCLE := 3.6
+const WALK_CYCLE := 2.72
+const RUN_CYCLE := 4.32
 const CROUCH_CYCLE := 1.4
 const CYCLE_TIME := 0.8
 ## Elbow to the middle of the glove: where the hands are, for tests and effects.
@@ -49,6 +50,7 @@ var _carry := 0.0
 var _down := 0.0
 var _was_reloading := false
 var _was_rolling := false
+var _was_grounded := false
 var _was_dead := false
 var _weapon_rest := Vector3.ZERO
 
@@ -85,6 +87,21 @@ func play(action_name: String) -> bool:
 			tree.set("parameters/upper_pick/transition_request", action_name)
 			tree.set("parameters/upper_act/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 	return true
+
+
+func _physics_process(_delta: float) -> void:
+	if tree == null:
+		return
+	var grounded := player.is_on_floor()
+	if grounded and not _was_grounded:
+		# The player retains the impact speed until its next grounded physics tick.
+		var hv := Vector2(player.velocity.x, player.velocity.z).length()
+		if player._airborne_speed < -3.0 and hv < player.walk_speed * 0.5 \
+				and not player.crouching and not player.dead and not player.is_rolling():
+			tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	elif not grounded and _was_grounded:
+		tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+	_was_grounded = grounded
 
 
 func _process(delta: float) -> void:
@@ -158,7 +175,7 @@ func _drive_tree(hv: float) -> void:
 	if player.dead != _was_dead:
 		t.set("parameters/alive/transition_request", "dead" if player.dead else "alive")
 		if player.dead:
-			for shot in ["reload", "upper_act", "full_act", "roll"]:
+			for shot in ["reload", "upper_act", "full_act", "roll", "land"]:
 				t.set("parameters/%s/request" % shot, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
 	_was_dead = player.dead
 
@@ -174,7 +191,9 @@ func _build_tree() -> void:
 		for i in a.get_track_count():
 			if a.track_get_key_count(i) > 0:
 				last = maxf(last, a.track_get_key_time(i, a.track_get_key_count(i) - 1))
-		if last > 0.0:
+		if clip in ["walk", "run", "crouch_walk"]:
+			a.length = CYCLE_TIME
+		elif last > 0.0:
 			a.length = last
 	var bt := AnimationNodeBlendTree.new()
 	_node(bt, "idle", _clip("idle"))
@@ -196,6 +215,8 @@ func _build_tree() -> void:
 	_node(bt, "fall", _clip("fall"))
 	_node(bt, "air", AnimationNodeBlend2.new())
 	_node(bt, "body", AnimationNodeBlend2.new())
+	_node(bt, "land_clip", _clip("land"))
+	_node(bt, "land", _shot(.025, .10))
 	_node(bt, "aim_clip", _clip("aim"))
 	_node(bt, "aim", _upper(AnimationNodeBlend2.new()))
 	_node(bt, "reload_clip", _clip("reload"))
@@ -233,7 +254,9 @@ func _build_tree() -> void:
 	bt.connect_node("air", 1, "fall")
 	bt.connect_node("body", 0, "ground")
 	bt.connect_node("body", 1, "air")
-	bt.connect_node("aim", 0, "body")
+	bt.connect_node("land", 0, "body")
+	bt.connect_node("land", 1, "land_clip")
+	bt.connect_node("aim", 0, "land")
 	bt.connect_node("aim", 1, "aim_clip")
 	bt.connect_node("reload_speed", 0, "reload_clip")
 	bt.connect_node("reload", 0, "aim")
