@@ -27,8 +27,6 @@ const WALK_CYCLE := 2.72
 const RUN_CYCLE := 4.32
 const CROUCH_CYCLE := 1.4
 const CYCLE_TIME := 0.8
-## Elbow to the middle of the glove: where the hands are, for tests and effects.
-const HAND := 0.35
 
 var player: Player
 var model: Node3D
@@ -390,10 +388,11 @@ func bone_pos(bone: String) -> Vector3:
 
 ## The middle of a hand ("L" or "R"), in the model's space.
 func hand(side: String) -> Vector3:
-	var b := skeleton.find_bone("Forearm" + side) if skeleton else -1
+	var b := skeleton.find_bone("Hand" + side) if skeleton else -1
 	if b < 0:
 		return Vector3.ZERO
-	return _pose(b) * Vector3(0.0, HAND, 0.0)
+	var knuckles := skeleton.find_bone("Fingers" + side)
+	return _pose(b) * (skeleton.get_bone_rest(knuckles).origin * 0.5)
 
 
 ## A point given in the weapon's own frame, in the model's space.

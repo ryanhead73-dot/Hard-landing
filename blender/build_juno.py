@@ -786,11 +786,11 @@ def build_model():
 # The rifle: where it sits in the hold and when aiming, as (position, Godot degrees) in the
 # spine's frame (so it rides the hips, lean and crouch, but not the chest's twist).
 HOLD_W = ((0.13, 1.27, -0.40), (-10, 0, 0))
+LOW_READY = ((.12, 1.29, -.35), (-19, 8, 0))
 AIM_W = ((0.095, 1.51, -0.40), (0, 0, 0))
 # Where the hands go on the rifle, in the weapon's own frame (-z is the muzzle).
 GRIP_R = (0.0, -0.12, 0.17)
 GRIP_L = (0.0, -0.06, -0.12)
-HAND = 0.35  # elbow to the middle of the glove
 # Elbows point down and out, the right one a little back (Godot axes, chest frame).
 POLE = {"L": (-0.45, -1.0, 0.05), "R": (0.55, -1.0, 0.35)}
 
@@ -850,7 +850,9 @@ def _solve_arm(arm, posed, rots, side, target, pole_direction):
     up = arm.data.bones["Arm" + side]
     lo = arm.data.bones["Forearm" + side]
     a = (lo.head_local - up.head_local).length
-    b = HAND
+    palm = arm.data.bones["Hand" + side]
+    v0 = (palm.head_local + palm.tail_local) * .5 - lo.head_local
+    b = v0.length
     c3 = _carried(arm, posed, "Arm" + side).to_3x3()
     s = posed["Arm" + side].translation
     d_vec = target - s
@@ -864,7 +866,6 @@ def _solve_arm(arm, posed, rots, side, target, pole_direction):
     hand = s + dirv * d
     u0 = lo.head_local - up.head_local
     w_up = u0.rotation_difference(c3.inverted() @ (elbow - s)).to_matrix()
-    v0 = bm.g(0, -HAND, 0)
     cf = c3 @ w_up
     w_lo = v0.rotation_difference(cf.inverted() @ (hand - elbow)).to_matrix()
     rots["Arm" + side] = w_up
@@ -1016,9 +1017,8 @@ def build_actions(arm):
     for i in range(33):
         t = i % 32 / 32 * TAU
         breath, shift = math.sin(2*t), math.sin(t)
-        adjust = max(0, -math.cos(t))**4
         pose = _merge(HOLD, {
-            "_feet": feet, "_w": ((.13, 1.27+.022*adjust, -.40+.012*adjust), (-10+5*adjust,0,2*adjust)),
+            "_feet": feet, "_w": LOW_READY,
             "Hips": (0, 2*shift, -2*shift), "Spine": (-2+1.7*breath, 0, 2.5*shift),
             "Chest": (1.3*breath, 3*shift, 0), "Head": (-breath, 13*math.sin(t-.45), -shift),
             "PackMount": (-1.1*math.sin(2*t-.5), -shift, 0)})
@@ -1075,6 +1075,7 @@ def build_actions(arm):
                     ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
                     height = min(height, ceiling - (pelvis.z + socket.z))
             pose = _merge(HOLD, {
+                "_w": (LOW_READY[0], (LOW_READY[1][0] - lean, 8, 0)),
                 "_feet": gait_feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
                 "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
                 "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
@@ -1096,9 +1097,10 @@ def build_actions(arm):
     # Keep the soles down as the crouched torso breathes.
     crouch = {"_feet": feet,
               "Spine": (-20, 0, 0), "Chest": (-4, 0, 0), "Head": (18, 0, 0), "_w": ((0.13, 1.27, -0.40), (14, 0, 0))}
-    action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
-                           (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
-                           (61, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)})])
+    low_hold = _merge(HOLD, crouch, {"_w": (LOW_READY[0], (1, 8, 0))})
+    action(arm, "crouch", [(1, low_hold, {"Hips": (0, -0.42, 0)}),
+                           (31, _merge(low_hold, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
+                           (61, low_hold, {"Hips": (0, -0.42, 0)})])
     # The retained torso turn puts the right shoulder farther outside its knee.
     low = _merge(HOLD, crouch) | free_arms(24, 14, 0) | {"ArmR": (22, 0, -17)}
     action(arm, "crouch_free", [(1, low, {"Hips": (0, -.42, 0)}),
@@ -1118,7 +1120,7 @@ def build_actions(arm):
               "Spine": (-4, 0, 0), "Head": (6, 0, 0)}
     fall_b = {"LegL": (18, 0, -8), "ShinL": (-34, 0, 0), "LegR": (12, 0, 8), "ShinR": (-30, 0, 0),
               "Spine": (-6, 0, 0), "Head": (8, 0, 0)}
-    balance = _merge(HOLD, {"_ikL": None, "ArmL": (18,0,-53), "ForearmL": (35,0,-9),
+    balance = _merge(HOLD, {"_w": LOW_READY,
                             "_poleR": (.9,-.5,.2)})
     action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
 
