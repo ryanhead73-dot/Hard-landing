@@ -454,8 +454,11 @@ func _save_load() -> void:
 	player = main.player
 	await _frames(20)
 	_check("load restores repairs", kestrel.is_repaired("canopy") and not kestrel.is_repaired("landing_gear") and Game.current_repair() == "landing_gear")
-	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.carrying == "struts" and Game.phase() == "return",
+	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.phase() == "return",
 		"scrap %d, mag %s, stims %d, charges %d, carrying %s, phase %s" % [Game.scrap, Game.has_upgrade("extended_mag"), Game.stims, Game.charges, Game.carrying, Game.phase()])
+	# The gear is salvaged in the Gillwood now: a part carried home in the Kettle by an older save
+	# counts as sent home (see Main.load_state), waiting at the install bay.
+	_check("a sourced part carried in a Kettle save loads as delivered", Game.carrying == "" and Game.delivered("struts"))
 	_check("load restores weapons and ammo", Game.owns_weapon("scattergun") and Game.ammo_in_mag("scattergun") == 3 and Game.ammo_reserve("scattergun") == 20 and player.weapon.current == "scattergun")
 	var gear2: QuarryCrawler = main.sites["landing_gear"]
 	_check("load restores site state", not gear2.has_component() and gear2.crate_searched(1) and not gear2.crate_searched(0))

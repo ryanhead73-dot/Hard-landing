@@ -565,11 +565,16 @@ func _regions() -> void:
 	await _frames(3)
 	await _press("interact")
 	# Well clear of the hoist while the drone comes down off the ridge and the brood wakes.
+	# On a slow machine the drone takes longer, and the brood by the hoist is only a few metres
+	# on: she's here to watch the drone, not to fight them, so nothing they do can kill her.
+	var keep_alive := func(_a: float): player.health = player.max_health()
+	player.damaged.connect(keep_alive)
 	_place(gw.to_global(GearEscort.START + Vector3(-4.0, 0.5, 0.0)), 0.0)
 	gear_wait = 0.0
 	while gear_wait < 14.0 and ge.at < 5:
 		await get_tree().physics_frame
 		gear_wait += get_physics_process_delta_time()
+
 	_check("a pod Juno burst first lets it pass", ge.at == 5 and ge.jams == 1, "at %d, jams %d" % [ge.at, ge.jams])
 	# Path recovery: a fresh escort built from the flags puts the drone back where it was.
 	var ge2 := GearEscort.new()
@@ -600,6 +605,7 @@ func _regions() -> void:
 	_check("at the hoist the strut goes up and home", ge.done() and Game.delivered("struts"), "at %d" % ge.at)
 	await get_tree().create_timer(1.6).timeout
 	_check("both off: the quest is done and the waypoint points home", main.quests.is_done("ferro_9") and rm.waypoint().distance_to(gw.exit_global()) < 2.0, "quest %s, step %d, waypoint %s, dead %s, hp %.0f" % [main.quests.state_of("ferro_9"), main.quests.step_of("ferro_9"), rm.waypoint() - gw.exit_global(), player.dead, player.health])
+	player.damaged.disconnect(keep_alive)
 	_check("the canopy sits on its skids and the strut lies on the ground", gw.canopy.position.y < 1.5 and gw.strut.global_position.y - gw.global_position.y < 1.5)
 	# The Gillwood's own creature: roosts under the caps, flares, swoops; stepping aside dodges.
 	_check("veilwings roost in the Gillwood", gw.residents.filter(func(r): return r[0] == "veilwing").size() == 3)
