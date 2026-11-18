@@ -16,6 +16,7 @@ func _run() -> void:
 	_clear_enemies()
 	_juno_contacts()
 	await _juno_locomotion()
+	await _juno_grips()
 	await _juno_unarmed()
 	await _juno_landings()
 	await _juno_upper_body()
@@ -33,8 +34,57 @@ func _rot(joint: String) -> Vector3:
 
 
 func _grip_gap(side: String) -> float:
+	var weapon := player.weapon
+	var model: Node3D = weapon._models[weapon.shown_model()]
+	var grip := Rig.joint(model, "Grip" + side)
+	if grip == null:
+		return INF
 	var a := player.anim
-	return a.hand(side).distance_to(a.weapon_point(Vector3(0.0, -0.12, 0.17) if side == "R" else Vector3(0.0, -0.06, -0.12)))
+	return a.hand(side).distance_to(a.skeleton.to_local(grip.global_position))
+
+
+## Seek the equipped player's imported clips at 60 Hz, including the entire four-second idle.
+func _juno_grips() -> void:
+	var a := player.anim
+	var w := player.weapon
+	_place(ARENA, 0.0)
+	await _frames(30)
+	a.tree.active = false
+	for id in ["rifle", "scattergun", "arc_lance"]:
+		if id != "rifle":
+			Game.give_weapon(id)
+			w.equip(id)
+			await _frames(30)
+		_check("%s equipped for grip checks" % id, w.shown_model() == id and w.current == id)
+		var model: Node3D = w._models[id]
+		var muzzle := Rig.joint(model, "Muzzle")
+		for clip in ["idle", "walk", "run", "crouch", "crouch_walk", "fall"]:
+			a._clips.play(clip)
+			a._clips.pause()
+			var length := a._clips.get_animation(clip).length
+			var steps := ceili(length * 60)
+			var worst := Vector2.ZERO
+			var pitch_min := 90.0
+			var pitch_max := -90.0
+			for i in range(steps + 1):
+				a._clips.seek(length * i / steps, true)
+				await get_tree().process_frame
+				worst.x = maxf(worst.x, _grip_gap("R"))
+				worst.y = maxf(worst.y, _grip_gap("L"))
+				if clip == "idle":
+					var forward := -muzzle.global_basis.z.normalized()
+					var pitch := rad_to_deg(asin(-forward.y))
+					pitch_min = minf(pitch_min, pitch)
+					pitch_max = maxf(pitch_max, pitch)
+			_check("%s %s max grip gap" % [id, clip], worst.x < .06 and worst.y < .08,
+				"R %.4f m, L %.4f m" % [worst.x, worst.y])
+			if clip == "idle":
+				_check("%s idle muzzle pitch" % id, pitch_min >= 10 and pitch_max <= 30,
+					"%.2f to %.2f degrees down" % [pitch_min, pitch_max])
+	a._clips.stop()
+	a.tree.active = true
+	w.equip("rifle")
+	await _frames(30)
 
 
 ## Sample both boots through heel strike, flat support and toe-off on the imported rig.

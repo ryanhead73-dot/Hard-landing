@@ -59,6 +59,7 @@ func _ready() -> void:
 		var at: Vector3 = site.to_global(shot[2]) if site else shot[2]
 		var look: Vector3 = site.to_global(shot[3]) if site else shot[3]
 		main.player.revive(at)
+		main.player.armed = shot[0] != "juno_unarmed"
 		var flat := look - at
 		main.player.face(atan2(-flat.x, -flat.z))
 		main.player.aim_at(look)
@@ -238,6 +239,7 @@ func _shots() -> Array:
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
 		["thief", "landing_gear", Vector3(-6.0, 0.5, 9.0), Vector3(-12.5, 0.6, 4.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
+		["juno_unarmed", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["juno_swap", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
