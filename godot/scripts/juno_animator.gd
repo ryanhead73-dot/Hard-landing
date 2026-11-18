@@ -50,7 +50,7 @@ var _carry := 0.0
 var _down := 0.0
 var _was_reloading := false
 var _was_rolling := false
-var _was_falling := false
+var _was_grounded := false
 var _was_dead := false
 var _weapon_rest := Vector3.ZERO
 
@@ -89,6 +89,21 @@ func play(action_name: String) -> bool:
 	return true
 
 
+func _physics_process(_delta: float) -> void:
+	if tree == null:
+		return
+	var grounded := player.is_on_floor()
+	if grounded and not _was_grounded:
+		# The player retains the impact speed until its next grounded physics tick.
+		var hv := Vector2(player.velocity.x, player.velocity.z).length()
+		if player._airborne_speed < -3.0 and hv < player.walk_speed * 0.5 \
+				and not player.crouching and not player.dead and not player.is_rolling():
+			tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	elif not grounded and _was_grounded:
+		tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+	_was_grounded = grounded
+
+
 func _process(delta: float) -> void:
 	if player == null:
 		return
@@ -111,9 +126,6 @@ func _process(delta: float) -> void:
 	state = _state_name(hv, grounded)
 	if tree:
 		_drive_tree(hv)
-		if grounded and _was_falling and not player.dead and not player.is_rolling():
-			tree.set("parameters/land/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
-	_was_falling = not grounded and player.velocity.y < 0.0 and not player.dead
 	var w := player.weapon
 	w.position = _weapon_rest + Vector3(0.0, 0.0, 0.06 * _recoil)
 	w.visible = player.armed and not (action in TWO_HANDED) and _down < 0.5

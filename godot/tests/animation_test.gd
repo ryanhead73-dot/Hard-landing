@@ -16,6 +16,7 @@ func _run() -> void:
 	_clear_enemies()
 	_juno_contacts()
 	await _juno_locomotion()
+	await _juno_landings()
 	await _juno_upper_body()
 	await _juno_down()
 	await _wildlife()
@@ -145,6 +146,53 @@ func _juno_locomotion() -> void:
 			low_hips = minf(low_hips, a.bone_pos("Hips").y)
 	_check("touchdown absorbs weight and recovers", landed and low_hips < .81 and a.bone_pos("Hips").y > .86
 		and is_equal_approx(a._clips.get_animation("land").length, .35), "lowest hips %.2f" % low_hips)
+
+
+func _juno_landings() -> void:
+	var a := player.anim
+	for approach in ["running", "crouched", "slow"]:
+		_place(ARENA, 0.0)
+		await _frames(20)
+		if approach == "running":
+			Input.action_press("move_forward")
+			Input.action_press("sprint")
+			await _frames(30)
+		await _press("jump")
+		var airborne := not player.is_on_floor()
+		if approach == "crouched":
+			Input.action_press("crouch")
+		var landed := false
+		var touchdown_speed := 0.0
+		var touchdown_crouched := false
+		var impact_speed := 0.0
+		var recovery := false
+		for i in 75:
+			await get_tree().physics_frame
+			if not landed and airborne and player.is_on_floor():
+				landed = true
+				touchdown_speed = Vector2(player.velocity.x, player.velocity.z).length()
+				touchdown_crouched = player.crouching
+				impact_speed = -player._airborne_speed
+			recovery = recovery or bool(a.tree.get("parameters/land/active"))
+			if approach == "slow" and landed and recovery:
+				break
+		Input.action_release("move_forward")
+		Input.action_release("sprint")
+		Input.action_release("crouch")
+		var real_landing := landed and impact_speed > 3.0
+		match approach:
+			"running":
+				_check("running touchdown skips landing recovery", real_landing and touchdown_speed > player.walk_speed + 0.5
+					and not touchdown_crouched and not recovery)
+			"crouched":
+				_check("crouched touchdown skips landing recovery", real_landing and touchdown_crouched
+					and touchdown_speed < player.walk_speed * 0.5 and not recovery)
+			"slow":
+				_check("slow standing touchdown starts landing recovery", real_landing and not touchdown_crouched
+					and touchdown_speed < player.walk_speed * 0.5 and recovery)
+				await _press("jump")
+				_check("jumping during landing recovery aborts it", recovery and not player.is_on_floor()
+					and player.velocity.y > 0.0 and not a.tree.get("parameters/land/active"))
 
 
 func _juno_upper_body() -> void:
