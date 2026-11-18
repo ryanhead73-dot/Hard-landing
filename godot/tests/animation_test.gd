@@ -16,6 +16,7 @@ func _run() -> void:
 	_clear_enemies()
 	_juno_contacts()
 	await _juno_locomotion()
+	await _juno_unarmed()
 	await _juno_landings()
 	await _juno_upper_body()
 	await _juno_down()
@@ -146,6 +147,38 @@ func _juno_locomotion() -> void:
 			low_hips = minf(low_hips, a.bone_pos("Hips").y)
 	_check("touchdown absorbs weight and recovers", landed and low_hips < .81 and a.bone_pos("Hips").y > .86
 		and is_equal_approx(a._clips.get_animation("land").length, .35), "lowest hips %.2f" % low_hips)
+
+
+func _juno_unarmed() -> void:
+	var a := player.anim
+	_place(ARENA, 0.0)
+	player.armed = false
+	Input.action_press("aim")
+	await _frames(36)
+	for side in ["L", "R"]:
+		var gap := _grip_gap(side)
+		var height := a.hand(side).y
+		_check("unarmed idle lowers hand %s even with aim held" % side,
+			a.state == "idle" and gap >= .25 and height < a.bone_pos("Chest").y,
+			"grip gap %.2f m, hand height %.2f m" % [gap, height])
+	Input.action_release("aim")
+	Input.action_press("move_forward")
+	await _frames(30)
+	# Check both exchanges in model space. A stationary hand cannot pass both.
+	var left_leads := false
+	var right_leads := false
+	for i in 72:
+		await get_tree().physics_frame
+		var hands := a.hand("L").z - a.hand("R").z
+		var feet := a.bone_pos("FootL").z - a.bone_pos("FootR").z
+		left_leads = left_leads or (hands < -.20 and feet > .25)
+		right_leads = right_leads or (hands > .20 and feet < -.25)
+	_check("unarmed walking swings both arms opposite the legs", a.state == "walk" and left_leads and right_leads)
+	Input.action_release("move_forward")
+	player.armed = true
+	await _frames(36)
+	_check("equipping returns both hands to the rifle", _grip_gap("R") < .06 and _grip_gap("L") < .08,
+		"R %.3f m, L %.3f m" % [_grip_gap("R"), _grip_gap("L")])
 
 
 func _juno_landings() -> void:
