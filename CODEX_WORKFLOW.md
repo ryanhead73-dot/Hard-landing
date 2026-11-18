@@ -3,8 +3,8 @@
 ## Agent context
 - **Claude (overseer and QA):** writes task briefs, reviews diffs, runs and checks tests, approves or rejects work. Does not do bulk edits.
 - **GPT / Codex (workhorse):** does the implementation. Can generate images and control Blender.
-  - **Sol 6.2:** main worker agent. Default for GDScript features, tests, refactors and batch fixes.
-  - **Astra 5.2:** covers harder tasks, such as Blender work (scripts, rigs, animation) and tricky systems.
+  - **Sol (`gpt-6.2-sol`):** main worker agent. Default for GDScript features, tests, refactors and batch fixes.
+  - **Astra (`gpt-6.2-astra`):** covers harder tasks, such as Blender work (scripts, rigs, animation) and tricky systems.
 - **Chrome connections:** both Claude and GPT have Chrome access. Claude in Chrome can review ChatGPT's browser output (e.g. images). GPT's Chrome connection can handle web-only tasks.
 - The project already has its own context (see `AGENTS.md` / `CLAUDE.md`). This file covers how to use Codex properly and efficiently.
 
@@ -37,3 +37,15 @@
 - Agents must not delete tests or assets to get a check passing.
 - Review anything touching the save format by hand.
 - Verify the Astra/Sol model names and strengths in Codex's model picker; swap roles if real behaviour differs.
+
+## Running Codex from a Claude cloud session
+- The `/codex:*` plugin commands are not available in cloud sessions; drive the CLI directly:
+  `npm i -g @openai/codex`, then `codex login --device-auth` (Jake enters the code shown at
+  auth.openai.com/codex/device; signing in elsewhere does not carry over).
+- The environment must allow `api.openai.com`, `chatgpt.com` and `auth.openai.com`.
+- One git worktree per task branch. Run with the sandbox on:
+  `codex exec -m gpt-6.2-astra -c model_reasoning_effort="high" -s workspace-write
+  -c 'sandbox_workspace_write.writable_roots=[...]' -C <worktree> -o <result.md> - < prompt.txt`
+  (add the main repo's `.git`, Godot's user dir and any output folder as writable roots).
+- Codex has image generation (`image_generation` feature) for concept and reference images.
+- Review: `codex review` in the task worktree.
