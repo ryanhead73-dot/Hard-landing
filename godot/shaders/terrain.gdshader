@@ -1,7 +1,8 @@
 shader_type spatial;
 // The basin floor: wet black basalt with cellular cracks, slate in the low wet ground, teal moss
 // in the creases and round the pools, glowing veins that come up at dusk. Vertex colour carries
-// the masks baked by CrashSite: r = wetness, g = moss, b = cliff (steep rock).
+// the masks baked by CrashSite: r = wetness, g = moss, b = cliff (steep rock), a = 1 off the worn
+// tracks between the ship and the sites, 0 on them.
 
 uniform sampler2D basalt_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D basalt_normal : hint_normal, filter_linear_mipmap, repeat_enable;
@@ -37,6 +38,9 @@ void fragment() {
 	float wet = clamp(COLOR.r + (big - 0.5) * 0.35, 0.0, 1.0);
 	float moss = smoothstep(0.45, 0.7, COLOR.g * 0.85 + (fine - 0.5) * 0.9 + (big - 0.5) * 0.5) * (1.0 - COLOR.b);
 	float cliff = COLOR.b;
+	// Worn tracks: paler, scuffed, no moss, broken up at the edges so they don't read as roads.
+	float track = clamp((1.0 - COLOR.a) * (0.75 + (fine - 0.5) * 0.9), 0.0, 1.0);
+	moss *= 1.0 - track;
 
 	// Ash-grey drifts and darker glassy flows at the large scale, cells and cracks up close.
 	float ash = smoothstep(0.55, 0.8, big);
@@ -47,7 +51,8 @@ void fragment() {
 	wet = max(wet, flow * 0.6);
 	rock = mix(rock, slate_color * mix(0.7, 1.1, cells), wet * 0.6);
 	rock = mix(rock, basalt_color * 0.8 * cells, cliff);
-	vec3 col = mix(rock, moss_color * mix(0.6, 1.2, fine), moss);
+	rock = mix(rock, vec3(0.16, 0.155, 0.15) * mix(0.75, 1.1, cells) * mix(0.9, 1.1, fine), track * 0.55);
+	vec3 col = mix(rock, moss_color * mix(0.8, 1.7, fine), moss);
 	// Cracks between the cells catch a faint teal from below, stronger at dusk.
 	float crack = smoothstep(0.5, 0.44, cells) * (1.0 - cliff) * smoothstep(0.4, 0.7, big);
 	float soak = rain * (1.0 - cliff * 0.5);
@@ -56,5 +61,6 @@ void fragment() {
 	SPECULAR = mix(mix(0.5, 0.7, wet), 0.75, soak);
 	NORMAL_MAP = triplanar(basalt_normal, p, w).rgb;
 	NORMAL_MAP_DEPTH = mix(2.2, 0.4, moss);
-	EMISSION = glow_color * (crack * 0.04) * glow;
+	// Moss gives off a faint teal of its own, so patches read through the haze by day.
+	EMISSION = glow_color * (crack * 0.04 * glow + moss * 0.012 * (0.5 + glow));
 }

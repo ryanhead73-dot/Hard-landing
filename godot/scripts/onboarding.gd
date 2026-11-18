@@ -2,8 +2,9 @@ class_name Onboarding
 extends Node
 ## First-time hints, shown one at a time when they become useful instead of a wall of controls:
 ## move and look at the start, sprint on the long walk out, aim and fire when something first
-## hunts Juno, the roll when she's first hurt, a stim when she's low. Each shows once per save
-## (Game.hints_seen) and clears when the player does the thing, or after a while.
+## hunts Juno, the roll when she's first hurt, a stim when she's low, flanking when shots first
+## glance off armour. Each shows once per save (Game.hints_seen) and clears when the player does
+## the thing, or after a while.
 
 ## id: [keyboard text, pad text, seconds before it gives up]
 const HINTS := {
@@ -12,6 +13,7 @@ const HINTS := {
 	"fight": ["[RMB] aim   [LMB] fire   Glowing spines take critical hits", "[LT] aim   [RT] fire   Glowing spines take critical hits", 14.0],
 	"dodge": ["[V] roll through a lunge: you can't be hurt at the start of it", "[B] roll through a lunge: you can't be hurt at the start of it", 10.0],
 	"stim": ["[Q] use a stim to patch the suit", "[LB] use a stim to patch the suit", 10.0],
+	"armor": ["Shots are glancing off its armour: hit it from the side or behind, or when it opens up", "Shots are glancing off its armour: hit it from the side or behind, or when it opens up", 10.0],
 }
 
 var main: Node
@@ -20,6 +22,9 @@ var _left := 0.0
 var _start := Vector3.ZERO
 var _sprinted := 0.0
 var _hits := 0
+## Hits that did full damage since the armour hint showed.
+var _clean_hits := 0
+var _armor_pending := false
 var _quiet := 0.0
 var enabled := true
 
@@ -27,7 +32,10 @@ var enabled := true
 func setup(m: Node) -> void:
 	main = m
 	main.player.damaged.connect(func(_a): _on_hurt())
-	main.player.weapon.hit_confirmed.connect(func(_k): _hits += 1)
+	main.player.weapon.hit_confirmed.connect(func(_k):
+		_hits += 1
+		_clean_hits += 1)
+	main.player.weapon.deflected.connect(_on_deflected)
 	Game.input_device_changed.connect(func(_p): _show())
 
 
@@ -61,12 +69,18 @@ func finish() -> void:
 
 func _show() -> void:
 	if current != "":
-		main.hud.show_hint(HINTS[current][1 if Game.using_pad else 0])
+		main.hud.show_hint(HINTS[current][1] if Game.using_pad else Game.keyboard_text(HINTS[current][0]))
 
 
 func _on_hurt() -> void:
 	if current == "" and not seen("dodge") and _quiet <= 0.0:
 		offer("dodge")
+
+
+func _on_deflected() -> void:
+	_clean_hits -= 1
+	if not seen("armor"):
+		_armor_pending = true
 
 
 func _process(delta: float) -> void:
@@ -81,7 +95,11 @@ func _process(delta: float) -> void:
 		return
 	if _quiet > 0.0:
 		return
-	if not seen("move"):
+	if _armor_pending and not seen("armor"):
+		_armor_pending = false
+		if offer("armor"):
+			_clean_hits = 0
+	elif not seen("move"):
 		offer("move")
 	elif _hunted() and not seen("fight"):
 		offer("fight")
@@ -105,6 +123,8 @@ func _done(p: Player, delta: float) -> bool:
 			return p.is_rolling()
 		"stim":
 			return p.health >= p.max_health() * 0.9
+		"armor":
+			return _clean_hits >= 2
 	return true
 
 

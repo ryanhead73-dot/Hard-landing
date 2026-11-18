@@ -39,8 +39,15 @@ func _ready() -> void:
 		"k_aft": [Vector3(32, 7, -14), centre], "k_top": [Vector3(-14, 22, -18), centre],
 		"k_gear": [Vector3(6.0, 0.9, -8.0), Vector3(1.5, 0.6, -2.6)],
 		"k_mast": [Vector3(14.0, 7.5, -5.0), Vector3(10.0, 5.0, 0.0)],
+		"k_nose": [Vector3(-9.0, 2.6, 10.5), Vector3(-9.5, 2.0, 3.5)],
+		"k_port": [Vector3(6, 5, -32), centre],
+		"k_low": [Vector3(-26, 2.0, 15), Vector3(-3, 2.5, 0)],
 	}
+	# Optional third argument: only the views whose names contain it.
+	var only: String = OS.get_cmdline_user_args()[2] if OS.get_cmdline_user_args().size() > 2 else ""
 	for name in views:
+		if only != "" and not only.contains(name):
+			continue
 		cam.position = views[name][0]
 		cam.look_at(views[name][1])
 		for i in 6:

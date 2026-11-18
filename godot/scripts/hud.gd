@@ -3,11 +3,23 @@ extends CanvasLayer
 ## On-screen readouts for the slice: objective and waypoint, crosshair, ammo, health, scrap,
 ## interaction prompt, messages, damage feedback and a dev panel (F1).
 
-const HELP_TEXT := "WASD move · Mouse look · RMB aim · LMB fire · R reload · 1-3 / wheel weapons · Q stim · G arc charge · Tab inventory · M map · L logs · Shift sprint · Space jump · V roll · C crouch · E interact · F flashlight"
+## The keyboard controls line, from the player's current key bindings.
+static func help_text() -> String:
+	var k := func(a: String) -> String: return Game.key_label(a)
+	return "%s%s%s%s move · Mouse look · RMB aim · LMB fire · %s reload · %s/%s/%s, wheel weapons · %s stim · %s arc charge · %s inventory · %s map · %s logs · %s sprint · %s jump · %s roll · %s crouch · %s interact · %s flashlight" % [
+		k.call("move_forward"), k.call("move_left"), k.call("move_back"), k.call("move_right"), k.call("reload"),
+		k.call("weapon_1"), k.call("weapon_2"), k.call("weapon_3"), k.call("stim"), k.call("throw"), k.call("inventory"),
+		k.call("map"), k.call("logs"), k.call("sprint"), k.call("jump"), k.call("dodge"), k.call("crouch"),
+		k.call("interact"), k.call("flashlight")]
 
 var _objective: Label
 var _hidden_for_cinematic: Array = []
 var _waypoint: Label
+## The tracked side job's marker, in teal so it never reads as the main objective.
+var _job_marker: Label
+var _job_target = null
+## A few words after the job marker's distance (a timed job's clock).
+var job_note := ""
 var _crosshair: Control
 var _ammo: Label
 var _health_fill: ColorRect
@@ -59,10 +71,15 @@ var _banner_time := 0.0
 var _hit_time := 0.0
 var _hit_killed := false
 var _hit_crit := false
+var _hit_armor := false
+## Glancing-hit markers shown (tests).
+var armor_shown := 0
 var crits_shown := 0
 ## Recent hits on Juno: [world position of the source, seconds left], drawn as red arcs.
 var _hurt_marks: Array = []
 var _message_time := 0.0
+## The waypoint marker hides inside this distance of the camera (the prompt takes over).
+const WAYPOINT_HIDE := 3.0
 var _waypoint_target = null
 
 
@@ -71,7 +88,8 @@ func _ready() -> void:
 	_help = _label("small")
 	_anchor(_help, 0.5, 1.0, -640, -26, 640, -8)
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_help.text = HELP_TEXT
+	_help.text = help_text()
+	Game.keys_changed.connect(func(): _help.text = PAD_HELP_TEXT if Game.using_pad else help_text())
 	# The full list lives in the pause menu; play teaches through one-at-a-time hints instead.
 	_help.visible = false
 	_help_time = 0.0
@@ -106,6 +124,7 @@ func _ready() -> void:
 	add_child(_scan)
 
 	_waypoint = _label("small", UiStyle.ORANGE)
+	_job_marker = _label("small", UiStyle.TEAL)
 
 	_crosshair = Control.new()
 	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -198,6 +217,11 @@ func _ready() -> void:
 	_voice.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	_voice.add_theme_constant_override("shadow_offset_x", 1)
 	_voice.add_theme_constant_override("shadow_offset_y", 1)
+	_size_subtitles()
+	Game.settings_changed.connect(func():
+		_size_subtitles()
+		if Game.subtitles == 0:
+			_voice.visible = false)
 	# An outline keeps them legible over bright sky, steam and the cream hull alike.
 	_voice.add_theme_constant_override("outline_size", 6)
 	_voice.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.04, 0.85))
@@ -315,6 +339,15 @@ func set_waypoint(target) -> void:
 	_waypoint_target = target
 
 
+## The side job's marker (SideJobs.waypoint()), or null.
+func set_job_waypoint(target) -> void:
+	_job_target = target
+
+
+func job_marker_visible() -> bool:
+	return _job_marker.visible
+
+
 func show_hint(text: String) -> void:
 	_hint.text = text
 	_hint.visible = text != ""
@@ -397,9 +430,10 @@ func hurt_mark_count() -> int:
 
 
 func hitmarker(killed: bool) -> void:
-	_hit_time = 0.15
+	_hit_time = 0.22 if killed else 0.15
 	_hit_killed = killed
 	_hit_crit = false
+	_hit_armor = false
 
 
 ## The hit marker for a weak-spot hit: bigger, amber, and it lingers a touch.
@@ -409,7 +443,19 @@ func crit_marker() -> void:
 	crits_shown += 1
 
 
+## The hit marker for a shot that glanced off armour: short, grey ticks over a flat bar, so it
+## reads as "that did little" next to the white hit and the amber crit.
+func armor_marker() -> void:
+	_hit_time = 0.18
+	_hit_armor = true
+	armor_shown += 1
+
+
 ## Scanner contacts to draw: [{pos: Vector3, kind: "crate" | "enemy"}].
+## The planted field beacon (Vector3) in this region, or null; shown on the compass.
+var beacon_target = null
+
+
 func set_scan(marks: Array) -> void:
 	_scan_marks = marks
 
@@ -479,13 +525,28 @@ func ending_text() -> String:
 	return _ending_text.text
 
 
+## Subtitle name colours. The name is always printed, so the colour is a help, never the only cue.
+const SPEAKER_COLOURS := {
+	Story.HOB: "9fe8d8",
+	Story.JUNO: "ffd08a",
+	Story.REYES: "c9b8ff",
+}
+
+
 func set_voice(speaker: String, text: String) -> void:
-	_voice.visible = text != ""
+	_voice.visible = text != "" and Game.subtitles > 0
 	if text == "":
 		_voice.text = ""
 		return
-	var colour := "9fe8d8" if speaker == Story.HOB else "ffd08a"
+	var colour: String = SPEAKER_COLOURS.get(speaker, "e9e1cc")
 	_voice.text = "[center][b][color=#%s]%s[/color][/b]   %s[/center]" % [colour, speaker.to_upper(), text]
+
+
+## Subtitle size from the accessibility setting.
+func _size_subtitles() -> void:
+	var k: float = Game.SUBTITLE_SCALE[Game.subtitles]
+	_voice.add_theme_font_size_override("normal_font_size", roundi((UiStyle.size("body") + 1) * k))
+	_voice.add_theme_font_size_override("bold_font_size", roundi((UiStyle.size("body") + 3) * k))
 
 
 func voice_text() -> String:
@@ -516,7 +577,13 @@ func _draw_scan() -> void:
 		if cam.is_position_behind(pos):
 			continue
 		var p := cam.unproject_position(pos)
-		if m["kind"] == "crate":
+		if m["kind"] == "beacon":
+			var bc := Color(FieldBeacon.COLOR, 0.9)
+			_scan.draw_line(p + Vector2(0, -10), p + Vector2(0, 8), bc, 2.0)
+			_scan.draw_circle(p + Vector2(0, -12), 3.5, bc)
+			var dist := cam.global_position.distance_to(m["pos"])
+			_scan.draw_string(UiStyle.font("heading"), p + Vector2(7, -6), "%d m" % roundi(dist), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bc)
+		elif m["kind"] == "crate":
 			var col := Color(1.0, 0.7, 0.3, 0.8)
 			_scan.draw_polyline(PackedVector2Array([p + Vector2(0, -6), p + Vector2(6, 0), p + Vector2(0, 6), p + Vector2(-6, 0), p + Vector2(0, -6)]), col, 1.5)
 		else:
@@ -533,11 +600,18 @@ func set_dev(visible_now: bool, text: String) -> void:
 
 
 func _update_waypoint() -> void:
+	_place_marker(_waypoint, _waypoint_target, "◆")
+	_place_marker(_job_marker, _job_target, "◇")
+	if _job_marker.visible and job_note != "":
+		_job_marker.text += "  " + job_note
+
+
+func _place_marker(marker: Label, at, glyph: String) -> void:
 	var cam := get_viewport().get_camera_3d()
-	if _waypoint_target == null or cam == null:
-		_waypoint.visible = false
+	if at == null or cam == null:
+		marker.visible = false
 		return
-	var target: Vector3 = _waypoint_target
+	var target: Vector3 = at
 	var screen := get_viewport().get_visible_rect().size
 	var dist := cam.global_position.distance_to(target)
 	var pos: Vector2
@@ -545,11 +619,15 @@ func _update_waypoint() -> void:
 		var flat := cam.global_basis.inverse() * (target - cam.global_position)
 		pos = Vector2(0.0 if flat.x < 0.0 else screen.x, screen.y * 0.5)
 	else:
-		pos = cam.unproject_position(target + Vector3.UP * 2.0)
+		# It floats above the goal: well clear from a distance, just over it up close (a goal a
+		# few metres away indoors would otherwise be marked up in the ceiling).
+		pos = cam.unproject_position(target + Vector3.UP * clampf(dist * 0.15, 0.3, 2.0))
 	pos = pos.clamp(Vector2(40, 90), screen - Vector2(140, 160))
-	_waypoint.text = "◆ %d m" % roundi(dist)
-	_waypoint.position = pos - Vector2(20, 10)
-	_waypoint.visible = dist > 6.0
+	marker.text = "%s %d m" % [glyph, roundi(dist)]
+	marker.position = pos - Vector2(20, 10)
+	# Hidden only once she's within reach of it, where the prompt takes over. (It used to hide
+	# inside 6 m, which left the opening's goals aboard the wreck with no marker at all.)
+	marker.visible = dist > WAYPOINT_HIDE
 
 
 ## The camera's heading in degrees: 0 is north (-Z), 90 east (+X).
@@ -582,6 +660,13 @@ func _draw_compass() -> void:
 			_compass.draw_string(font, Vector2(x - lw * 0.5, 20), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(UiStyle.CREAM, fade))
 		else:
 			_compass.draw_line(Vector2(x, 14 if deg % 45 else 10), Vector2(x, 22), Color("e9e1cc", 0.6 * fade), 1.0)
+	if beacon_target is Vector3:
+		var bd: Vector3 = beacon_target - cam.global_position
+		var bb := fposmod(rad_to_deg(atan2(bd.x, -bd.z)), 360.0)
+		var boff := clampf(wrapf(bb - heading, -180.0, 180.0), -COMPASS_SPAN, COMPASS_SPAN)
+		var bx := w + boff / COMPASS_SPAN * w
+		_compass.draw_line(Vector2(bx, 3), Vector2(bx, 14), FieldBeacon.COLOR, 2.0)
+		_compass.draw_circle(Vector2(bx, 3), 2.5, FieldBeacon.COLOR)
 	if _waypoint_target is Vector3:
 		var d: Vector3 = _waypoint_target - cam.global_position
 		var bearing := fposmod(rad_to_deg(atan2(d.x, -d.z)), 360.0)
@@ -618,11 +703,21 @@ func _draw_crosshair() -> void:
 			var a := -PI * 0.5 + off
 			var alpha := clampf(m[1], 0.0, 1.0)
 			_crosshair.draw_arc(c, 96.0, a - 0.32, a + 0.32, 14, Color(1.0, 0.22, 0.12, 0.75 * alpha), 5.0, true)
-	if _hit_time > 0.0:
-		var hit_col := Color("ff5a3a") if _hit_killed else (Color("ffc84a") if _hit_crit else Color.WHITE)
-		var reach := 19.0 if _hit_crit else 15.0
+	if _hit_time > 0.0 and _hit_armor:
+		var grey := Color(0.68, 0.74, 0.8, clampf(_hit_time / 0.18, 0.0, 1.0) * 0.5 + 0.5)
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-			_crosshair.draw_line(c + d * 8.0, c + d * reach, hit_col, 3.0 if _hit_crit else 2.5)
+			_crosshair.draw_line(c + d * 8.0, c + d * 11.0, grey, 2.0)
+		_crosshair.draw_line(c + Vector2(-9.0, 16.0), c + Vector2(9.0, 16.0), grey, 2.0)
+	elif _hit_time > 0.0:
+		var hit_col := Color("ff5a3a") if _hit_killed else (Color("ffc84a") if _hit_crit else Color.WHITE)
+		# A kill is told apart by shape as well as colour (long, heavy strokes with a dark edge),
+		# so it reads for colour-blind players too.
+		var reach := 22.0 if _hit_killed else (19.0 if _hit_crit else 15.0)
+		var width := 4.0 if _hit_killed else (3.0 if _hit_crit else 2.5)
+		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+			if _hit_killed:
+				_crosshair.draw_line(c + d * 7.0, c + d * (reach + 1.0), Color(0, 0, 0, 0.55), width + 2.5)
+			_crosshair.draw_line(c + d * 8.0, c + d * reach, hit_col, width)
 		if _hit_crit:
 			_crosshair.draw_arc(c, 24.0, 0.0, TAU, 24, Color(1.0, 0.78, 0.29, _hit_time / 0.22 * 0.8), 2.0, true)
 
@@ -648,7 +743,7 @@ func _anchor(control: Control, ax: float, ay: float, left: float, top: float, ri
 
 
 func _on_device_changed(pad: bool) -> void:
-	_help.text = PAD_HELP_TEXT if pad else HELP_TEXT
+	_help.text = PAD_HELP_TEXT if pad else help_text()
 	set_prompt(_prompt_raw)
 	set_stims(_stims_last.x, _stims_last.y)
 	set_charges(_charges_last.x, _charges_last.y)

@@ -5,31 +5,124 @@ extends Node3D
 var continue_button: Button
 var new_button: Button
 
+var settings: PauseMenu
+var credits: CreditsPanel
+var _menu: CanvasLayer
 var _difficulty: OptionButton
+var _warning: Label
+## Seconds left to press New game again to confirm starting over on top of a save.
+var _confirm_left := 0.0
+const CONFIRM_TIME := 4.0
 var _camera: Camera3D
 var _t := 0.0
 
 
 func _ready() -> void:
 	Game.reset()
+	# Keyboard bindings, so Settings > Key bindings and the controls line read right here too.
+	if Game.default_keys.is_empty():
+		Game.default_keys = (load("res://scripts/main.gd") as Script).get_script_constant_map()["KEYS"].duplicate(true)
+		Game.apply_keys()
 	_build_scene()
 	_build_menu()
+	# Start loading the game in the background while the player is on the menu.
+	ResourceLoader.load_threaded_request(MAIN_SCENE)
 	Sfx.loop_flat("wind_loop", self, -14.0, "Ambience")
 	Sfx.loop_flat("music_calm", self, -10.0, "Music")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# `-- --benchmark [low|medium|high]` runs the benchmark straight away.
+	var args := OS.get_cmdline_user_args()
+	if "--benchmark" in args:
+		for i in Game.GRAPHICS_NAMES.size():
+			if Game.GRAPHICS_NAMES[i].to_lower() in args:
+				Game.graphics = i
+		get_tree().change_scene_to_file.call_deferred("res://scenes/benchmark.tscn")
 
 
 func _process(delta: float) -> void:
+	if _confirm_left > 0.0:
+		_confirm_left -= delta
+		if _confirm_left <= 0.0:
+			new_button.text = "New game"
+			_warning.visible = false
+	if not settings.visible and not settings.bindings.visible and not credits.visible:
+		UiStyle.keep_pad_focus(_menu, continue_button if not continue_button.disabled else new_button)
 	# A slow drift around the wreck.
 	_t += delta * 0.04
 	_camera.position = Vector3(cos(_t) * 38.0, 9.0, sin(_t) * 38.0 + 6.0)
 	_camera.look_at(Vector3(0.0, 2.5, 0.0))
 
 
+## New game. With a save on disk, the first press asks (the button changes and a line says what
+## will happen); a second press within a few seconds starts over.
+func _new_game() -> void:
+	if continue_button.disabled or _confirm_left > 0.0:
+		start(false)
+		return
+	_confirm_left = CONFIRM_TIME
+	new_button.text = "Start over? Press again"
+	_warning.visible = true
+
+
+## Shown while the basin loads, one at random.
+const TIPS := [
+	"You can't be hurt in the first third of a dodge roll.",
+	"Shots glance off a ram's head plate. Get round its flank.",
+	"The arc lance locks up anything it doesn't kill, for half a second.",
+	"Crawlways need you to crouch.",
+	"Rest in Kestrel's bunk to save and heal.",
+	"Follow the coloured light column to the site you're heading for.",
+	"Arc charges ignore armour and shove a whole pack back.",
+	"Every repair gives Kestrel something new. Check the fabricator after each one.",
+]
+const MAIN_SCENE := "res://scenes/main.tscn"
+
+var loading: Control
+
+
 func start(load_save: bool) -> void:
+	if loading and loading.visible:
+		return
 	Game.pending_load = Game.read_save() if load_save else {}
 	Game.intro_pending = not load_save
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_show_loading()
+	# Two frames so the loading card is on screen before the load blocks.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var scene: PackedScene
+	if ResourceLoader.load_threaded_get_status(MAIN_SCENE) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		scene = ResourceLoader.load_threaded_get(MAIN_SCENE)
+	if scene == null:
+		scene = load(MAIN_SCENE)
+	get_tree().change_scene_to_packed(scene)
+
+
+func _show_loading() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 20
+	add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.04, 0.05, 0.92)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	loading = dim
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	box.alignment = BoxContainer.ALIGNMENT_END
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.offset_left = 90
+	box.offset_right = -90
+	box.offset_bottom = -80
+	dim.add_child(box)
+	var head := Label.new()
+	head.text = "LOADING"
+	UiStyle.apply(head, "banner", UiStyle.AMBER)
+	box.add_child(head)
+	var tip := Label.new()
+	tip.name = "Tip"
+	tip.text = TIPS[randi() % TIPS.size()]
+	UiStyle.apply(tip, "lead")
+	box.add_child(tip)
 
 
 func _build_scene() -> void:
@@ -50,6 +143,9 @@ func _build_scene() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color("3a3540")
 	env.fog_density = 0.006
+	env.adjustment_enabled = true
+	env.adjustment_brightness = Game.brightness
+	Game.settings_changed.connect(func(): env.adjustment_brightness = Game.brightness)
 	var world := WorldEnvironment.new()
 	world.environment = env
 	add_child(world)
@@ -71,6 +167,7 @@ func _build_scene() -> void:
 
 func _build_menu() -> void:
 	var layer := CanvasLayer.new()
+	_menu = layer
 	add_child(layer)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
@@ -86,7 +183,12 @@ func _build_menu() -> void:
 	box.add_child(Control.new())
 	continue_button = _button(box, "Continue", start.bind(true))
 	continue_button.disabled = Game.read_save().is_empty()
-	new_button = _button(box, "New game", start.bind(false))
+	new_button = _button(box, "New game", _new_game)
+	_warning = Label.new()
+	_warning.text = "Your saved campaign is replaced the first time you rest or install."
+	UiStyle.apply(_warning, "small", UiStyle.AMBER)
+	_warning.visible = false
+	box.add_child(_warning)
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = "Difficulty  "
@@ -100,7 +202,23 @@ func _build_menu() -> void:
 		Game.save_settings())
 	row.add_child(_difficulty)
 	box.add_child(row)
+	settings = PauseMenu.new()
+	settings.from_title = true
+	add_child(settings)
+	settings.closed.connect(func(): _difficulty.selected = Game.difficulty)
+	credits = CreditsPanel.new()
+	add_child(credits)
+	_button(box, "Settings", settings.open).name = "Settings"
+	var bench := _button(box, "Benchmark", func(): get_tree().change_scene_to_file("res://scenes/benchmark.tscn"))
+	bench.tooltip_text = "A one-minute run through the slice that measures frame times and saves a report."
+	_button(box, "Credits", credits.open).name = "Credits"
 	_button(box, "Quit", func(): get_tree().quit())
+	var version := Label.new()
+	version.name = "Version"
+	version.text = "v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
+	UiStyle.apply(version, "small", UiStyle.DIM)
+	layer.add_child(version)
+	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
 	# Anchor once the contents give it a size: left edge, centred vertically at any resolution.
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 90)

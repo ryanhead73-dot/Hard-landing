@@ -16,17 +16,66 @@
    "licence": "Project original",
    "author": "Hard Landing team"
   },
+  "jake_pbr": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-08 (Shatterlands PBR pack): generated albedos processed for tiling, normal and roughness derived from them; hull authored procedurally. No third-party imagery.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
   "godot": {
    "origin": "Godot Engine 4.7 (engine, default font and editor-generated resources)",
    "licence": "MIT (Godot Engine); default font Open Sans / Noto under OFL 1.1 via the engine",
    "author": "Godot Engine contributors",
-   "url": "https://godotengine.org/license"
+   "url": "https://godotengine.org/license",
+   "credit": "Godot Engine 4.7"
   },
   "barlow": {
    "origin": "Barlow and Barlow Condensed by Jeremy Tribby, via https://github.com/google/fonts/tree/main/ofl/barlow (downloaded 2026-11-06)",
    "licence": "SIL Open Font License 1.1 (fonts/OFL.txt ships beside the fonts)",
    "author": "The Barlow Project Authors",
-   "url": "https://github.com/jpt/barlow"
+   "url": "https://github.com/jpt/barlow",
+   "credit": "Barlow and Barlow Condensed typefaces"
+  },
+  "icon_script": {
+   "origin": "Drawn by tools/make_icon.py in this repository",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_audio": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-08 (Kestrel opening asset batches 01-04): original synthesised sound design and music loops, converted to the project's formats. No third-party recordings.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_assets": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Original_Assets.zip): original procedural synthesis and textures generated for this brief, no third-party samples or stock; converted to the project's formats.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_d": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Engine_Hall_and_Boss_Audio.zip): newly composed procedural synthesis and an engine-hall plating texture generated for this brief, no third-party samples, recordings or stock; audio resampled to 44.1 kHz.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_pack3": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Asset_Pack_3.zip): original synthesised music and sound design and two generated tiling materials, no third-party samples, recordings or stock; audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_pack4": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-09 (Hard_Landing_Asset_Pack_4.zip): original synthesised music and sound design and two generated tiling materials, no third-party samples, recordings or stock; audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "jake_gpt_pack5": {
+   "origin": "Made for Hard Landing by Jake, 2026-11-10 (Hard_Landing_Asset_Pack_5.zip): original synthesised music and creature and world sound design and two generated tiling materials, no third-party samples, recordings or stock; creature sequences cut at their cue points into separate cues and levelled, audio resampled to 44.1 kHz, music encoded to Ogg Vorbis.",
+   "licence": "Project original",
+   "author": "Hard Landing team"
+  },
+  "kokoro_tts": {
+   "origin": "HOB's voice: each line spoken by the Kokoro-82M text-to-speech model (voice bm_george, via kokoro-onnx, model files v1.0) on 2026-11-10, then given a ship-computer treatment by tools/audio/make_hob_voice.py and encoded to Ogg Vorbis",
+   "licence": "Apache License 2.0 (model weights and voices)",
+   "author": "hexgrad (Kokoro-82M); thewh1teagle (kokoro-onnx)",
+   "url": "https://huggingface.co/hexgrad/Kokoro-82M",
+   "credit": "Kokoro-82M text-to-speech (HOB's voice)"
   }
  },
  "tiers": {
@@ -73,6 +122,10 @@
    "source": "synth_music",
    "tier": "bed"
   },
+  "arc_jolt": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
   "arc_zap": {
    "source": "synth_sfx",
    "tier": "detail"
@@ -117,6 +170,10 @@
    "source": "synth_sfx",
    "tier": "detail"
   },
+  "hit_armor": {
+   "source": "synth_sfx",
+   "tier": "detail"
+  },
   "hit_crit": {
    "source": "synth_sfx",
    "tier": "detail"
@@ -150,6 +207,110 @@
    "tier": "foreground"
   },
   "loom_hum": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "ridge_thrum": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "ridge_heave": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "diver_grind": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "diver_erupt": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "pinweaver_click": {
+   "source": "jake_gpt_pack5",
+   "tier": "detail"
+  },
+  "thread_spool": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "thread_snap": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_drone": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_inhale": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "singer_chord": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "singer_pull": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "singer_call": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "boost_thrust": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "mirror_alarm": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "magnet_clamp": {
+   "source": "jake_gpt_pack3",
+   "tier": "hero"
+  },
+  "hoist_winch": {
+   "source": "jake_gpt_pack3",
+   "tier": "bed"
+  },
+  "cage_drop": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "resonator_tick": {
+   "source": "jake_gpt_pack3",
+   "tier": "detail"
+  },
+  "crown_tick": {
+   "source": "synth_sfx",
+   "tier": "foreground"
+  },
+  "resonator_lock": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "cantor_high": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_mid": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_low": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_wave": {
+   "source": "synth_sfx",
+   "tier": "hero"
+  },
+  "cantor_heart": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "cantor_anchor": {
    "source": "synth_sfx",
    "tier": "foreground"
   },
@@ -376,6 +537,278 @@
   "wind_loop": {
    "source": "synth_music",
    "tier": "bed"
+  },
+  "hob_chime": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "hob_warning": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "hob_warning_detuned": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "triple_click": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scanner_ping": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "med_seal": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "relay_two_note": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "breaker_clunk": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "fence_snap": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "relay_surge": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_cell_seat": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_rail_align": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "rifle_first_shot": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_hiss": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_chitter": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_attack": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "scuttler_step": {
+   "source": "jake_audio",
+   "tier": "foreground"
+  },
+  "music_ship_theme": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "music_sighting": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "music_first_fight": {
+   "source": "jake_audio",
+   "tier": "music"
+  },
+  "amb_basin_loop": {
+   "source": "jake_audio",
+   "tier": "bed"
+  },
+  "amb_gully_loop": {
+   "source": "jake_audio",
+   "tier": "bed"
+  },
+  "amb_cold_ship_loop": {
+   "source": "jake_audio",
+   "tier": "bed"
+  },
+  "hob_boot_sequence": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "aux_install_sting": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_low": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_mid": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "glass_wind_high": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "helmet_humming": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "seedpod_flash": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "dish_restart": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "crawlspace_hatch": {
+   "source": "jake_gpt_assets",
+   "tier": "foreground"
+  },
+  "rain_cup_drip": {
+   "source": "jake_gpt_assets",
+   "tier": "detail"
+  },
+  "guardian_roar": {
+   "source": "jake_gpt_d",
+   "tier": "hero"
+  },
+  "guardian_step": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "guardian_impact": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "guardian_hurt": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "cantor_drone": {
+   "source": "jake_gpt_d",
+   "tier": "bed"
+  },
+  "cantor_windup": {
+   "source": "jake_gpt_d",
+   "tier": "hero"
+  },
+  "finale_klaxon": {
+   "source": "jake_gpt_d",
+   "tier": "bed"
+  },
+  "launch_liftoff": {
+   "source": "jake_gpt_d",
+   "tier": "foreground"
+  },
+  "resonator_tick_low": {
+   "source": "jake_gpt_pack3",
+   "tier": "detail"
+  },
+  "resonator_tick_high": {
+   "source": "jake_gpt_pack3",
+   "tier": "detail"
+  },
+  "tether_snap": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "coolant_vent": {
+   "source": "jake_gpt_pack3",
+   "tier": "foreground"
+  },
+  "music_cantor": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "music_departure": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "music_ending": {
+   "source": "jake_gpt_pack3",
+   "tier": "music"
+  },
+  "guardian_wake": {
+   "source": "jake_gpt_pack4",
+   "tier": "hero"
+  },
+  "guardian_search": {
+   "source": "jake_gpt_pack4",
+   "tier": "bed"
+  },
+  "cantor_singer_join": {
+   "source": "jake_gpt_pack4",
+   "tier": "hero"
+  },
+  "cantor_death": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "shear_slide": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "thrust_cache_open": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "aux_breaker_trip": {
+   "source": "jake_gpt_pack4",
+   "tier": "foreground"
+  },
+  "music_patience": {
+   "source": "jake_gpt_pack4",
+   "tier": "music"
+  },
+  "music_crown": {
+   "source": "jake_gpt_pack4",
+   "tier": "music"
+  },
+  "veilwing_screech": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "veilwing_dive": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "veilwing_flap": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "airlock_open": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "beacon_plant": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "drone_hover": {
+   "source": "jake_gpt_pack5",
+   "tier": "bed"
+  },
+  "drone_chirp": {
+   "source": "jake_gpt_pack5",
+   "tier": "foreground"
+  },
+  "music_shatterlands": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_gillwood": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_loom": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
+  },
+  "music_region_combat": {
+   "source": "jake_gpt_pack5",
+   "tier": "music"
   }
  },
  "files": [
@@ -388,6 +821,46 @@
    "source": "blender_scripts"
   },
   {
+   "path": "assets/textures/shatterlands/shatterlands_ground/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/fungus_stem/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/fungus_cap_underside/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/hauler_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/basalt_hex_columns/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_palisade_scrap_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_grow_bed_soil/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/glasshouse_frame_metal/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_glass_clean/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/greenhouse_glass_dirty/*.png",
+   "source": "jake_pbr"
+  },
+  {
    "path": "assets/kestrel/*.glb",
    "source": "blender_scripts"
   },
@@ -398,6 +871,58 @@
   {
    "path": "fonts/*.ttf",
    "source": "barlow"
+  },
+  {
+   "path": "icon.*",
+   "source": "icon_script"
+  },
+  {
+   "path": "assets/textures/shatterlands/ferro9_hull/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/shatterlands/gillwood_floor/*.png",
+   "source": "jake_pbr"
+  },
+  {
+   "path": "assets/textures/kestrel/canopy_cracks.png",
+   "source": "jake_gpt_assets"
+  },
+  {
+   "path": "assets/textures/kestrel/markings_atlas.png",
+   "source": "jake_gpt_assets"
+  },
+  {
+   "path": "assets/textures/shatterlands/engine_hall_plating/*.png",
+   "source": "jake_gpt_d"
+  },
+  {
+   "path": "assets/textures/shatterlands/tuning_crown_stone/*.png",
+   "source": "jake_gpt_pack3"
+  },
+  {
+   "path": "assets/textures/shatterlands/living_fibre/*.png",
+   "source": "jake_gpt_pack3"
+  },
+  {
+   "path": "assets/textures/shatterlands/long_patience_hull/*.png",
+   "source": "jake_gpt_pack4"
+  },
+  {
+   "path": "assets/textures/shatterlands/hauler_cargo_deck/*.png",
+   "source": "jake_gpt_pack4"
+  },
+  {
+   "path": "assets/textures/shatterlands/loom_ridge_rock/*.png",
+   "source": "jake_gpt_pack5"
+  },
+  {
+   "path": "assets/textures/shatterlands/gillwood_bark/*.png",
+   "source": "jake_gpt_pack5"
+  },
+  {
+   "path": "audio/voice/hob/*.ogg",
+   "source": "kokoro_tts"
   }
  ]
 }

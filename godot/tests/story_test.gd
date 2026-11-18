@@ -5,6 +5,9 @@ extends "res://tests/test_base.gd"
 ##   godot --headless --path . res://tests/story_test.tscn
 
 
+## Where each region's logs are found (checked again in expansion_test, where the region loads).
+const REGION_SOURCES := {"shatterlands": ["marigold_locker"], "gillwood": ["ferro_cockpit"], "loom_expanse": ["survey_marker"], "long_patience": ["distress"]}
+
 func _name() -> String:
 	return "STORY TEST"
 
@@ -36,6 +39,14 @@ func _data() -> void:
 			var cache_src: String = l["source"]
 			if not cache_src.begins_with("cache:") or int(cache_src.substr(6)) >= main.wildlife.caches.size():
 				bad.append("no drift cache for " + key)
+			continue
+		if l["site"] in RegionDB.travel_regions():
+			if not REGION_SOURCES.get(l["site"], []).has(l["source"]):
+				bad.append("no place for " + key)
+			continue
+		if l["site"] == "discovery":
+			if not main.discoveries.ids().has(l["source"]):
+				bad.append("no discovery " + key)
 			continue
 		if Campaign.index_of(l["site"]) < 0:
 			bad.append("unknown site " + l["site"])
@@ -128,6 +139,7 @@ func _finale() -> void:
 	_check("objective says to start the spool", Game.objective_text().contains("spool"), Game.objective_text())
 	await _press("interact")
 	var f: Finale = main.finale
+	f.skip_crises()
 	_check("spool starts the final assault", f.state == Finale.State.SPOOLING and main.siege.active == ShipSiege.FINALE and main.siege.siege_enemies().size() > 0)
 	_check("objective: hold the hull", Game.objective_text().contains("Hold"), Game.objective_text())
 	await _frames(5)
@@ -157,6 +169,7 @@ func _finale() -> void:
 	# Second try, with an ordinary siege still armed: the finale folds it in.
 	main.siege.arm(2, 5.0)
 	await _press("interact")
+	f.skip_crises()
 	_check("starting the spool cancels a waiting siege", main.siege.pending == -1 and main.siege.active == ShipSiege.FINALE)
 	f.spool = Finale.SPOOL_TIME - 0.05
 	await _frames(6)
@@ -168,6 +181,7 @@ func _finale() -> void:
 	_check("the wildlife runs off and is gone", _enemy_count() == 0, "left=%d" % _enemy_count())
 
 	var y0 := kestrel.global_position.y
+	f.pulse_t = Finale.GAP_FROM + 0.1
 	await _press("interact")
 	_check("launch starts the cinematic", Game.launched and f.state == Finale.State.LAUNCHING and main._cine_cam != null and main.get_viewport().get_camera_3d() == main._cine_cam)
 	await _press("inventory")

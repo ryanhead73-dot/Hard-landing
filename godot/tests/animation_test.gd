@@ -18,6 +18,7 @@ func _run() -> void:
 	await _juno_upper_body()
 	await _juno_down()
 	await _wildlife()
+	await _lurker_emerge()
 	await _ship()
 	await _intro()
 	finished = true
@@ -224,6 +225,28 @@ func _wildlife() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_check("dead creatures curl their legs", is_instance_valid(sc) and sc.anim._dead > 0.9 and sc.anim.pose.rot_of("LegR1").z < -30.0)
 	_clear_enemies()
+
+
+## A lurker bursting out of its pool eases its jaw open over a few frames instead of snapping it.
+func _lurker_emerge() -> void:
+	var lk: Enemy = main.spawn_enemy("lurker", ARENA + Vector3(0.0, 0.0, -20.0))
+	lk.target = null
+	lk.set_physics_process(false)
+	await _frames(10)
+	var jaw_rest: float = _jaw(lk)
+	lk.state = Lurker.State.EMERGE
+	await _frames(1)
+	var jaw_first: float = _jaw(lk)
+	await get_tree().create_timer(0.6).timeout
+	var jaw_open: float = _jaw(lk)
+	_check("a lurker's jaw eases open as it emerges", absf(jaw_first - jaw_rest) < 15.0 and absf(jaw_open - jaw_rest) > 22.0,
+		"rest %.0f, first frame %.0f, after 0.6 s %.0f" % [jaw_rest, jaw_first, jaw_open])
+	_clear_enemies()
+
+
+func _jaw(e: Enemy) -> float:
+	var j: Node3D = e.anim.pose.node("Jaw")
+	return rad_to_deg(j.rotation.x) if j else 0.0
 
 
 func _ship() -> void:

@@ -84,7 +84,7 @@ func _build_quarry() -> void:
 func _build_crawler() -> void:
 	var steel := _mat(Color("3a3f43"), 0.5, 0.6)
 	var inner := _mat(Color("2a2d30"), 0.9)
-	Rig.spawn("site_crawler", self)
+	Rig.spawn_static("site_crawler", self)
 	AudioZones.reverb_area(self, Vector3(6.6, 3.2, 13.2), Vector3(0.0, BAY_FLOOR + 1.6, -8.0), 0.6)
 	for side in [-1.0, 1.0]:
 		_collider(Vector3(1.6, 1.6, 15.0), Vector3(side * 4.4, 0.8, -8.0))

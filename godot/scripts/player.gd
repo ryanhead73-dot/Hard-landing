@@ -2,6 +2,7 @@ class_name Player
 extends CharacterBody3D
 ## Third-person player: movement, over-the-shoulder aim, salvage rifle and health.
 
+signal stim_used
 signal health_changed(health: float, max_health: float)
 signal damaged(amount: float)
 signal died
@@ -37,6 +38,10 @@ signal died
 ## landing is kept until she lands.
 const COYOTE_TIME := 0.12
 const JUMP_BUFFER := 0.15
+## The engine's reward: the suit thrusters. A second press in the air kicks her up and forward,
+## once per jump, enough for a ledge about three metres up.
+const BOOST_UP := 6.0
+const BOOST_PUSH := 2.5
 ## How fast the camera eases back out after a wall pushed it in (m/s). It always snaps in.
 const BOOM_RECOVER := 3.5
 
@@ -54,7 +59,19 @@ const CLIMB := {"rifle": [0.22, 0.1], "scattergun": [1.6, 0.4], "arc_lance": [1.
 const CLIMB_RECOVER := 0.8
 
 var crouching := false
+## Strapped into a seat (the opening's approach): looks round, but no moving, jumping or shooting.
+var seated := false
+## The suit won't knit itself while it's punctured (the opening, until the med-seal goes on).
+var regen_blocked := false
+## Holding a working gun. The opening starts her without one until she builds the rifle.
+var armed := true:
+	set(value):
+		armed = value
+		if weapon:
+			weapon.visible = value
 var aiming := false
+## Toggle-aim mode: whether a press has latched aim on.
+var _aim_latched := false
 var dead := false
 var health := 100.0
 var weapon: Weapon
@@ -93,7 +110,6 @@ var _shake_noise := FastNoiseLite.new()
 var _shake_t := 0.0
 var _airborne_speed := 0.0
 var _sprinting := false
-var _stop_until := 0
 ## Where the last hit came from (world space), for the HUD's damage arcs.
 var last_hit_from := Vector3.ZERO
 ## Camera boom eased back out after a squeeze (see BOOM_RECOVER), and the node that carries it.
@@ -101,6 +117,11 @@ var _boom_smooth := 3.1
 var _boom: Node3D
 var _since_floor := 0.0
 var _jump_buffer := 0.0
+## Snagged (a Loom trip-thread, a loose pocket of weave): a slow walk and no sprint until it runs out.
+var snag_t := 0.0
+## Boosts used (tests read it); whether this jump's boost is spent.
+var boosts := 0
+var _boosted := false
 
 
 func _ready() -> void:
@@ -157,6 +178,7 @@ func _ready() -> void:
 	_pitch.add_child(_flashlight)
 
 	weapon = Weapon.new()
+	weapon.visible = armed
 	weapon.name = "Rifle"
 	weapon.camera = _camera
 	weapon.shooter = self
@@ -240,6 +262,16 @@ func take_damage(amount: float, from: Vector3 = Vector3.ZERO) -> bool:
 ## Shakes the camera. Amounts add up to 1.
 func add_trauma(amount: float) -> void:
 	trauma = minf(trauma + amount, 1.0)
+	Game.rumble(amount * 0.5, amount * 1.2, 0.1 + amount * 0.3)
+
+
+## Snags her for `secs` (see snag_t).
+func snag(secs: float) -> void:
+	snag_t = maxf(snag_t, secs)
+
+
+func is_sprinting() -> bool:
+	return _sprinting
 
 
 func is_rolling() -> bool:
@@ -247,6 +279,25 @@ func is_rolling() -> bool:
 
 
 ## In the untouchable opening of a roll.
+func can_boost() -> bool:
+	return Game.is_repaired("engine") and not _boosted and not dead and not seated and not crouching and not is_on_floor() \
+		and (Game.carrying == "" or Campaign.PACKS_LIGHT.has(Game.carrying))
+
+
+## The thrusters fire: up, and a little along the way she's facing.
+func boost() -> void:
+	_boosted = true
+	_jump_buffer = 0.0
+	boosts += 1
+	var fwd := -_body.global_basis.z
+	fwd.y = 0.0
+	velocity.y = maxf(velocity.y, 0.0) + BOOST_UP
+	velocity += fwd.normalized() * BOOST_PUSH
+	Sfx.play("boost_thrust", global_position, -2.0, 0.1)
+	if is_inside_tree():
+		Vfx.burst(get_parent(), global_position + Vector3.UP * 0.9 + _body.global_basis.z * 0.3, Color("ffb04a"), 14, 3.0, 0.05, 0.35, Vector3.DOWN, 30.0, 0.0)
+
+
 func is_dodging() -> bool:
 	return roll_t >= 0.0 and roll_t < ROLL_GUARD
 
@@ -262,20 +313,17 @@ func start_roll() -> bool:
 	dir.y = 0.0
 	_roll_dir = dir.normalized()
 	roll_t = 0.0
+	_aim_latched = false
 	_body.rotation.y = atan2(-_roll_dir.x, -_roll_dir.z)
 	Sfx.play("roll_whoosh", global_position, -4.0, 0.1)
 	return true
 
 
-## Freezes time for a beat (a kill landing). Skipped headless, where tests count frames.
+## Freezes time for a beat (a kill landing). Game owns the clock (see Game.hit_stop).
 func hit_stop(seconds: float) -> void:
-	if DisplayServer.get_name() == "headless" or get_tree().paused:
+	if get_tree().paused:
 		return
-	_stop_until = maxi(_stop_until, Time.get_ticks_msec() + int(seconds * 1000.0))
-	Engine.time_scale = 0.05
-	get_tree().create_timer(seconds, true, false, true).timeout.connect(func():
-		if Time.get_ticks_msec() >= _stop_until - 5:
-			Engine.time_scale = 1.0)
+	Game.hit_stop(seconds)
 
 
 func big_kill() -> void:
@@ -285,6 +333,7 @@ func big_kill() -> void:
 
 func _on_fired() -> void:
 	_kick += KICK.get(weapon.current, 0.04)
+	Game.rumble(clampf(KICK.get(weapon.current, 0.04) * 4.0, 0.15, 0.6), 0.0, 0.06)
 	var c: Array = CLIMB.get(weapon.current, [0.3, 0.1])
 	var up := deg_to_rad(float(c[0])) * (0.6 if aiming else 1.0)
 	_pitch.rotation.x = clampf(_pitch.rotation.x + up, deg_to_rad(-70.0), deg_to_rad(50.0))
@@ -303,6 +352,7 @@ func use_stim() -> bool:
 	health_changed.emit(health, max_health())
 	Sfx.play("stim", null, -4.0, 0.0)
 	anim.play("stim")
+	stim_used.emit()
 	return true
 
 
@@ -321,6 +371,7 @@ func throw_charge() -> ArcCharge:
 ## Back on your feet at `at`. A loaded game keeps its saved ammo, so it passes refill = false.
 func revive(at: Vector3, refill := true) -> void:
 	dead = false
+	_aim_latched = false
 	health = max_health()
 	velocity = Vector3.ZERO
 	global_position = at
@@ -343,7 +394,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * sens, deg_to_rad(-70.0), deg_to_rad(50.0))
 	elif event.is_action_pressed("flashlight"):
 		_flashlight.visible = not _flashlight.visible
-	elif event.is_action_pressed("reload") and not dead:
+	elif event.is_action_pressed("reload") and not dead and armed:
 		weapon.start_reload()
 	elif event.is_action_pressed("weapon_next") and not dead:
 		weapon.cycle(1)
@@ -352,7 +403,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Right-stick look: a power-1.6 response curve for fine aim near the centre, full speed at the
-## edge. Slower while aiming, like the mouse, and scaled by the sensitivity setting.
+## edge. Slower while aiming, like the mouse, and scaled by the controller sensitivity setting.
 func _pad_look(delta: float) -> void:
 	if dead or Game.dev_panel_open or get_tree().paused:
 		return
@@ -360,7 +411,7 @@ func _pad_look(delta: float) -> void:
 	if v == Vector2.ZERO:
 		return
 	v *= pow(v.length(), 0.6)
-	var speed := Game.pad_look_speed * (Game.mouse_sensitivity / 0.0025) * (aim_fov / fov if aiming else 1.0)
+	var speed := Game.pad_look_speed * Game.pad_sensitivity * (aim_fov / fov if aiming else 1.0)
 	var look_y := -v.y if Game.invert_y else v.y
 	_yaw.rotate_y(-v.x * speed * delta)
 	_pitch.rotation.x = clampf(_pitch.rotation.x - look_y * speed * 0.7 * delta, deg_to_rad(-70.0), deg_to_rad(50.0))
@@ -374,10 +425,10 @@ func _poll_actions() -> void:
 		use_stim()
 	if Input.is_action_just_pressed("throw"):
 		throw_charge()
-	if Input.is_action_just_pressed("dodge"):
+	if Input.is_action_just_pressed("dodge") and not seated:
 		start_roll()
 	for i in Weapon.ORDER.size():
-		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
+		if armed and Input.is_action_just_pressed("weapon_%d" % (i + 1)):
 			weapon.equip(Weapon.ORDER[i])
 
 
@@ -393,7 +444,7 @@ func _process(delta: float) -> void:
 	_update_boom(delta)
 	_since_damage += delta
 	var servo := Game.has_upgrade("regen_servo")
-	if not dead and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
+	if not dead and not regen_blocked and _since_damage > (regen_delay * 0.6 if servo else regen_delay) and health < max_health():
 		health = minf(health + regen_rate * (1.5 if servo else 1.0) * delta, max_health())
 		health_changed.emit(health, max_health())
 
@@ -446,19 +497,38 @@ func _physics_process(delta: float) -> void:
 	if is_rolling():
 		_roll(delta)
 		return
+	if seated:
+		velocity = Vector3(0.0, minf(velocity.y, 0.0), 0.0)
+		aiming = false
+		move_and_slide()
+		return
 	_since_floor = 0.0 if is_on_floor() else _since_floor + delta
+	if is_on_floor():
+		_boosted = false
 	_jump_buffer = JUMP_BUFFER if Input.is_action_just_pressed("jump") else maxf(_jump_buffer - delta, 0.0)
+	var jumped := false
 	if _jump_buffer > 0.0 and _since_floor <= COYOTE_TIME and velocity.y <= 0.5 and not crouching:
 		velocity.y = jump_velocity
 		_jump_buffer = 0.0
 		_since_floor = COYOTE_TIME + 1.0
+		jumped = true
+	if not jumped and Input.is_action_just_pressed("jump") and _since_floor > COYOTE_TIME and can_boost():
+		boost()
 	_update_crouch(Input.is_action_pressed("crouch"))
-	aiming = Input.is_action_pressed("aim")
+	if Game.toggle_aim:
+		if Input.is_action_just_pressed("aim"):
+			_aim_latched = not _aim_latched
+		aiming = _aim_latched
+	else:
+		_aim_latched = false
+		aiming = Input.is_action_pressed("aim")
+	if not armed:
+		aiming = false
 	# The click that captures the mouse shouldn't fire. Headless runs (tests) can't capture.
 	if _hold_fire and not Input.is_action_pressed("fire"):
 		_hold_fire = false
 	var can_fire := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Game.using_pad or DisplayServer.get_name() == "headless"
-	var firing := can_fire and not _hold_fire and Input.is_action_pressed("fire")
+	var firing := armed and can_fire and not _hold_fire and Input.is_action_pressed("fire")
 	if firing and weapon.try_fire(aiming):
 		_combat_face = 0.6
 
@@ -470,12 +540,16 @@ func _physics_process(delta: float) -> void:
 	_sprinting = false
 	if crouching:
 		speed = crouch_speed
-	elif Input.is_action_pressed("sprint") and not aiming and Game.carrying == "":
+	elif Input.is_action_pressed("sprint") and not aiming and (Game.carrying == "" or Campaign.PACKS_LIGHT.has(Game.carrying)):
 		speed = sprint_speed
 		_sprinting = dir.length() > 0.3
 	if aiming:
 		speed = minf(speed, walk_speed * 0.7)
-	if Game.carrying != "":
+	if snag_t > 0.0:
+		snag_t = maxf(snag_t - delta, 0.0)
+		speed = minf(speed, walk_speed * 0.4)
+		_sprinting = false
+	if Game.carrying != "" and not Campaign.PACKS_LIGHT.has(Game.carrying):
 		speed *= carry_speed_factor
 	# Quick to get going, quicker to stop, and only a little steering in the air.
 	var want := Vector2(dir.x, dir.z) * speed
@@ -501,7 +575,7 @@ func _roll(delta: float) -> void:
 	roll_t += delta
 	var t := clampf(roll_t / ROLL_TIME, 0.0, 1.0)
 	var speed := ROLL_SPEED * lerpf(1.0, 0.45, t * t)
-	if Game.carrying != "":
+	if Game.carrying != "" and not Campaign.PACKS_LIGHT.has(Game.carrying):
 		speed *= carry_speed_factor
 	velocity.x = _roll_dir.x * speed
 	velocity.z = _roll_dir.z * speed

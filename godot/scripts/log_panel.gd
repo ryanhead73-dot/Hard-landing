@@ -35,6 +35,12 @@ func _refresh() -> void:
 				_refresh())
 		return
 	_title.text = "LOGS  %d / %d" % [Game.logs.size(), Story.LOGS.size()]
+	# The journal has no pad button of its own; it opens from here.
+	var main := get_parent()
+	if main and main.get("journal"):
+		_button("Journal: what to do next", func():
+			close()
+			main.journal.open())
 	if Game.logs.is_empty():
 		_row("No logs yet. Salvage crates and components sometimes carry a data slate.")
 		return

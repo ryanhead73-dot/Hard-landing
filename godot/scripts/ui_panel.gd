@@ -47,6 +47,11 @@ func _ready() -> void:
 	visible = false
 
 
+func _process(_delta: float) -> void:
+	if visible:
+		UiStyle.keep_pad_focus(self)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return

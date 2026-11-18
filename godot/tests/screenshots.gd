@@ -10,6 +10,9 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out := args[0] if args.size() > 0 else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
+	# Shots are taken at the --resolution asked for, never the player's fullscreen setting.
+	Game.window_mode = 0
+	Game.apply_settings()
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
@@ -70,6 +73,14 @@ func _ready() -> void:
 			var target := at + Vector3(0.0, 1.05, 0.0)
 			cam.look_at_from_position(target + front * 3.0 + side * 1.2 + Vector3(0.0, 0.3, 0.0), target)
 			cam.make_current()
+		if shot[0] == "juno_swap":
+			# Frozen just before halfway through switching from the rifle to the scattergun.
+			var w: Weapon = main.player.weapon
+			Game.give_weapon("scattergun")
+			w.equip("scattergun")
+			w._swap_left = Weapon.SWITCH_TIME * 0.56
+			w._show_model()
+			w.set_process(false)
 		var beasts: Array = []
 		if shot[0] == "creatures":
 			# A line-up a few metres ahead, frozen once they've settled into their idle pose.
@@ -109,9 +120,12 @@ func _ready() -> void:
 			main.hud.set_prompt("[E] Throw the breaker")
 			main.hud.show_message("Found 12 scrap and a stim.")
 		var pause_menu: PauseMenu = null
-		if shot[0] == "pause":
+		if shot[0] == "pause" or shot[0] == "keys":
 			pause_menu = main.get_children().filter(func(c): return c is PauseMenu)[0]
 			pause_menu.open()
+			if shot[0] == "keys":
+				pause_menu._open_bindings()
+				pause_menu.bindings._listen("interact")
 		if shot[0] == "map":
 			for c in main.wildlife.caches:
 				if c.index % 2 == 0:
@@ -224,10 +238,12 @@ func _shots() -> Array:
 		["cache_far", "cache", Vector3.ZERO, Vector3.ZERO],
 		["thief", "landing_gear", Vector3(-6.0, 0.5, 9.0), Vector3(-12.5, 0.6, 4.0)],
 		["juno", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
+		["juno_swap", "", Vector3(-24.0, 0.5, -6.0), Vector3(-30.0, 1.0, -8.0)],
 		["relay", "aux_power", Vector3(2.0, 0.5, 16.0), Vector3(0.0, 2.0, -4.0)],
 		["relay_near", "aux_power", Vector3(9.0, 0.5, 6.0), Vector3(2.0, 3.0, -6.0)],
 		["hud", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["pause", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
+		["keys", "", Vector3(4.0, 0.5, 26.0), Vector3(0.0, 3.0, 0.0)],
 		["relay_inside", "aux_power", Vector3(-3.0, 0.5, -3.0), Vector3(2.0, 1.5, -8.0)],
 	]
 

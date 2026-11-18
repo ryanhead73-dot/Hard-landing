@@ -23,7 +23,7 @@ func _run() -> void:
 	_clear_enemies()
 	_check("every repair has a mission of one or more stages", Campaign.REPAIRS.all(func(r): return runner.stage_count(r["id"]) >= 1))
 	# From the crash site the HUD names the trip; the first stage shows on arrival (slice_test).
-	_check("first stage is the breakers", String(runner.stage("aux_power").get("text", "")).contains("breakers"))
+	_check("first stage wires in the battery contact", String(runner.stage("aux_power").get("text", "")).contains("battery contact"))
 	_check("the opening objective names the relay", Game.objective_text().contains("relay station"), Game.objective_text())
 	_check_placement()
 	for r in Campaign.REPAIRS:
@@ -107,9 +107,24 @@ func _play_mission(r: Dictionary) -> void:
 	_check("%s: mission is current" % id, Game.current_repair() == id, Game.current_repair())
 	player.revive(site.component_point() + Vector3.UP * 0.2)
 	await _frames(8)
+	if Campaign.sourced(id):
+		# Salvaged by its own mission in another region (expansion_test plays those): the old
+		# Kettle site is scenery now, its devices dark and its component not offered.
+		_check("%s: the old Kettle site stays dark" % id, not _label().contains(r["component_name"]) and runner.objective() == "" and not site.active, _label())
+		Game.deliver_component(r["component"])
+		kestrel.set_repaired(id, true)
+		await _frames(5)
+		return
 	_check("%s: component won't come free before the mission" % id, _label().contains("won't come free") or _label().begins_with("[Hold E]"), _label())
 	await _press("interact")
 	_check("%s: component stays put" % id, site.has_component() and Game.carrying == "")
+	if id == "aux_power":
+		# The relay's breaker waits for the contact the yard's scuttler drops (see Opening).
+		await _go_to_device(runner.device(id, 0, 0))
+		_check("aux_power: the breaker waits for its battery contact", _label().contains("battery contact"), _label())
+		await _press("interact")
+		_check("aux_power: and stays dead without it", runner.stage_index(id) == 0)
+		Game.set_flag("relay_contact", true)
 	for si in range(runner.stage_index(id), runner.stage_count(id)):
 		_clear_enemies()
 		var s := runner.stage(id)
@@ -153,7 +168,13 @@ func _play_mission(r: Dictionary) -> void:
 func _work_devices(id: String, si: int, s: Dictionary) -> void:
 	var list: Array = runner.devices[id][si]
 	_check("%s stage %d: devices are lit" % [id, si], range(list.size()).all(func(i): return list[i].state == (MissionDevice.State.DONE if i in Game.mission_done else MissionDevice.State.PENDING)))
-	var seq: Array = s.get("order", range(list.size()))
+	var decoys: Array = s.get("decoys", [])
+	var seq: Array = Array(s.get("order", range(list.size()))).filter(func(i): return not i in decoys)
+	for i in decoys:
+		# A decoy is never right: it undoes the stage, and nothing moves on.
+		await _go_to_device(list[i])
+		await _press("interact")
+		_check("%s stage %d: decoy %d trips the stage" % [id, si, i], Game.mission_done.is_empty() and runner.stage_index(id) == si and list[i].state == MissionDevice.State.PENDING)
 	for i in seq:
 		var d: MissionDevice = list[i]
 		if i in Game.mission_done:

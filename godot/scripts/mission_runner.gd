@@ -6,6 +6,8 @@ extends Node
 ##   activate work every device (E, or hold E for `hold` seconds; a hit or walking off interrupts).
 ##   pulse    as activate, but a Loom pulse during the hold knocks it out of tune.
 ##   defend   start the device, then stay within `radius` for `seconds` while waves come in.
+##            A wave is a list of kinds, or {kinds, spawns?, elite?, say?}: its own spawn points
+##            (site-local), a name that makes its first creature an elite, and a line as it comes.
 ##   elite    kill a named elite (`kind`, `name`, `pos`).
 ##   search   search spots (hold E) for the one thing hidden in one of them (`answer`); a signal
 ##            meter climbs as Juno closes on it, the waypoint only points at the area (`pos`)
@@ -18,6 +20,9 @@ extends Node
 ## An activate stage with an `order` must be worked in that order (each device's `reading` shows
 ## in its prompt as the clue); the wrong one undoes the stage (`wrong_text`, `wrong_say`,
 ## `wrong_damage` to Juno, and the site's `on_wrong`).
+## Any stage can name a `needs_flag`: until that Game flag is set its devices only show
+## `locked_label`. An activate stage's `decoys` are devices that are never right: working one
+## undoes the stage as a wrong order does (no `order` needed), and the rest finish it.
 ## After the last stage comes the implicit "take" stage. Stage index and the devices done in the
 ## current stage live in Game (mission_stage, mission_done) so they save with the session.
 
@@ -101,7 +106,7 @@ func setup(game_main: Node) -> void:
 
 func stage_index(id: String) -> int:
 	var site: ExpeditionSite = main.sites.get(id)
-	if site == null:
+	if site == null or Campaign.sourced(id):
 		return 0
 	if bypass:
 		return site.mission.size()
@@ -112,6 +117,8 @@ func stage_index(id: String) -> int:
 func stage(id: String) -> Dictionary:
 	var site: ExpeditionSite = main.sites.get(id)
 	var i := stage_index(id)
+	if Campaign.sourced(id):
+		return {"type": "elsewhere"}
 	if site == null or i >= site.mission.size():
 		return {"type": "take"}
 	return site.mission[i]
@@ -132,7 +139,7 @@ func device(id: String, stage_i: int, index: int) -> MissionDevice:
 ## The text for the objective line, or "" when the campaign's own line applies.
 func objective() -> String:
 	var id := Game.current_repair()
-	if id == "" or Game.carrying != "":
+	if id == "" or Game.carrying != "" or Campaign.sourced(id):
 		return ""
 	var s := stage(id)
 	var text: String = s.get("text", "")
@@ -158,7 +165,7 @@ func objective() -> String:
 ## Where the waypoint points during a mission stage, or null to use the component.
 func waypoint():
 	var id := Game.current_repair()
-	if id == "" or Game.carrying != "":
+	if id == "" or Game.carrying != "" or Campaign.sourced(id):
 		return null
 	var site: ExpeditionSite = main.sites[id]
 	var s := stage(id)
@@ -207,6 +214,8 @@ func interaction(pos: Vector3) -> Dictionary:
 		var d: MissionDevice = list[i]
 		if i in Game.mission_done or _flat(d.global_position - pos) > REACH or absf(d.global_position.y - pos.y) > 1.6:
 			continue
+		if s.has("needs_flag") and not Game.flags.get(s["needs_flag"], false):
+			return {"label": s.get("locked_label", "Not yet")}
 		var spec: Dictionary = specs[i]
 		var label: String = spec.get("label", "Work the device")
 		if spec.has("reading"):
@@ -253,8 +262,10 @@ func _process(delta: float) -> void:
 	_update_objective()
 	var id := Game.current_repair()
 	var hud: Hud = main.hud
-	if bypass or id == "" or Game.carrying != "" or main.player.dead:
-		hud.set_task(-1.0)
+	if bypass or id == "" or Game.carrying != "" or main.player.dead or Campaign.sourced(id):
+		# Main's held prompts share the task bar: leave it to them while one is filling.
+		if main._hold_t <= 0.0:
+			hud.set_task(-1.0)
 		return
 	var site: ExpeditionSite = main.sites[id]
 	var s := stage(id)
@@ -498,17 +509,23 @@ func ring_visible() -> bool:
 	return _ring != null and _ring.visible
 
 
-func _spawn_wave(site: ExpeditionSite, s: Dictionary, kinds: Array) -> void:
+func _spawn_wave(site: ExpeditionSite, s: Dictionary, wave: Variant) -> void:
+	var spec: Dictionary = wave if wave is Dictionary else {"kinds": wave}
+	var kinds: Array = spec.get("kinds", [])
 	var points: Array[Vector3] = site.ambush_points()
 	if points.is_empty():
 		points = site.spawn_points()
-	if s.has("spawns"):
+	var spawns: Array = spec.get("spawns", s.get("spawns", []))
+	if not spawns.is_empty():
 		points.clear()
-		for p in s["spawns"]:
+		for p in spawns:
 			points.append(site.to_global(p))
 	for i in kinds.size():
 		var at: Vector3 = points[(i + _wave_index) % points.size()] + Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(-1.5, 1.5))
-		main.spawn_enemy(kinds[i], at).alert(false)
+		var elite: String = spec.get("elite", "") if i == 0 else ""
+		main.spawn_enemy(kinds[i], at, elite).alert(false)
+	if spec.has("say"):
+		main.voice.say(spec["say"])
 	# Say where it's coming from, so the player can turn to meet it.
 	var centre := Vector3.ZERO
 	for i in kinds.size():
@@ -593,7 +610,7 @@ func _complete_device(index: int) -> void:
 	if index in Game.mission_done:
 		return
 	var s0 := stage(id)
-	if s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index:
+	if index in s0.get("decoys", []) or (s0.has("order") and int(s0["order"][Game.mission_done.size()]) != index):
 		_wrong_order(id, s0, index)
 		return
 	Game.mission_done.append(index)
@@ -606,7 +623,7 @@ func _complete_device(index: int) -> void:
 		return
 	Sfx.play("repair_clunk", d.global_position, -4.0)
 	(main.sites[id] as ExpeditionSite).on_device_done(si, index, true)
-	if Game.mission_done.size() >= devices[id][si].size():
+	if Game.mission_done.size() >= devices[id][si].size() - s.get("decoys", []).size():
 		_advance(id)
 	else:
 		_update_objective()
@@ -717,7 +734,7 @@ func refresh(animate: bool) -> void:
 				var st := MissionDevice.State.DORMANT
 				if done_repair or bypass or i < si or (id == current and i == si and j in Game.mission_done):
 					st = MissionDevice.State.DONE
-				elif id == current and i == si:
+				elif id == current and i == si and not Campaign.sourced(id):
 					st = MissionDevice.State.PENDING
 				d.set_state(st, animate)
 

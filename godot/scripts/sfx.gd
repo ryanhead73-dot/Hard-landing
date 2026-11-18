@@ -11,7 +11,7 @@ const DUCK_ATTACK := 60.0
 const DUCK_RELEASE := 9.0
 
 const SOUNDS: Array[String] = [
-	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "kill_tick",
+	"rifle_shot", "rifle_reload", "rifle_empty", "hit_tick", "hit_crit", "hit_armor", "arc_jolt", "kill_tick",
 	"scuttler_alert", "scuttler_lunge", "scuttler_hurt", "scuttler_death",
 	"player_hurt", "scrap_pickup", "cell_pickup", "power_up", "fabricate",
 	"beacon_ping", "footstep_0", "footstep_1", "steam_hiss", "steam_burst", "manifold_pickup",
@@ -29,6 +29,27 @@ const SOUNDS: Array[String] = [
 	"signal_ping",
 	"skimmer_screech", "skimmer_dive", "skimmer_rake", "skimmer_flap", "skimmer_hurt", "skimmer_death",
 	"hull_groan",
+	# The opening (Jake's asset batch, 2026-11-08).
+	"hob_chime", "hob_warning", "hob_warning_detuned", "triple_click", "scanner_ping", "med_seal",
+	"relay_two_note", "breaker_clunk", "fence_snap", "relay_surge", "rifle_cell_seat", "rifle_rail_align",
+	"rifle_first_shot", "scuttler_hiss", "scuttler_chitter", "scuttler_attack", "scuttler_step",
+	"music_ship_theme", "music_sighting", "music_first_fight", "amb_basin_loop", "amb_gully_loop", "amb_cold_ship_loop",
+	# Jake's second batch (2026-11-09): HOB's reboot, the aux sting, and the walk finds.
+	"hob_boot_sequence", "aux_install_sting", "glass_wind_low", "glass_wind_mid", "glass_wind_high",
+	"helmet_humming", "rain_cup_drip", "seedpod_flash", "dish_restart", "crawlspace_hatch",
+	# The Loom Expanse (milestone C): ridges, ridge divers, pinweavers, the chord singer.
+	"ridge_thrum", "ridge_heave", "diver_grind", "diver_erupt", "pinweaver_click", "thread_spool", "thread_snap",
+	"singer_drone", "singer_inhale", "singer_chord", "singer_pull", "singer_call",
+	"boost_thrust", "mirror_alarm", "magnet_clamp", "hoist_winch", "cage_drop",
+	"resonator_tick", "crown_tick", "resonator_lock", "cantor_high", "cantor_mid", "cantor_low", "cantor_wave", "cantor_heart", "cantor_anchor",
+	"guardian_roar", "guardian_step", "guardian_impact", "guardian_hurt", "cantor_drone", "cantor_windup",
+	"finale_klaxon", "launch_liftoff",
+	"resonator_tick_low", "resonator_tick_high", "tether_snap", "coolant_vent",
+	"music_cantor", "music_departure", "music_ending",
+	"guardian_wake", "guardian_search", "cantor_singer_join", "cantor_death", "shear_slide", "thrust_cache_open",
+	"aux_breaker_trip", "music_patience", "music_crown",
+	"veilwing_screech", "veilwing_dive", "veilwing_flap", "airlock_open", "beacon_plant", "drone_hover", "drone_chirp",
+	"music_shatterlands", "music_gillwood", "music_loom", "music_region_combat",
 ]
 const MAX_VARIANTS := 8
 

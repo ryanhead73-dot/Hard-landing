@@ -1,16 +1,23 @@
-"""Builds Kestrel's exterior skin as GLB: the curved roof fairings, belly keel, nose cone,
-twin tail fins and the engine nacelle.
+"""Builds Kestrel's exterior as GLB, to the orthographic model sheet (33 m long nose to nozzle,
+20 m span): a faceted salvage hull with a glazed cockpit canopy, dorsal fin and twin engine pods.
 
 Run headless with Blender 4.2+ (or the `bpy` 4.2 module):
     python blender/build_kestrel.py
 
-The skin is fitted around the deck plan in godot/data/kestrel_layout.json: the rooms stay the
-walkable CSG interior, and these fairings wrap over and under them with a little clearance, so
-from outside Kestrel reads as a curved salvage hauler rather than a stack of boxes. Openings
-(side door, canopy windows, cargo ramp) are left clear. Coordinates are Kestrel's local space
-in Godot (plan x - 16.5, y, plan z - 13). Mesh objects named "oxide_*" or "dark_*" take those
-materials in Godot; everything else is cream hull.
-Output: godot/assets/kestrel/<part>.glb.
+The hull is lofted through hand-placed stations so it wraps the walkable deck plan in
+godot/data/kestrel_layout.json with clearance: the rooms stay the CSG interior and collision, and
+this shell is the silhouette. Each station is a ten-sided section (flat belly and roof, chamfered
+corners, and a break line on each side where the canopy glazing starts). The side door and the
+stern ramp are cut through it. Coordinates are Kestrel's local space in Godot
+(plan x - 16.5, y, plan z - 13).
+
+Object names pick the material in Godot: oxide_*, dark_*, frame_*, glass_*, decal_*; the rest
+is hull.
+Outputs (godot/assets/kestrel/):
+    kestrel_hull.glb     hull shell, fin, vents, oxide plates, panel seams, canopy frame ribs
+    kestrel_scorch.glb   crash soot overlays (hidden on the pre-crash ship)
+    kestrel_canopy.glb   the canopy glazing on its own (swapped cracked/clear by the canopy repair)
+    kestrel_nacelle.glb  one engine pod on the centreline (Godot places it at plan z 7.6 / 18.4)
 """
 
 import json
@@ -26,7 +33,33 @@ OUT = os.path.join(ROOT, "godot", "assets", "kestrel")
 LAYOUT = json.load(open(os.path.join(ROOT, "godot", "data", "kestrel_layout.json")))
 HALF_LEN = LAYOUT["length"] * 0.5
 CZ = LAYOUT["centreline_z"]
-T = LAYOUT["wall"] * 0.5
+
+# x (aft of the nose), half width W, roof T, belly B, roof chamfer c, belly chamfer cb.
+STATIONS = [
+    (0.0, 0.3, 1.55, 1.0, 0.1, 0.1),
+    (1.0, 1.25, 2.3, 0.45, 0.4, 0.35),
+    (2.2, 2.05, 3.15, 0.05, 0.55, 0.45),
+    (3.4, 2.75, 4.0, -0.4, 0.4, 0.35),
+    (6.0, 3.4, 4.2, -0.48, 0.6, 0.45),
+    (8.2, 4.15, 4.15, -0.5, 0.65, 0.45),
+    (11.3, 4.4, 4.1, -0.55, 0.6, 0.55),
+    (16.0, 4.4, 4.0, -0.6, 0.6, 0.6),
+    (23.5, 4.4, 3.85, -0.6, 0.6, 0.6),
+    (27.0, 4.2, 3.65, -0.5, 0.55, 0.5),
+    (29.6, 4.2, 3.55, -0.45, 0.5, 0.5),
+    (30.45, 3.5, 3.35, -0.25, 0.4, 0.35),
+]
+# Extra loft rings so face boundaries land on the canopy, vent and seam lines.
+EXTRA_X = [4.6, 7.0, 9.6, 13.4, 14.0, 14.6, 15.2, 15.8, 16.4, 19.6, 25.5]
+WINDOW_Y = 2.0          # side break line: glazing above it, from GLASS_X[0] to GLASS_X[1]
+GLASS_X = (1.0, 8.2)
+GLASS_ROOF_TO = 3.4     # the roof is glazed only ahead of the cockpit's front wall
+SKIN = 0.07
+
+HULL = (0.82, 0.76, 0.62)
+OXIDE = (0.55, 0.12, 0.03)
+DARK = (0.02, 0.025, 0.03)
+GLASS = (0.1, 0.2, 0.22)
 
 
 def g(x, y, z):
@@ -45,256 +78,371 @@ def material(name, rgb):
     return m
 
 
-HULL = (0.82, 0.76, 0.62)
-OXIDE = (0.55, 0.12, 0.03)
-DARK = (0.02, 0.025, 0.03)
-
-
-def make(name, bm, rgb=HULL, smooth=True, solidify=0.0, offset=-1.0):
+def make(name, bm, rgb=HULL, smooth=False):
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
     for p in mesh.polygons:
         p.use_smooth = smooth
-    mesh.materials.append(material(name.split("_")[0] if name.split("_")[0] in ("oxide", "dark") else "hull", rgb))
+    mesh.materials.append(material(name.split("_")[0], rgb))
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
-    if solidify:
-        mod = obj.modifiers.new("Solidify", "SOLIDIFY")
-        mod.thickness = solidify
-        mod.offset = offset
     return obj
 
 
-def loft(bm, rings, closed, cap_start=False, cap_end=False):
-    """Skins a list of rings (lists of plan-space points, same length) into faces."""
-    verts = [[bm.verts.new(g(*p)) for p in ring] for ring in rings]
+def apply_mods(obj):
+    bpy.context.view_layer.objects.active = obj
+    for mod in list(obj.modifiers):
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+# --- Sections ------------------------------------------------------------------------------
+
+def station(x):
+    """Interpolated (W, T, B, c, cb) at plan x."""
+    for a, b in zip(STATIONS, STATIONS[1:]):
+        if a[0] <= x <= b[0]:
+            t = (x - a[0]) / (b[0] - a[0])
+            return tuple(a[i] + (b[i] - a[i]) * t for i in range(1, 6))
+    s = STATIONS[0] if x < STATIONS[0][0] else STATIONS[-1]
+    return s[1:]
+
+
+def window_y(x):
+    W, T, B, c, cb = station(x)
+    return min(max(WINDOW_Y, B + cb + 0.05), T - c - 0.05)
+
+
+def section(x, grow=0.0):
+    """Ten (z, y) points round the section, anticlockwise seen from the nose, starting at the
+    belly's starboard corner. Face k runs from point k to k+1:
+    0 stbd belly chamfer, 1 stbd lower side, 2 stbd upper side, 3 stbd roof chamfer, 4 roof,
+    5 port roof chamfer, 6 port upper side, 7 port lower side, 8 port belly chamfer, 9 belly."""
+    W, T, B, c, cb = station(x)
+    W, T, B = W + grow, T + grow, B - grow
+    wy = window_y(x)
+    half = [((W - cb), B), (W, B + cb), (W, wy), (W, T - c), ((W - c), T)]
+    pts = [(CZ + z, y) for z, y in half]
+    pts += [(CZ - z, y) for z, y in reversed(half)]
+    return pts
+
+
+GLASS_FACES = {2, 3, 5, 6}
+ROOF_FACE = 4
+
+
+def ring_xs():
+    xs = sorted(set([s[0] for s in STATIONS] + EXTRA_X + list(GLASS_X) + [GLASS_ROOF_TO]))
+    return xs
+
+
+def hull():
+    """The shell and, separately, its canopy glazing."""
+    xs = ring_xs()
+    bm = bmesh.new()
+    glass_bm = bmesh.new()
+    rings = [[bm.verts.new(g(x, y, z)) for z, y in section(x)] for x in xs]
+    grings = [[glass_bm.verts.new(g(x, y, z)) for z, y in section(x)] for x in xs]
     n = len(rings[0])
-    for a, b in zip(verts, verts[1:]):
-        for k in range(n if closed else n - 1):
+    for i in range(len(xs) - 1):
+        xm = (xs[i] + xs[i + 1]) * 0.5
+        for k in range(n):
             k2 = (k + 1) % n
-            bm.faces.new((a[k], a[k2], b[k2], b[k]))
-    if cap_start:
-        bm.faces.new(list(reversed(verts[0])))
-    if cap_end:
-        bm.faces.new(verts[-1])
+            glazed = GLASS_X[0] <= xm <= GLASS_X[1] and (k in GLASS_FACES or (k == ROOF_FACE and xm < GLASS_ROOF_TO))
+            r = grings if glazed else rings
+            target = glass_bm if glazed else bm
+            target.faces.new((r[i][k], r[i][k2], r[i + 1][k2], r[i + 1][k]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    for b in (bm, glass_bm):
+        bmesh.ops.remove_doubles(b, verts=b.verts, dist=0.0005)
+        loose = [v for v in b.verts if not v.link_faces]
+        bmesh.ops.delete(b, geom=loose, context="VERTS")
+        bmesh.ops.recalc_face_normals(b, faces=b.faces)
+    # Normals of the open shell can come out inward; force them to face away from the axis.
+    for b, is_glass in ((bm, False), (glass_bm, True)):
+        flip = []
+        for f in b.faces:
+            c = f.calc_center_median()
+            axis = Vector((c.x, 0.0, 1.6))
+            if f.normal.dot(c - axis) < 0.0 and abs(f.normal.x) < 0.95:
+                flip.append(f)
+        if flip:
+            bmesh.ops.reverse_faces(b, faces=flip)
+    shell = make("hull", bm)
+    mod = shell.modifiers.new("Solidify", "SOLIDIFY")
+    mod.thickness = SKIN
+    mod.offset = -1.0
+    mod.use_rim = True
+    apply_mods(shell)
+    # Openings: the side door (starboard, over the door steps) and the stern cargo ramp.
+    door = LAYOUT["door_steps"]["x"]
+    cut(shell, (door[0] - 0.05, door[1] + 0.05), (-0.9, 2.45), (16.9, 18.8))
+    ramp = next(o for o in LAYOUT["openings"] if o["id"] == "cargo_ramp")
+    cut(shell, (29.9, 31.0), (-0.1, 2.95), (ramp["z"][0] - 0.3, ramp["z"][1] + 0.3))
+    make("glass_canopy", glass_bm, GLASS)
+
+
+def cut(obj, xr, yr, zr):
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    lo, hi = g(xr[0], yr[0], zr[1]), g(xr[1], yr[1], zr[0])
+    for v in bm.verts:
+        v.co = Vector((lo.x if v.co.x < 0 else hi.x, lo.y if v.co.y < 0 else hi.y, lo.z if v.co.z < 0 else hi.z))
+    mesh = bpy.data.meshes.new("cutter")
+    bm.to_mesh(mesh)
+    bm.free()
+    cutter = bpy.data.objects.new("cutter", mesh)
+    bpy.context.collection.objects.link(cutter)
+    mod = obj.modifiers.new("Cut", "BOOLEAN")
+    mod.operation = "DIFFERENCE"
+    mod.solver = "EXACT"
+    mod.object = cutter
+    apply_mods(obj)
+    bpy.data.objects.remove(cutter)
+
+
+# --- Surface details -------------------------------------------------------------------------
+
+def on_face(x, k, u, lift=0.012):
+    """A point on section face k at plan x, a fraction u along it, lifted off the skin."""
+    pts = section(x, lift)
+    a, b = pts[k], pts[(k + 1) % len(pts)]
+    return (x, a[1] + (b[1] - a[1]) * u, a[0] + (b[0] - a[0]) * u)
+
+
+def quad_strip(bm, rows):
+    """Rows of points (same length) -> faces."""
+    vs = [[bm.verts.new(g(*p)) for p in row] for row in rows]
+    for a, b in zip(vs, vs[1:]):
+        for k in range(len(a) - 1):
+            bm.faces.new((a[k], a[k + 1], b[k + 1], b[k]))
+    return vs
+
+
+def band(name, x0, x1, faces, rgb, lift=0.012, skip_door=False):
+    """A strip round the listed section faces between x0 and x1 (panel seams, frame ribs)."""
+    bm = bmesh.new()
+    for k in faces:
+        quad_strip(bm, [[on_face(x0, k, 0.0, lift), on_face(x0, k, 1.0, lift)],
+                        [on_face(x1, k, 0.0, lift), on_face(x1, k, 1.0, lift)]])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    return verts
+    return make(name, bm, rgb)
 
 
-def superellipse(cy, cz, half_w, half_h, n, steps, start=0.0, end=math.tau):
-    """Points round (cy, cz): angle 0 is +z (starboard), pi/2 is up."""
-    pts = []
-    for i in range(steps + 1 if end - start < math.tau - 1e-6 else steps):
-        a = start + (end - start) * i / steps
-        c, s = math.cos(a), math.sin(a)
-        z = cz + half_w * math.copysign(abs(c) ** (2.0 / n), c)
-        y = cy + half_h * math.copysign(abs(s) ** (2.0 / n), s)
-        pts.append((z, y))
-    return pts
-
-
-# --- Fitting the skin to the deck plan --------------------------------------------------------
-
-def rooms_at(x, min_top=0.0):
-    return [r for r in LAYOUT["rooms"] if r["x"][0] - T <= x <= r["x"][1] + T and r["ceiling"] + 0.2 > min_top]
-
-
-def raw_half_width(x, min_top):
-    rs = rooms_at(x, min_top)
-    return max((max(abs(r["z"][0] - CZ), abs(r["z"][1] - CZ)) + T for r in rs), default=0.0)
-
-
-def raw_top(x):
-    return max((r["ceiling"] + 0.2 for r in rooms_at(x)), default=0.0)
-
-
-def dilate(f, x, reach=0.7, samples=8):
-    return max(f(x + reach * (i / samples * 2.0 - 1.0)) for i in range(samples + 1))
-
-
-# --- Parts -----------------------------------------------------------------------------------
-
-def roof(name, x0, x1, base_y, step=0.2, n=4.0):
-    """An arched fairing from base_y up over the rooms between x0 and x1, ends capped."""
+def vents():
+    """Six slanted cooling louvres on each roof chamfer, ahead of the radiators."""
     bm = bmesh.new()
-    rings = []
-    x = x0
-    xs = []
-    while x <= x1 + 1e-6:
-        xs.append(x)
-        x += step
-    for x in xs:
-        w = dilate(lambda q: raw_half_width(q, base_y), x)
-        top = dilate(raw_top, x)
-        W = w + 0.22
-        # Rise so the top corners of the rooms sit inside the arch (superellipse n).
-        k = max(0.92 - (w / W) ** n, 0.05)
-        R = max(top - base_y, 0.3) / k ** (1.0 / n) + 0.08
-        # Round the ends down into the caps.
-        end = min(x - x0, x1 - x) / 1.2
-        shrink = 1.0 if end >= 1.0 else 0.75 + 0.25 * math.sin(end * math.pi * 0.5)
-        pts = superellipse(base_y, CZ, W, R * shrink, n, 28, 0.0, math.pi)
-        rings.append([(x, y, z) for z, y in pts])
-    loft(bm, rings, closed=False)
-    # End caps: fans from the base centre.
-    for ring, flip in ((rings[0], True), (rings[-1], False)):
-        centre = bm.verts.new(g(ring[0][0], base_y, CZ))
-        vs = [bm.verts.new(g(*p)) for p in ring]
-        for a, b in zip(vs, vs[1:]):
-            bm.faces.new((centre, b, a) if flip else (centre, a, b))
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+    for i in range(6):
+        x = 13.5 + i * 0.5
+        for k in (3, 5):
+            lo_u, hi_u = (0.15, 0.85)
+            rows = []
+            for u in (lo_u, hi_u):
+                skew = (u - 0.5) * 0.3 * (1 if k == 3 else -1) * -1
+                p0 = on_face(x + skew, k, u, 0.02)
+                p1 = on_face(x + 0.14 + skew, k, u, 0.02)
+                rows.append([p0, p1])
+            quad_strip(bm, rows)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    return make(name, bm, solidify=0.08)
+    make("dark_vents", bm, DARK)
 
 
-def keel(name, x0, x1, half_w=1.9, depth=0.55, top_y=-0.21):
+def oxide_plates():
+    """The sheet's raked oxide panel low on each side under the canopy, and a stern patch."""
+    bm = bmesh.new()
+    for k in (1, 7):
+        rows = []
+        for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+            row = []
+            for s in range(25):
+                f = s / 24
+                # Parallelogram: lower edge x 4.6..9.2, upper edge shifted aft and shorter.
+                x = (4.6 + 4.6 * f) * (1.0 - t) + (6.3 + 3.6 * f) * t
+                W, T, B, c, cb = station(x)
+                y0, y1 = B + cb + 0.25, window_y(x) - 0.45
+                y = y0 + (y1 - y0) * t
+                u = (y - (B + cb)) / max(window_y(x) - (B + cb), 0.01)
+                row.append(on_face(x, k, u if k == 1 else 1.0 - u, 0.02))
+            rows.append(row)
+        quad_strip(bm, rows)
+    # Roof patch over the cargo bay, as on the crash paintover.
+    for k in (4,):
+        quad_strip(bm, [[on_face(x, k, u, 0.015) for u in (0.12, 0.5, 0.88)] for x in (24.2, 26.0, 27.8, 29.4)])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    make("oxide_plates", bm, OXIDE)
+
+
+def fin():
+    """Single swept dorsal fin over the cargo bay."""
     bm = bmesh.new()
     rings = []
-    steps = 40
-    for i in range(steps + 1):
-        x = x0 + (x1 - x0) * i / steps
-        t = i / steps
-        taper = math.sin(math.pi * min(t / 0.18, 1.0, (1.0 - t) / 0.12) * 0.5) if t < 0.18 or t > 0.88 else 1.0
-        pts = superellipse(top_y, CZ, half_w * (0.4 + 0.6 * taper), depth * (0.2 + 0.8 * taper), 3.0, 20, math.pi, math.tau)
-        rings.append([(x, y, z) for z, y in pts])
-    loft(bm, rings, closed=False, cap_start=False, cap_end=False)
-    return make(name, bm, solidify=0.06)
-
-
-def nose(name):
-    """Chin and nose cone ahead of the cockpit, under the windscreen."""
-    bm = bmesh.new()
-    rings = []
-    tip_x, root_x = 0.15, 3.75
-    steps = 24
-    for i in range(steps + 1):
-        t = i / steps
-        x = tip_x + (root_x - tip_x) * t
-        # Ogive: blunt, then full.
-        k = math.sin(t * math.pi * 0.5) ** 0.6
-        half_w = 0.12 + 2.45 * k
-        bottom, top = 0.85 - 1.3 * k, 0.95 + 1.04 * k
-        cy, hh = (top + bottom) * 0.5, (top - bottom) * 0.5
-        pts = superellipse(cy, CZ, half_w, max(hh, 0.1), 2.6, 32)
-        rings.append([(x, y, z) for z, y in pts])
-    loft(bm, rings, closed=True, cap_start=True, cap_end=True)
-    obj = make(name, bm)
-    # A dark sensor window under the chin, and an oxide stripe round the cone.
-    bm2 = bmesh.new()
-    band = []
-    for x in (1.6, 1.85):
-        t = (x - tip_x) / (root_x - tip_x)
-        k = math.sin(t * math.pi * 0.5) ** 0.6
-        half_w = 0.12 + 2.45 * k + 0.012
-        bottom, top = 0.85 - 1.3 * k - 0.012, 0.95 + 1.04 * k + 0.012
-        pts = superellipse((top + bottom) * 0.5, CZ, half_w, (top - bottom) * 0.5, 2.6, 32)
-        band.append([(x, y, z) for z, y in pts])
-    loft(bm2, band, closed=True)
-    make(name + "_oxide_band".replace(name + "_", "oxide_nose_"), bm2, OXIDE)
-    return obj
-
-
-def rounded_rect(z0, z1, y0, y1, r, steps=4):
-    """Corner points of a rounded rectangle in (z, y), anticlockwise from the bottom right."""
-    pts = []
-    for cz, cy, a0 in ((z1 - r, y0 + r, -math.pi / 2), (z1 - r, y1 - r, 0.0),
-                       (z0 + r, y1 - r, math.pi / 2), (z0 + r, y0 + r, math.pi)):
-        for i in range(steps + 1):
-            a = a0 + (math.pi / 2) * i / steps
-            pts.append((cz + math.cos(a) * r, cy + math.sin(a) * r))
-    return pts
-
-
-def plate_with_hole(bm, x, outer, inner):
-    """A flat face at plan x bounded by `outer` with `inner` cut out (both (z, y) loops)."""
-    edges = []
-    for loop in (outer, inner):
-        vs = [bm.verts.new(g(x, y, z)) for z, y in loop]
-        for a, b in zip(vs, vs[1:] + vs[:1]):
-            edges.append(bm.edges.new((a, b)))
-    bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=edges)
-    # Face forward (towards the nose, -x in Blender) so the solidified plate shades outward.
-    flip = [f for f in bm.faces if f.normal.x > 0.0]
-    if flip:
-        bmesh.ops.reverse_faces(bm, faces=flip)
-
-
-WINDSCREEN = (11.25, 14.75, 1.95, 3.35)
-
-
-def cowl(name):
-    """The cockpit's front bulkhead skin: a hull-coloured bezel round the windscreen that hides
-    the boxy wall ends between the nose cone and the roof, with an oxide frame round the glass."""
-    z0, z1, y0, y1 = WINDSCREEN
-    outer = rounded_rect(CZ - 2.62, CZ + 2.62, 0.9, 3.55, 0.7, 6)
-    inner = rounded_rect(z0, z1, y0, y1, 0.22)
-    bm = bmesh.new()
-    plate_with_hole(bm, 3.44, outer, inner)
-    make(name, bm, solidify=0.12, offset=0.0)
-    bm = bmesh.new()
-    frame = rounded_rect(z0 - 0.14, z1 + 0.14, y0 - 0.14, y1 + 0.14, 0.32)
-    plate_with_hole(bm, 3.37, frame, inner)
-    make("oxide_" + name, bm, OXIDE, solidify=0.03, offset=0.0)
-
-
-def fin(name, zc):
-    """Swept tail fin with a thin airfoil, oxide tip."""
-    bm = bmesh.new()
-    root = [(29.2, 2.7), (33.3, 2.7)]
-    tip = [(32.0, 6.1), (33.7, 6.1)]
-    thick_root, thick_tip = 0.22, 0.1
-    rings = []
-    for t in (0.0, 0.25, 0.5, 0.75, 1.0):
-        lx = root[0][0] + (tip[0][0] - root[0][0]) * t
-        tx = root[1][0] + (tip[1][0] - root[1][0]) * t
-        y = root[0][1] + (tip[0][1] - root[0][1]) * t
-        th = thick_root + (thick_tip - thick_root) * t
+    root_y = station(28.0)[1] - 0.1
+    for t in (0.0, 0.3, 0.65, 1.0):
+        lx = 25.6 + (29.6 - 25.6) * t
+        tx = 30.3 + (31.4 - 30.3) * t
+        y = root_y + (5.9 - root_y) * t
+        th = 0.34 + (0.12 - 0.34) * t
         ring = []
-        for k in range(12):
-            a = math.tau * k / 12
-            u = 0.5 - 0.5 * math.cos(a)  # 0 leading edge .. 1 trailing edge
+        for k in range(10):
+            a = math.tau * k / 10
+            u = 0.5 - 0.5 * math.cos(a)
             x = lx + (tx - lx) * u
-            half = th * 0.5 * (math.sin(math.pi * u ** 0.6) if 0 < u < 1 else 0.0) + 0.005
-            ring.append((x, y, zc + math.copysign(half, math.sin(a))))
+            half = th * 0.5 * (math.sin(math.pi * u ** 0.6) if 0 < u < 1 else 0.0) + 0.01
+            ring.append(bm.verts.new(g(x, y, CZ + math.copysign(half, math.sin(a)))))
         rings.append(ring)
-    loft(bm, rings, closed=True, cap_start=True, cap_end=True)
-    make(name, bm)
-    bm2 = bmesh.new()
-    cap = []
-    for t in (0.86, 1.0):
-        lx = root[0][0] + (tip[0][0] - root[0][0]) * t
-        tx = root[1][0] + (tip[1][0] - root[1][0]) * t
-        y = root[0][1] + (tip[0][1] - root[0][1]) * t + 0.01
-        cap.append([(lx - 0.01, y, zc - 0.07), (tx + 0.01, y, zc - 0.07), (tx + 0.01, y, zc + 0.07), (lx - 0.01, y, zc + 0.07)])
-    loft(bm2, cap, closed=True, cap_end=True)
-    make("oxide_" + name, bm2, OXIDE, smooth=False)
-
-
-def nacelle(name):
-    """Engine nacelle along +x, centred on its axis at the origin of plan (29.0, 1.9, 13)."""
+    for a, b in zip(rings, rings[1:]):
+        for k in range(10):
+            k2 = (k + 1) % 10
+            bm.faces.new((a[k], a[k2], b[k2], b[k]))
+    bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    make("hull_fin", bm)
+    # Oxide cap on the fin tip.
     bm = bmesh.new()
-    # (x offset from the nacelle centre, radius) from the intake lip to the nozzle.
-    profile = [(-4.55, 0.78), (-4.6, 0.92), (-4.45, 1.06), (-4.0, 1.1), (-1.0, 1.12), (2.0, 1.06),
-               (3.6, 0.96), (4.3, 0.86), (4.45, 0.8), (4.4, 0.7)]
-    rings = []
-    for dx, r in profile:
-        ring = []
-        for k in range(32):
-            a = math.tau * k / 32
-            ring.append((29.0 + dx, 1.9 + r * math.sin(a), CZ + r * math.cos(a)))
-        rings.append(ring)
-    loft(bm, rings, closed=True)
-    make(name, bm)
-    # Dark intake and nozzle throats, and an oxide band round the cowling.
-    for part, x0, x1, r0, r1, rgb in (("dark_intake", -4.55, -3.6, 0.78, 0.7, DARK), ("dark_nozzle", 4.4, 3.6, 0.7, 0.62, DARK),
-                                       ("oxide_band", -2.2, -1.6, 1.125, 1.125, OXIDE)):
-        bm2 = bmesh.new()
-        rings = []
-        for dx, r in ((x0, r0), (x1, r1)):
-            rings.append([(29.0 + dx, 1.9 + r * math.sin(math.tau * k / 32), CZ + r * math.cos(math.tau * k / 32)) for k in range(32)])
-        loft(bm2, rings, closed=True, cap_end=part.startswith("dark"))
-        make(part, bm2, rgb)
+    rows = []
+    for y, lx, tx in ((5.3, 29.25, 31.18), (5.92, 29.62, 31.42)):
+        rows.append([(lx, y, CZ - 0.09), (tx, y, CZ - 0.09), (tx, y, CZ + 0.09), (lx, y, CZ + 0.09), (lx, y, CZ - 0.09)])
+    quad_strip(bm, rows)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    make("oxide_fin", bm, OXIDE)
+
+
+# --- Engine pod ------------------------------------------------------------------------------
+
+POD_Y = 1.9
+POD_SIDES = 12
+POD_PROFILE = [(18.0, 0.72), (18.08, 0.92), (18.45, 1.05), (28.0, 1.05), (30.8, 0.98), (32.6, 0.86), (33.0, 0.8)]
+
+
+def pod_ring(x, r, phase=0.5):
+    return [(x, POD_Y + r * math.sin(math.tau * (k + phase) / POD_SIDES), CZ + r * math.cos(math.tau * (k + phase) / POD_SIDES))
+            for k in range(POD_SIDES)]
+
+
+def nacelle():
+    bm = bmesh.new()
+    rings = [[bm.verts.new(g(*p)) for p in pod_ring(x, r)] for x, r in POD_PROFILE]
+    for a, b in zip(rings, rings[1:]):
+        for k in range(POD_SIDES):
+            k2 = (k + 1) % POD_SIDES
+            bm.faces.new((a[k], a[k2], b[k2], b[k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    make("nacelle", bm)
+    for name, x0, x1, r0, r1, rgb, cap in (("dark_intake", 18.0, 18.9, 0.72, 0.6, DARK, True),
+                                           ("dark_nozzle", 33.0, 32.2, 0.8, 0.66, DARK, True),
+                                           ("oxide_band", 20.2, 20.9, 1.065, 1.065, OXIDE, False),
+                                           ("dark_seam_pod", 27.4, 27.5, 1.06, 1.06, DARK, False)):
+        b2 = bmesh.new()
+        rs = [[b2.verts.new(g(*p)) for p in pod_ring(x, r)] for x, r in ((x0, r0), (x1, r1))]
+        for k in range(POD_SIDES):
+            k2 = (k + 1) % POD_SIDES
+            b2.faces.new((rs[0][k], rs[0][k2], rs[1][k2], rs[1][k]))
+        if cap:
+            b2.faces.new(rs[1])
+        bmesh.ops.recalc_face_normals(b2, faces=b2.faces)
+        make(name, b2, rgb)
+
+
+# --- Decal overlays ----------------------------------------------------------------------------
+# Thin mesh overlays UV-mapped into the 2048 decal atlas (assets/textures/kestrel/decal_atlas.png),
+# image coordinates 0..1 with y down. They work in every renderer, unlike Decal nodes.
+ATLAS = {
+    "soot_a": (0.585, 0.03, 0.73, 0.14), "soot_b": (0.80, 0.0, 0.935, 0.18),
+    "soot_c": (0.6, 0.18, 0.735, 0.28), "soot_d": (0.79, 0.19, 0.945, 0.32),
+    "soot_wide": (0.54, 0.0, 0.99, 0.38),
+    "hazard": (0.035, 0.405, 0.455, 0.455), "power": (0.565, 0.445, 0.66, 0.535),
+    "warning": (0.69, 0.44, 0.8, 0.535), "streaks": (0.53, 0.57, 0.99, 0.68),
+    "rivets": (0.03, 0.825, 0.965, 0.855),
+}
+# Jake's markings atlas (assets/textures/kestrel/markings_atlas.png, 2048 square): 24 cells of
+# 480 x 288 px, rows of four, from the pack manifest's pixel rects.
+MARK_CELLS = ["kestrel", "hl33k", "no_step", "rescue", "n01", "n02", "n03", "n04", "n05", "n06", "n07", "n08",
+              "n09", "n10", "n11", "n12", "chevron", "drip_a", "drip_b", "drip_c", "dent_a", "dent_b", "dent_c", "dent_d"]
+for i, name in enumerate(MARK_CELLS):
+    px, py = 16 + 512 * (i % 4), 80 + 320 * (i // 4)
+    ATLAS["m_" + name] = (px / 2048, py / 2048, (px + 480) / 2048, (py + 288) / 2048)
+UPWARD = {0, 1, 2, 3}   # faces whose u runs up the hull; 5..8 run down, 4 and 9 run across
+
+
+def side_u(k, f):
+    """u on face k for a fraction f measured up the face (or across, for the roof and belly)."""
+    return f if k in UPWARD or k in (4, 9) else 1.0 - f
+
+
+def decal(bm, uv, region, x0, x1, k, f_bottom, f_top, lift=0.022, nx=4):
+    """Overlay on face k between plan x0..x1 and fractions f_bottom..f_top up the face. The
+    image reads left to right when seen from outside, with its top edge up the hull."""
+    ix0, iy0, ix1, iy1 = ATLAS[region]
+    flip = k in (5, 6, 7, 8)  # port side: seen from outside, the nose is on the right
+    rows = []
+    for j, f in enumerate((f_top, f_bottom)):
+        row = []
+        for i in range(nx + 1):
+            t = i / nx
+            p = on_face(x0 + (x1 - x0) * t, k, side_u(k, f), lift)
+            iu = ix0 + (ix1 - ix0) * (1.0 - t if flip else t)
+            iv = iy0 + (iy1 - iy0) * j
+            row.append((bm.verts.new(g(*p)), (iu, 1.0 - iv)))
+        rows.append(row)
+    for a, b in zip(rows, rows[1:]):
+        for i in range(nx):
+            f = bm.faces.new((a[i][0], a[i + 1][0], b[i + 1][0], b[i][0]))
+            for loop, (_, co) in zip(f.loops, (a[i], a[i + 1], b[i + 1], b[i])):
+                loop[uv].uv = co
+
+
+def decals(name, entries):
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    for e in entries:
+        decal(bm, uv, *e)
+    make(name, bm, DARK)
+
+
+WEAR = [
+    # Rivet lines just under the window line, both sides, cockpit to stern.
+    ("rivets", 8.4, 19.0, 1, 0.9, 0.97, 0.022, 8), ("rivets", 19.0, 29.5, 1, 0.9, 0.97, 0.022, 8),
+    ("rivets", 8.4, 19.0, 7, 0.9, 0.97, 0.022, 8), ("rivets", 19.0, 29.5, 7, 0.9, 0.97, 0.022, 8),
+    # Hazard stripe over the side door, and warning marks by the engine intakes.
+    ("hazard", 11.8, 14.0, 2, 0.28, 0.42), ("warning", 16.4, 17.2, 1, 0.45, 0.85, 0.022, 1),
+    ("warning", 16.4, 17.2, 7, 0.45, 0.85, 0.022, 1), ("power", 9.0, 9.8, 1, 0.35, 0.8, 0.022, 1),
+    # Rain streaks under the cooling louvres and along the cargo bay.
+    ("streaks", 13.2, 16.8, 2, 0.05, 1.0), ("streaks", 13.2, 16.8, 6, 0.05, 1.0),
+    ("streaks", 24.0, 28.6, 1, 0.1, 0.95), ("streaks", 24.0, 28.6, 7, 0.1, 0.95),
+]
+SCORCH = [
+    # Nose-down impact: soot over the chin and lower nose.
+    ("soot_wide", 0.3, 3.6, 9, 0.05, 0.95), ("soot_a", 0.4, 3.4, 1, 0.0, 1.0), ("soot_c", 0.4, 3.4, 7, 0.0, 1.0),
+    ("soot_b", 0.6, 3.0, 0, 0.0, 1.0), ("soot_d", 0.6, 3.0, 8, 0.0, 1.0),
+    # Engine surge: trails along the port flank where the pod tore away, and over the stern roof.
+    ("soot_wide", 17.5, 26.0, 7, 0.0, 1.0, 0.024), ("soot_b", 18.0, 22.0, 6, 0.0, 1.0, 0.024),
+    ("soot_d", 26.5, 30.3, 4, 0.0, 0.45, 0.026), ("soot_a", 22.0, 25.0, 3, 0.0, 1.0, 0.024),
+    ("soot_c", 8.6, 11.0, 8, 0.0, 1.0),
+]
+
+
+# Faces: 1/7 the lower flanks (2 m tall amidships), 2/6 the upper flanks, 4 the roof.
+MARKINGS = [
+    # Her name and hull number on both flanks, readable from outside.
+    # Forward of the wings and engine pods, on the upper flanks, so nothing hides them.
+    ("m_kestrel", 8.5, 11.3, 2, 0.08, 0.92, 0.03), ("m_kestrel", 8.5, 11.3, 6, 0.08, 0.92, 0.03),
+    ("m_hl33k", 14.4, 16.1, 2, 0.2, 0.85, 0.03), ("m_hl33k", 14.4, 16.1, 6, 0.2, 0.85, 0.03),
+    ("m_rescue", 4.6, 6.8, 1, 0.2, 0.72, 0.03), ("m_rescue", 4.6, 6.8, 7, 0.2, 0.72, 0.03),
+    ("m_no_step", 19.6, 21.0, 4, 0.36, 0.64, 0.03),
+    # Panel numbers by the seams.
+    ("m_n01", 2.4, 2.9, 1, 0.62, 0.78, 0.03), ("m_n02", 10.0, 10.5, 1, 0.62, 0.78, 0.03),
+    ("m_n03", 20.0, 20.5, 2, 0.15, 0.4, 0.03), ("m_n04", 26.0, 26.5, 1, 0.62, 0.78, 0.03),
+    ("m_n07", 2.4, 2.9, 7, 0.62, 0.78, 0.03), ("m_n08", 10.0, 10.5, 7, 0.62, 0.78, 0.03),
+    ("m_n09", 20.0, 20.5, 6, 0.15, 0.4, 0.03), ("m_n10", 26.0, 26.5, 7, 0.62, 0.78, 0.03),
+    # Hazard chevrons either side of the cargo ramp.
+    ("m_chevron", 27.4, 29.4, 1, 0.02, 0.32, 0.03), ("m_chevron", 27.4, 29.4, 7, 0.02, 0.32, 0.03),
+    # Rust weeping from under the rivet line and the vents, and old dents.
+    ("m_drip_a", 14.6, 15.3, 1, 0.4, 0.88, 0.03), ("m_drip_b", 16.8, 17.6, 7, 0.35, 0.88, 0.03),
+    ("m_drip_c", 24.4, 25.0, 1, 0.3, 0.86, 0.03), ("m_drip_a", 11.0, 11.6, 7, 0.4, 0.88, 0.03),
+    ("m_dent_a", 3.6, 4.6, 1, 0.1, 0.4, 0.03), ("m_dent_b", 25.6, 26.3, 7, 0.3, 0.55, 0.03),
+    ("m_dent_c", 22.0, 23.4, 2, 0.2, 0.55, 0.03), ("m_dent_d", 8.6, 9.3, 7, 0.08, 0.36, 0.03),
+]
 
 
 def export(name):
@@ -306,22 +454,42 @@ def export(name):
 
 def main():
     reset()
-    roof("roof_main", 8.0, 30.2, 2.5)
-    roof("roof_cockpit", 3.5, 8.3, 3.35, step=0.15)
-    export("kestrel_roof")
+    hull()
+    glass = bpy.data.objects["glass_canopy"]
+    bpy.data.objects.remove(glass)
+    fin()
+    vents()
+    oxide_plates()
+    for i, x in enumerate((9.6, 19.6, 25.5)):
+        band("dark_seam_%d" % i, x - 0.03, x + 0.03, [0, 1, 2, 3, 4, 5, 6, 7, 8], DARK)
+    # Canopy frame: ribs over the glazing and a sill along the break line.
+    for i, x in enumerate((1.0, 2.2, 3.4, 4.6, 5.8, 7.0, 8.2)):
+        faces = [2, 3, 4, 5, 6] if x <= GLASS_ROOF_TO else [2, 3, 5, 6]
+        band("frame_rib_%d" % i, x - 0.07, x + 0.07, faces, DARK, lift=0.03)
+    for k, u in ((2, 0.0), (6, 1.0), (3, 0.0), (5, 1.0)):
+        bm = bmesh.new()
+        xs = [x for x in ring_xs() if GLASS_X[0] <= x <= GLASS_X[1]]
+        rows = []
+        for x in xs:
+            p = on_face(x, k, u, 0.03)
+            rows.append([(p[0], p[1] - 0.06, p[2]), (p[0], p[1] + 0.06, p[2])])
+        quad_strip(bm, rows)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        make("frame_sill_%d_%d" % (k, int(u)), bm, DARK)
+    decals("decal_wear", WEAR)
+    decals("markings", MARKINGS)
+    export("kestrel_hull")
     reset()
-    keel("keel", 4.2, 29.4)
-    export("kestrel_keel")
+    decals("decal_scorch", SCORCH)
+    export("kestrel_scorch")
     reset()
-    nose("nose")
-    cowl("cowl")
-    export("kestrel_nose")
+    hull()
+    for obj in list(bpy.data.objects):
+        if obj.name != "glass_canopy":
+            bpy.data.objects.remove(obj)
+    export("kestrel_canopy")
     reset()
-    fin("fin_port", 7.6)
-    fin("fin_stbd", 18.4)
-    export("kestrel_fins")
-    reset()
-    nacelle("nacelle")
+    nacelle()
     export("kestrel_nacelle")
 
 

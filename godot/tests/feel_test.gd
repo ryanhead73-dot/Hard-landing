@@ -19,6 +19,12 @@ func _run() -> void:
 	await _splash()
 	await _damage_arcs()
 	await _rifle()
+	await _weapon_swap()
+	await _hit_stop()
+	await _accessibility()
+	await _key_bindings()
+	await _pad_focus()
+	_display()
 	_graphics()
 	finished = true
 
@@ -177,13 +183,227 @@ func _graphics() -> void:
 	var vp := get_viewport()
 	Game.graphics = Game.GRAPHICS_HIGH
 	Game.graphics_changed.emit()
+	_check("High shadows every lamp", main.kestrel._aux_lights.all(func(l): return l.shadow_enabled and l.omni_shadow_mode == OmniLight3D.SHADOW_CUBE))
 	_check("High adds indirect light, haze, soft shadows and 4x MSAA", env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.light_angular_distance > 0.0 and vp.msaa_3d == Viewport.MSAA_4X)
 	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()
+	var lit: Array = main.kestrel._aux_lights.filter(func(l): return l.shadow_enabled)
+	_check("Medium shadows only the workshop lamps, two passes each", lit.size() == Kestrel.SHADOW_LAMPS and lit.all(func(l): return l.omni_shadow_mode == OmniLight3D.SHADOW_DUAL_PARABOLOID), "%d shadowed" % lit.size())
 	_check("Medium keeps SSAO and the haze, drops indirect light", not env.ssil_enabled and env.ssao_enabled and env.volumetric_fog_density > 0.0 and main._sun.directional_shadow_max_distance == 120.0 and vp.msaa_3d == Viewport.MSAA_2X)
 	Game.graphics = Game.GRAPHICS_LOW
 	Game.graphics_changed.emit()
 	_check("Low drops SSAO, haze and cascades, renders at 85%", not env.ssil_enabled and not env.ssao_enabled and env.volumetric_fog_density == 0.0 and env.volumetric_fog_enabled and main._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS and vp.scaling_3d_scale < 1.0)
+	_check("Low drops the lamps' shadows", main.kestrel._aux_lights.all(func(l): return not l.shadow_enabled))
 	_check("the presets are named Low, Medium, High", Game.GRAPHICS_NAMES == ["Low", "Medium", "High"])
 	Game.graphics = Game.GRAPHICS_MEDIUM
 	Game.graphics_changed.emit()
+
+
+## Switching weapons tips the old gun muzzle-down, swaps it at the bottom and brings the new one
+## up, instead of popping.
+func _weapon_swap() -> void:
+	var w: Weapon = player.weapon
+	Game.give_weapon("scattergun")
+	w.equip("rifle")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.1).timeout
+	_check("no dip at rest", w.swap_dip() == 0.0 and w._models["rifle"].rotation.x == 0.0)
+	w.equip("scattergun")
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.3).timeout
+	_check("early in a switch the rifle is still in her hands, tipping down",
+		w.shown_model() == "rifle" and w._models["rifle"].visible and not w._models["scattergun"].visible and w._models["rifle"].rotation.x < -0.05,
+		"%s %.2f" % [w.shown_model(), w._models["rifle"].rotation.x])
+	_check("it can't fire mid-switch", not w.try_fire(false))
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.4).timeout
+	_check("past halfway the scattergun has replaced it, coming up", w.shown_model() == "scattergun" and w._models["scattergun"].visible and not w._models["rifle"].visible,
+		w.shown_model())
+	await get_tree().create_timer(Weapon.SWITCH_TIME * 0.5).timeout
+	_check("and the switch settles level", w.swap_dip() == 0.0 and w._models["scattergun"].rotation.x == 0.0, "%.2f" % w._models["scattergun"].rotation.x)
+	w.equip("rifle")
+	await get_tree().create_timer(Weapon.SWITCH_TIME + 0.1).timeout
+
+
+## Hit-stop always lets go: overlapping stops, a pause mid-stop and the player being freed
+## mid-stop (quitting to the title) all come back to full speed. (Jake saw it stick.)
+func _hit_stop() -> void:
+	Game.hit_stop(0.1, true)
+	Game.hit_stop(0.05, true)
+	_check("a hit-stop slows time", Engine.time_scale == Game.HIT_STOP_SCALE)
+	await get_tree().create_timer(0.3, true, false, true).timeout
+	_check("overlapping stops end on time", Engine.time_scale == 1.0, str(Engine.time_scale))
+	Game.hit_stop(5.0, true)
+	await get_tree().create_timer(Game.HIT_STOP_MAX + 0.15, true, false, true).timeout
+	_check("no stop lasts longer than the cap", Engine.time_scale == 1.0, str(Engine.time_scale))
+	Game.hit_stop(0.2, true)
+	get_tree().paused = true
+	await get_tree().create_timer(0.05, true, false, true).timeout
+	_check("pausing mid-stop restores full speed", Engine.time_scale == 1.0, str(Engine.time_scale))
+	get_tree().paused = false
+	Engine.time_scale = 0.3
+	await get_tree().create_timer(0.05, true, false, true).timeout
+	_check("a stray slow-down is put right", Engine.time_scale == 1.0, str(Engine.time_scale))
+
+
+## Accessibility settings: toggle aim latches and unlatches, subtitles hide or grow, and both
+## are in the pause menu and saved.
+func _accessibility() -> void:
+	player.revive(_ground(main.SPAWN + Vector3(8.0, 0.0, 8.0)))
+	await _frames(5)
+	Game.toggle_aim = true
+	await _press("aim")
+	await _frames(3)
+	_check("toggle aim: one press aims and it stays on", player.aiming)
+	await _press("aim")
+	await _frames(3)
+	_check("a second press lets go", not player.aiming)
+	await _press("aim")
+	player.revive(player.global_position)
+	await _frames(3)
+	_check("going down drops toggled aim", not player.aiming)
+	Game.toggle_aim = false
+	var hud: Hud = main.hud
+	var base: int = hud._voice.get_theme_font_size("normal_font_size")
+	Game.subtitles = 3
+	Game.apply_settings()
+	_check("largest subtitles are half as big again", hud._voice.get_theme_font_size("normal_font_size") >= roundi(base * 1.45), "%d vs %d" % [hud._voice.get_theme_font_size("normal_font_size"), base])
+	Game.subtitles = 0
+	Game.apply_settings()
+	hud.set_voice("Juno", "Testing.")
+	_check("subtitles off hides them", not hud._voice.visible)
+	Game.subtitles = 1
+	Game.apply_settings()
+	hud.set_voice("Juno", "Testing.")
+	_check("and on shows them", hud._voice.visible)
+	hud.set_voice("", "")
+	var menu: Node = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	_check("the pause menu has aim mode and subtitles", menu.find_child("AimMode", true, false) != null and menu.find_child("Subtitles", true, false) != null)
+	var cfg := ConfigFile.new()
+	Game.toggle_aim = true
+	Game.subtitles = 2
+	Game.save_settings()
+	cfg.load(Game.settings_path)
+	_check("both are saved", cfg.get_value("access", "toggle_aim") == true and cfg.get_value("access", "subtitles") == 2)
+	Game.toggle_aim = false
+	Game.subtitles = 1
+	Game.save_settings()
+	Game.apply_settings()
+
+
+## Rebinding: a new key drives the action, the old one stops, a clash swaps, prompts and the
+## help line follow, it saves, and reset puts everything back.
+func _key_bindings() -> void:
+	_check("default bindings come from the game's key table", Game.primary_key("interact") == KEY_E and Game.key_label("interact") == "E")
+	Game.rebind("interact", KEY_H)
+	_check("rebinding moves the action to the new key", _has_key("interact", KEY_H) and not _has_key("interact", KEY_E))
+	Game.rebind("reload", KEY_H)
+	_check("taking a key in use swaps it over", Game.primary_key("reload") == KEY_H and Game.primary_key("interact") == KEY_R,
+		"%s %s" % [Game.key_label("reload"), Game.key_label("interact")])
+	_check("prompts follow the binding", Game.device_text("[E] Open the armoury locker") == "[R] Open the armoury locker", Game.device_text("[E] Open the armoury locker"))
+	_check("the controls line follows it", Hud.help_text().contains("H reload") and Hud.help_text().contains("R interact"), Hud.help_text())
+	Game.save_settings()
+	var cfg := ConfigFile.new()
+	cfg.load(Game.settings_path)
+	_check("bindings are saved", int(cfg.get_value("keys", "reload", 0)) == KEY_H)
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	menu.open()
+	menu._open_bindings()
+	await _frames(2)
+	_check("the pause menu opens the bindings list", menu.bindings.visible and not menu.visible and menu.bindings._buttons.size() == Game.REBINDABLE.size())
+	menu.bindings._listen("jump")
+	var ev := InputEventKey.new()
+	ev.physical_keycode = KEY_J
+	ev.pressed = true
+	menu.bindings._input(ev)
+	_check("pressing a key while listening binds it", Game.primary_key("jump") == KEY_J and menu.bindings.listening == "")
+	Game.reset_keys()
+	_check("reset puts the defaults back", Game.primary_key("interact") == KEY_E and Game.primary_key("reload") == KEY_R and Game.primary_key("jump") == KEY_SPACE and _has_key("interact", KEY_E))
+	menu.bindings.close()
+	await _frames(2)
+	_check("closing it returns to the pause menu", menu.visible and not menu.bindings.visible)
+	menu.close()
+
+
+## With a pad, every menu holds a focused control so the d-pad and A work; focus comes back
+## after a panel rebuilds its buttons, and B backs out of listening for a key.
+func _pad_focus() -> void:
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	var vp := get_viewport()
+	Game.using_pad = true
+	menu.open()
+	await _frames(2)
+	var owner := vp.gui_get_focus_owner()
+	_check("the pause menu focuses Resume on a pad", owner != null and owner.name == "Resume", str(owner))
+	menu._open_bindings()
+	await _frames(2)
+	owner = vp.gui_get_focus_owner()
+	_check("the bindings list takes focus", owner != null and menu.bindings.is_ancestor_of(owner), str(owner))
+	menu.bindings._listen("jump")
+	var back := InputEventJoypadButton.new()
+	back.button_index = JOY_BUTTON_B
+	back.pressed = true
+	menu.bindings._input(back)
+	_check("B stops listening without closing", menu.bindings.listening == "" and menu.bindings.visible and Game.primary_key("jump") == KEY_SPACE)
+	menu.bindings.close()
+	await _frames(2)
+	menu.close()
+	await _frames(1)
+	var fab: FabricatorMenu = main.fabricator
+	var was := [Game.scrap, Game.stims]
+	Game.scrap = 999
+	Game.stims = 0
+	fab.open()
+	await _frames(2)
+	owner = vp.gui_get_focus_owner()
+	_check("the fabricator focuses a build button", owner is Button and fab.is_ancestor_of(owner), str(owner))
+	fab._refresh()
+	await _frames(3)
+	owner = vp.gui_get_focus_owner()
+	_check("focus comes back after the list rebuilds", owner != null and fab.is_ancestor_of(owner) and not owner.is_queued_for_deletion(), str(owner))
+	fab.close()
+	# Vibration: a knock rumbles the pad, and the setting turns it off.
+	var n := Game.rumbles
+	main.player.add_trauma(0.4)
+	_check("a hit rumbles the pad", Game.rumbles == n + 1 and Game.last_rumble.y > 0.3, str(Game.last_rumble))
+	Game.vibration = false
+	main.player.add_trauma(0.4)
+	_check("vibration can be turned off", Game.rumbles == n + 1)
+	Game.vibration = true
+	_check("the pause menu has a vibration switch", menu.find_child("Vibration", true, false) != null)
+	_check("the pause menu has controller look sensitivity", menu.find_child("PadSensitivity", true, false) != null)
+	Game.scrap = was[0]
+	Game.stims = was[1]
+	Game.using_pad = false
+	await _frames(1)
+
+
+## Display settings: window mode, v-sync and the frame cap are in the menu, saved, and the cap
+## reaches the engine.
+func _display() -> void:
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	_check("the pause menu has display, frame cap and v-sync", menu.find_child("WindowMode", true, false) != null and menu.find_child("FpsCap", true, false) != null and menu.find_child("VSync", true, false) != null)
+	var was := [Game.window_mode, Game.vsync, Game.fps_cap]
+	Game.window_mode = 2
+	Game.vsync = false
+	Game.fps_cap = 144
+	Game.apply_settings()
+	_check("the frame cap reaches the engine", Engine.max_fps == 144)
+	Game.save_settings()
+	Game.window_mode = 0
+	Game.vsync = true
+	Game.fps_cap = 0
+	Game.load_settings()
+	_check("display settings are saved", Game.window_mode == 2 and not Game.vsync and Game.fps_cap == 144)
+	Game.window_mode = was[0]
+	Game.vsync = was[1]
+	Game.fps_cap = was[2]
+	Game.apply_settings()
+	Game.save_settings()
+	_check("lifting the cap frees the engine", Engine.max_fps == Game.fps_cap)
+	var b := Game.brightness
+	(menu.find_child("Brightness", true, false) as HSlider).value = 1.3
+	_check("brightness reaches the picture", is_equal_approx(main._env.adjustment_brightness, 1.3), str(main._env.adjustment_brightness))
+	Game.brightness = b
+	Game.apply_settings()
+
+
+func _has_key(action: String, key: int) -> bool:
+	return InputMap.action_get_events(action).any(func(e): return e is InputEventKey and e.physical_keycode == key)

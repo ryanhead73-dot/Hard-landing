@@ -10,6 +10,12 @@ signal died(enemy: Enemy)
 const WHISKERS := [0.4, 0.8, 1.2, 1.6, 2.0, 2.4]
 const WHISKER_LENGTH := 2.2
 const STEER_INTERVAL := 0.2
+## Stuck check: a creature that is trying to move but covers less than STUCK_MOVE metres in
+## STUCK_CHECK seconds backs off to one side for UNSTICK_TIME, and hops if it happens twice running.
+const STUCK_CHECK := 0.6
+const STUCK_MOVE := 0.3
+const UNSTICK_TIME := 0.8
+const HOP_SPEED := 3.6
 
 @export var max_health := 60.0
 @export var speed := 5.0
@@ -40,6 +46,18 @@ var last_hit_crit := false
 var last_hit_dir := Vector3.ZERO
 var last_hit_amount := 0.0
 var crits_taken := 0
+## A shot that does less than this share of its damage glanced off armour (a ram's head plate,
+## the Warden's closed shell). Blasts have no direction and never glance.
+const ARMOR_BELOW := 0.7
+## Whether the last hit glanced off armour.
+var last_hit_armored := false
+var armored_hits := 0
+## Arc lance hits lock a creature up for this long (half for elites, a fraction for bosses).
+const SHOCK_TIME := 0.55
+var shocked := false
+var shocks_taken := 0
+var _shock_tween: Tween
+var _shock_rest := Vector3.ZERO
 var _weak: Node3D
 ## How many creatures may close in on Juno to bite at once (story, normal, hard); the rest
 ## circle at a distance and wait their turn, so a pack reads as a pack and not a pile-up.
@@ -60,6 +78,16 @@ var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _steer := Vector3.ZERO
 var _steer_timer := 0.0
 var _steer_side := 0.0
+## Half the body's width, for the side feelers (from the collision shape).
+var _radius := -1.0
+var _stuck_at := Vector3.ZERO
+var _stuck_check := 0.0
+var _stuck_streak := 0
+var _steered_frame := -100
+var _unstick := Vector3.ZERO
+var _unstick_timer := 0.0
+## Times this creature has had to work itself loose (tests).
+var unstuck_count := 0
 var _flash_mats: Array[StandardMaterial3D] = []
 var _flash_meshes: Array[MeshInstance3D] = []
 ## The Blender model (see Rig), under the subclass's visual root.
@@ -130,6 +158,10 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, dir: Vector3 = Ve
 		mult = maxf(mult, 1.0) * CRIT_MULT
 		crits_taken += 1
 		_crit_effect(point)
+	last_hit_armored = not last_hit_crit and dir != Vector3.ZERO and mult < ARMOR_BELOW
+	if last_hit_armored:
+		armored_hits += 1
+		_armor_effect(point, dir)
 	health -= amount * mult
 	last_hit_dir = dir
 	last_hit_amount = amount * mult
@@ -165,6 +197,57 @@ func _crit_effect(point: Vector3) -> void:
 	if not is_inside_tree():
 		return
 	Vfx.burst(get_parent(), point, Color("ffd36a"), 14, 5.0, 0.06, 0.3, Vector3.UP, 120.0, -6.0)
+
+
+## Pale sparks kicked back off the plate, and a dull knock with a whine where it hit.
+func _armor_effect(point: Vector3, dir: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var back := (-dir + Vector3.UP * 0.4).normalized()
+	Vfx.burst(get_parent(), point, Color("d8e4f0"), 10, 6.0, 0.04, 0.22, back, 35.0, -9.0)
+	Sfx.play("hit_armor", point, -2.0, 0.12)
+
+
+## Caught by the arc lance: it seizes up where it stands, shaking and crackling blue, then carries
+## on (its timers wait too).
+func shock(seconds := SHOCK_TIME) -> void:
+	if dead or not is_inside_tree():
+		return
+	if is_in_group("bosses"):
+		seconds *= 0.3
+	elif is_elite():
+		seconds *= 0.5
+	shocks_taken += 1
+	if not shocked and _rig:
+		_shock_rest = _rig.position
+	shocked = true
+	set_physics_process(false)
+	velocity = Vector3(0.0, minf(velocity.y, 0.0), 0.0)
+	Sfx.play("arc_jolt", global_position, -3.0, 0.1)
+	Vfx.burst(get_parent(), global_position + Vector3.UP * 0.6, Color("9fd8ff"), 18, 3.0, 0.03, seconds, Vector3.UP, 180.0, 0.0)
+	if _shock_tween:
+		_shock_tween.kill()
+	_shock_tween = create_tween()
+	if _rig:
+		_shock_tween.tween_method(func(k: float):
+			if is_instance_valid(_rig):
+				_rig.position = _shock_rest + Vector3(randf_range(-1.0, 1.0), randf_range(-0.5, 0.5), randf_range(-1.0, 1.0)) * 0.05 * (1.0 - k),
+			0.0, 1.0, seconds)
+	else:
+		_shock_tween.tween_interval(seconds)
+	_shock_tween.tween_callback(_end_shock)
+
+
+func _end_shock() -> void:
+	if not shocked:
+		return
+	shocked = false
+	if _shock_tween:
+		_shock_tween.kill()
+		_shock_tween = null
+	if _rig and is_instance_valid(_rig):
+		_rig.position = _shock_rest
+	set_physics_process(true)
 
 
 ## Starts hunting. Nearby wildlife joins in when the alarm spreads.
@@ -213,6 +296,7 @@ func _on_calm() -> void:
 
 
 func _die() -> void:
+	_end_shock()
 	_release_slot()
 	dead = true
 	hunting = false
@@ -298,6 +382,24 @@ func _flat(v: Vector3) -> Vector3:
 ## Short feelers find a clear heading around walls and wreckage. Once it picks a side of an
 ## obstacle it keeps to that side until the way ahead is clear, so it doesn't dither.
 func _steer_around_walls(want: Vector3, delta: float) -> Vector3:
+	var frame := Engine.get_physics_frames()
+	if frame - _steered_frame > 10:
+		# Steering again after a bite, a stagger or a rest: start the stuck check afresh.
+		_stuck_at = global_position
+		_stuck_check = 0.0
+		_unstick_timer = 0.0
+	_steered_frame = frame
+	if _unstick_timer > 0.0:
+		_unstick_timer -= delta
+		return _unstick
+	_stuck_check += delta
+	if _stuck_check >= STUCK_CHECK:
+		var moved := _flat(global_position - _stuck_at).length()
+		_stuck_at = global_position
+		_stuck_check = 0.0
+		if moved < STUCK_MOVE:
+			return _work_loose(want)
+		_stuck_streak = 0
 	_steer_timer -= delta
 	if _steer_timer > 0.0 and _steer != Vector3.ZERO:
 		return _steer
@@ -320,6 +422,20 @@ func _steer_around_walls(want: Vector3, delta: float) -> Vector3:
 	return _steer
 
 
+## Pinned in a gap the feelers missed, or on a lip: back away to one side, try the other side
+## next, and hop if it keeps happening.
+func _work_loose(want: Vector3) -> Vector3:
+	unstuck_count += 1
+	_stuck_streak += 1
+	_steer_side = -_steer_side if _steer_side != 0.0 else (1.0 if randf() < 0.5 else -1.0)
+	_unstick = (want.cross(Vector3.UP) * _steer_side - want * 0.6).normalized()
+	_unstick_timer = UNSTICK_TIME
+	_steer_timer = 0.0
+	if _stuck_streak >= 2 and is_on_floor():
+		velocity.y = HOP_SPEED
+	return _unstick
+
+
 func _first_clear_angle(space: PhysicsDirectSpaceState3D, origin: Vector3, want: Vector3, side: float) -> float:
 	for angle in WHISKERS:
 		if _whisker_clear(space, origin, want.rotated(Vector3.UP, angle * side)):
@@ -327,11 +443,34 @@ func _first_clear_angle(space: PhysicsDirectSpaceState3D, origin: Vector3, want:
 	return INF
 
 
+## A heading is clear when feelers down the middle, low down and at both shoulders all are, so
+## a gap has to be as wide as the body.
 func _whisker_clear(space: PhysicsDirectSpaceState3D, origin: Vector3, heading: Vector3) -> bool:
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + heading * WHISKER_LENGTH, Game.LAYER_WORLD)
-	var hit := space.intersect_ray(query)
-	# Walkable slopes are not obstacles.
-	return hit.is_empty() or (hit.normal as Vector3).y > 0.6
+	if _radius < 0.0:
+		_radius = _body_radius()
+	var side := heading.cross(Vector3.UP).normalized() * _radius * 0.9
+	for start in [origin, origin + Vector3.DOWN * 0.3, origin + side, origin - side]:
+		var query := PhysicsRayQueryParameters3D.create(start, start + heading * WHISKER_LENGTH, Game.LAYER_WORLD)
+		var hit := space.intersect_ray(query)
+		# Walkable slopes are not obstacles.
+		if not hit.is_empty() and (hit.normal as Vector3).y <= 0.6:
+			return false
+	return true
+
+
+func _body_radius() -> float:
+	for c in get_children():
+		if c is CollisionShape3D and c.shape:
+			var sh: Shape3D = c.shape
+			if sh is SphereShape3D:
+				return sh.radius
+			if sh is CapsuleShape3D:
+				return sh.radius
+			if sh is BoxShape3D:
+				return maxf(sh.size.x, sh.size.z) * 0.5
+			if sh is CylinderShape3D:
+				return sh.radius
+	return 0.5
 
 
 ## Registers materials that flash white-hot when hit.

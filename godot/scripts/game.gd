@@ -12,11 +12,15 @@ signal graphics_changed
 signal repairs_changed
 signal inventory_changed
 signal log_found(id: String)
+## A world flag changed (see set_flag).
+signal flag_changed(id: String, value: Variant)
 
 ## Physics layer bits shared by every script.
 const LAYER_WORLD := 1
 const LAYER_PLAYER := 2
 const LAYER_ENEMY := 4
+## Things only shots touch (a pinweaver's thread): nothing walks into them.
+const LAYER_SHOT := 8
 
 const UPGRADE_ORDER: Array[String] = [
 	"extended_mag", "stim_pouch", "plating", "heavy_rounds", "regen_servo", "scatter_choke",
@@ -44,25 +48,45 @@ const NEEDS_TEXT := {
 	"engine": "top-tier builds need engine bleed power",
 }
 
-const SETTINGS_PATH := "user://settings.cfg"
-const SAVE_VERSION := 1
+var settings_path := "user://settings.cfg"
+## The save format this build writes; older saves are upgraded by SaveMigrations.
+const SAVE_VERSION := SaveMigrations.CURRENT
 
 var mouse_sensitivity := 0.0025
 var invert_y := false
+## Controller vibration (rumble) on shots, hits taken, blasts and big kills.
+var vibration := true
+## The last rumble asked for, [weak, strong, seconds], and how many there have been (for tests).
+var last_rumble := Vector3.ZERO
+var rumbles := 0
 ## True after the last input came from a gamepad; prompts and look follow it.
 var using_pad := false
 signal input_device_changed(pad: bool)
 ## Right-stick look speed in radians per second at full deflection (the settings slider scales it).
 var pad_look_speed := 3.2
+## Controller look sensitivity, a multiplier on pad_look_speed (separate from the mouse).
+const PAD_SENSITIVITY_RANGE := Vector2(0.4, 2.0)
+var pad_sensitivity := 1.0
 ## Key or button names shown in prompts, keyboard first, then gamepad.
 const PROMPT_KEYS := {
-	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"],
+	"interact": ["E", "Y"], "stim": ["Q", "LB"], "throw": ["G", "RB"], "logs": ["L", "D-pad left"], "journal": ["J", "D-pad left"],
 	"map": ["M", "D-pad down"], "inventory": ["Tab", "View"], "reload": ["R", "X"], "dodge": ["V", "B"],
+	"beacon": ["B", "Share"],
 }
 var master_volume := 0.8
 var music_volume := 0.7
 ## Sound effects (the SFX bus: weapons, creatures, machines, UI).
 var sfx_volume := 1.0
+## HOB's spoken lines (the Voice bus).
+var voice_volume := 1.0
+## The frame-rate readout (F3).
+var show_fps := false
+## Subtitles: 0 off, 1 on, 2 large, 3 largest.
+const SUBTITLE_NAMES := ["Off", "On", "Large", "Largest"]
+const SUBTITLE_SCALE := [1.0, 1.0, 1.25, 1.5]
+var subtitles := 1
+## Aim by holding the button (false) or press once to aim, again to stop (true).
+var toggle_aim := false
 var difficulty := 1
 ## Camera shake strength (0 turns it off).
 var screen_shake := 1.0
@@ -73,6 +97,20 @@ const GRAPHICS_MEDIUM := 1
 const GRAPHICS_HIGH := 2
 const GRAPHICS_NAMES := ["Low", "Medium", "High"]
 var graphics := GRAPHICS_MEDIUM
+
+## Display. Fullscreen is borderless at the desktop resolution; Exclusive hands the monitor to
+## the game. Alt+Enter flips between windowed and fullscreen.
+const WINDOW_NAMES := ["Windowed", "Fullscreen", "Exclusive fullscreen"]
+const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+var window_mode := 1
+var vsync := true
+## Frame-rate cap; 0 means none.
+const FPS_CAPS := [0, 30, 60, 120, 144]
+var fps_cap := 0
+## Picture brightness (the environment's brightness adjustment), 1.0 as graded.
+const BRIGHTNESS_RANGE := Vector2(0.7, 1.4)
+var brightness := 1.0
+var _shown_window := -1
 
 var scrap := 0
 ## The component on the player's back (a Campaign component id), or "".
@@ -108,8 +146,20 @@ var mission_stage: Dictionary = {}
 var mission_done: Array = []
 ## The current mission stage's objective line (set by MissionRunner), or "".
 var mission_objective := ""
+## A region mission's own line while Juno is there for a sourced repair (FerroCanopy), or "".
+var region_objective := ""
+## The opening's own objective line (see Opening); wins over the campaign's while it is set.
+var opening_objective := ""
 ## Set by the title screen for a new game: main plays the crash intro once.
 var intro_pending := false
+
+## Expansion state (save v2). The region Juno is in (see RegionDB), the campaign act (1-4),
+## world flags (id -> value, set by quests, discoveries and dialogue) and the quest log
+## (quest id -> {state, step}; see QuestDB).
+var region := SaveMigrations.DEFAULT_REGION
+var act := 1
+var flags: Dictionary = {}
+var quests: Dictionary = {}
 
 
 ## The name to show for an action's key on the current device.
@@ -118,19 +168,142 @@ func key_name(action: String) -> String:
 	return names[1 if using_pad else 0]
 
 
-## Rewrites keyboard prompts ("[E] ...", "[Hold E] ...") for the current device.
+## Rewrites keyboard prompts ("[E] ...", "[Hold E] ...") for the current device and the
+## player's key bindings.
 func device_text(text: String) -> String:
 	if not using_pad:
-		return text
+		return keyboard_text(text)
 	return text.replace("[Hold E]", "[Hold %s]" % key_name("interact")).replace("[E]", "[%s]" % key_name("interact"))
 
 
+# --- Key bindings ---------------------------------------------------------------------------
+
+## Keyboard actions the player can rebind, in the order the bindings menu lists them, with
+## their names there. Each has one primary key (rebindable) after main.KEYS' defaults; any
+## secondary default key (arrows, Ctrl, Alt, I) stays as it is.
+const REBINDABLE := [
+	["move_forward", "Move forward"], ["move_back", "Move back"], ["move_left", "Move left"],
+	["move_right", "Move right"], ["sprint", "Sprint"], ["jump", "Jump"], ["crouch", "Crouch"],
+	["dodge", "Roll"], ["interact", "Interact"], ["reload", "Reload"], ["stim", "Use stim"],
+	["throw", "Throw arc charge"], ["flashlight", "Flashlight"], ["weapon_1", "Rifle"],
+	["weapon_2", "Scattergun"], ["weapon_3", "Arc lance"], ["inventory", "Inventory"],
+	["map", "Map"], ["logs", "Logs"], ["journal", "Journal"], ["beacon", "Plant beacon"],
+]
+## Defaults, filled from main.KEYS when the game scene first sets up input.
+var default_keys: Dictionary = {}
+## action -> physical keycode the player chose.
+var key_overrides: Dictionary = {}
+signal keys_changed
+
+
+func primary_key(action: String) -> int:
+	if key_overrides.has(action):
+		return key_overrides[action]
+	var keys: Array = default_keys.get(action, [])
+	return keys[0] if keys.size() > 0 else KEY_NONE
+
+
+func key_label(action: String) -> String:
+	var k := primary_key(action)
+	return OS.get_keycode_string(k) if k != KEY_NONE else "?"
+
+
+## Binds `action`'s primary key to `key`. A key already on another action swaps over, so no key
+## does two things and nothing is left unbound.
+func rebind(action: String, key: int) -> void:
+	var old := primary_key(action)
+	for pair in REBINDABLE:
+		var other: String = pair[0]
+		if other != action and primary_key(other) == key:
+			_set_key(other, old)
+	_set_key(action, key)
+	apply_keys()
+	keys_changed.emit()
+
+
+func reset_keys() -> void:
+	key_overrides.clear()
+	apply_keys()
+	keys_changed.emit()
+
+
+func _set_key(action: String, key: int) -> void:
+	var keys: Array = default_keys.get(action, [])
+	if keys.size() > 0 and keys[0] == key:
+		key_overrides.erase(action)
+	else:
+		key_overrides[action] = key
+
+
+## Puts the bindings into the InputMap: the primary key (chosen or default) plus the defaults'
+## secondary keys, unless one of those is now another action's primary.
+func apply_keys() -> void:
+	var taken := {}
+	for action in default_keys:
+		taken[primary_key(action)] = action
+	for action in default_keys:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for ev in InputMap.action_get_events(action):
+			if ev is InputEventKey:
+				InputMap.action_erase_event(action, ev)
+		var keys: Array = [primary_key(action)]
+		for k in default_keys[action].slice(1):
+			if not taken.has(k):
+				keys.append(k)
+		for k in keys:
+			var ev := InputEventKey.new()
+			ev.physical_keycode = k
+			InputMap.action_add_event(action, ev)
+
+
+## Rewrites the default key names in keyboard text ("[E]", "[Hold E]", "[Shift]") to the
+## player's bindings.
+func keyboard_text(text: String) -> String:
+	if key_overrides.is_empty() or not text.contains("["):
+		return text
+	# Two passes through placeholders, so swapped keys (E->R, R->H) don't chain.
+	var out := text
+	var now: Array[String] = []
+	for action in key_overrides:
+		var keys: Array = default_keys.get(action, [])
+		if keys.is_empty():
+			continue
+		var was := OS.get_keycode_string(keys[0])
+		var mark := "\u0001%d\u0001" % now.size()
+		now.append(key_label(action))
+		out = out.replace("[%s]" % was, "[%s]" % mark).replace("[Hold %s]" % was, "[Hold %s]" % mark)
+	for i in now.size():
+		out = out.replace("\u0001%d\u0001" % i, now[i])
+	return out
+
+
 ## True for the B button press that backs out of a menu.
+## Rumbles every connected pad, if a pad is in use and vibration is on. Weak is the high-frequency
+## motor (rattles: shots), strong the low one (thumps: hits, blasts); both 0-1.
+func rumble(weak: float, strong: float, seconds: float) -> void:
+	if not vibration or not using_pad:
+		return
+	last_rumble = Vector3(clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), seconds)
+	rumbles += 1
+	for pad in Input.get_connected_joypads():
+		Input.start_joy_vibration(pad, last_rumble.x, last_rumble.y, seconds)
+
+
 func is_pad_back(event: InputEvent) -> bool:
 	return event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
+		show_fps = not show_fps
+		apply_settings()
+		save_settings()
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ENTER and event.alt_pressed:
+		window_mode = 0 if window_mode != 0 else 1
+		apply_settings()
+		save_settings()
+		get_viewport().set_input_as_handled()
 	var pad := using_pad
 	if event is InputEventJoypadButton and event.pressed:
 		pad = true
@@ -145,21 +318,80 @@ func _input(event: InputEvent) -> void:
 		input_device_changed.emit(pad)
 
 
+## Hit-stop: time runs at HIT_STOP_SCALE until this wall-clock tick (msec), 0 when none.
+const HIT_STOP_SCALE := 0.05
+## A hit-stop never lasts longer than this, whatever asked for it.
+const HIT_STOP_MAX := 0.3
+var stop_until := 0
+
+
+## Freezes time for a beat. Game restores it from its own _process against the wall clock, so
+## nothing (a scene change, a freed player, a pause, a lost timer) can leave the game in slow
+## motion. Skipped headless, where tests count frames.
+func hit_stop(seconds: float, force := false) -> void:
+	if DisplayServer.get_name() == "headless" and not force:
+		return
+	stop_until = maxi(stop_until, Time.get_ticks_msec() + int(minf(seconds, HIT_STOP_MAX) * 1000.0))
+	Engine.time_scale = HIT_STOP_SCALE
+
+
+func _process(_delta: float) -> void:
+	if stop_until == 0:
+		# Anything else that slowed time and forgot to put it back.
+		if Engine.time_scale != 1.0:
+			Engine.time_scale = 1.0
+		return
+	if Time.get_ticks_msec() >= stop_until or get_tree().paused:
+		stop_until = 0
+		Engine.time_scale = 1.0
+
+
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_isolate_test_files()
 	load_settings()
+	add_child(FpsOverlay.new())
+
+
+## A test scene (res://tests/...) gets its own settings and save files, so suites run side by side
+## can't read each other's saves, and no test touches the player's real ones.
+func _isolate_test_files() -> void:
+	for arg in OS.get_cmdline_args():
+		if arg.begins_with("res://tests/"):
+			var test_name := arg.get_file().get_basename()
+			DirAccess.make_dir_recursive_absolute("user://tests")
+			settings_path = "user://tests/%s_settings.cfg" % test_name
+			save_path = "user://tests/%s_save.json" % test_name
+			return
 
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) == OK:
+	if cfg.load(settings_path) == OK:
 		mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 		invert_y = cfg.get_value("controls", "invert_y", invert_y)
+		vibration = cfg.get_value("controls", "vibration", vibration)
+		pad_sensitivity = clampf(cfg.get_value("controls", "pad_sensitivity", pad_sensitivity), PAD_SENSITIVITY_RANGE.x, PAD_SENSITIVITY_RANGE.y)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		music_volume = cfg.get_value("audio", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx_volume", sfx_volume)
+		voice_volume = cfg.get_value("audio", "voice_volume", voice_volume)
+		show_fps = cfg.get_value("video", "show_fps", show_fps)
 		difficulty = clampi(cfg.get_value("game", "difficulty", difficulty), 0, 2)
 		screen_shake = clampf(cfg.get_value("game", "screen_shake", screen_shake), 0.0, 1.0)
 		graphics = clampi(cfg.get_value("video", "graphics", graphics), GRAPHICS_LOW, GRAPHICS_HIGH)
+		subtitles = clampi(cfg.get_value("access", "subtitles", subtitles), 0, SUBTITLE_NAMES.size() - 1)
+		toggle_aim = cfg.get_value("access", "toggle_aim", toggle_aim)
+		window_mode = clampi(cfg.get_value("video", "window_mode", window_mode), 0, WINDOW_NAMES.size() - 1)
+		vsync = cfg.get_value("video", "vsync", vsync)
+		fps_cap = int(cfg.get_value("video", "fps_cap", fps_cap))
+		brightness = clampf(cfg.get_value("video", "brightness", brightness), BRIGHTNESS_RANGE.x, BRIGHTNESS_RANGE.y)
+		if fps_cap not in FPS_CAPS:
+			fps_cap = 0
+		key_overrides = {}
+		if cfg.has_section("keys"):
+			for action in cfg.get_section_keys("keys"):
+				key_overrides[action] = int(cfg.get_value("keys", action))
 	apply_settings()
 
 
@@ -169,7 +401,7 @@ func load_settings() -> void:
 ## the SFX bus pulls them down under gunfire and blasts, and a "Duck" amplifier that Sfx.duck()
 ## drives for story beats (dialogue, the aux power-up).
 static func ensure_buses() -> void:
-	for bus_name in ["Music", "Ambience", "SFX", "Interior"]:
+	for bus_name in ["Music", "Ambience", "SFX", "Interior", "Voice"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			var i := AudioServer.bus_count - 1
@@ -224,13 +456,27 @@ func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("controls", "invert_y", invert_y)
+	cfg.set_value("controls", "vibration", vibration)
+	cfg.set_value("controls", "pad_sensitivity", pad_sensitivity)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("audio", "sfx_volume", sfx_volume)
+	cfg.set_value("audio", "voice_volume", voice_volume)
+	cfg.set_value("video", "show_fps", show_fps)
 	cfg.set_value("game", "difficulty", difficulty)
 	cfg.set_value("game", "screen_shake", screen_shake)
 	cfg.set_value("video", "graphics", graphics)
-	cfg.save(SETTINGS_PATH)
+	cfg.set_value("access", "subtitles", subtitles)
+	cfg.set_value("access", "toggle_aim", toggle_aim)
+	cfg.set_value("video", "window_mode", window_mode)
+	cfg.set_value("video", "vsync", vsync)
+	cfg.set_value("video", "fps_cap", fps_cap)
+	cfg.set_value("video", "brightness", brightness)
+	if cfg.has_section("keys"):
+		cfg.erase_section("keys")
+	for action in key_overrides:
+		cfg.set_value("keys", action, key_overrides[action])
+	cfg.save(settings_path)
 
 
 func apply_settings() -> void:
@@ -238,7 +484,21 @@ func apply_settings() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Voice"), linear_to_db(maxf(voice_volume, 0.0001)))
+	_apply_display()
 	settings_changed.emit()
+
+
+## Window mode, v-sync and the frame cap. The window only changes when the setting does, so a
+## slider elsewhere in the menu doesn't make it flicker. Nothing to do without a window.
+func _apply_display() -> void:
+	Engine.max_fps = fps_cap
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	if window_mode != _shown_window:
+		_shown_window = window_mode
+		DisplayServer.window_set_mode(WINDOW_MODES[window_mode])
 
 
 func reset() -> void:
@@ -259,7 +519,14 @@ func reset() -> void:
 	mission_stage.clear()
 	mission_done.clear()
 	mission_objective = ""
+	opening_objective = ""
+	region_objective = ""
+	region = SaveMigrations.DEFAULT_REGION
+	act = 1
+	flags.clear()
+	quests.clear()
 	inventory_changed.emit()
+	flag_changed.emit("", null)
 	repairs_changed.emit()
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
@@ -284,7 +551,7 @@ func enemy_health_scale() -> float:
 # --- Save and load -------------------------------------------------------------------------
 
 func has_save() -> bool:
-	return FileAccess.file_exists(save_path)
+	return FileAccess.file_exists(save_path) or FileAccess.file_exists(backup_path())
 
 
 ## The session half of a save. Main adds the world (sites, siege, weapon in hand).
@@ -305,6 +572,10 @@ func session_state() -> Dictionary:
 		"hints_seen": hints_seen.duplicate(),
 		"mission_stage": mission_stage.duplicate(),
 		"mission_done": mission_done.duplicate(),
+		"region": region,
+		"act": act,
+		"flags": flags.duplicate(true),
+		"quests": quests.duplicate(true),
 	}
 
 
@@ -343,35 +614,75 @@ func apply_session(data: Dictionary) -> void:
 	hints_seen.clear()
 	for h in data.get("hints_seen", []):
 		hints_seen.append(String(h))
+	region = String(data.get("region", SaveMigrations.DEFAULT_REGION))
+	act = clampi(int(data.get("act", 1)), 1, 4)
+	flags = (data.get("flags", {}) as Dictionary).duplicate(true)
+	quests = (data.get("quests", {}) as Dictionary).duplicate(true)
+	_open_by_repairs()
+	# Whatever listens for flags (gates, quests) looks again: the whole set just changed.
+	flag_changed.emit("", null)
 	scrap_changed.emit(scrap)
 	carrying_changed.emit(carrying)
 	upgrades_changed.emit()
 	inventory_changed.emit()
 
 
+## Cooling clears the canyon's rockfall (Jake, 2026-11-07). Saves made before that rule have
+## cooling in and the canyon shut, and the canopy is salvaged beyond it now: open it for them.
+func _open_by_repairs() -> void:
+	if is_repaired("cooling") and not flags.get("shatterlands_open", false):
+		set_flag("shatterlands_open")
+	if is_repaired("wing") and not flags.get("loom_open", false):
+		set_flag("loom_open")
+
+
+## Writes the save safely: the new file goes to a temp file first and only replaces the save once
+## it is complete, and the save it replaces is kept as a backup. A crash or power cut mid-write
+## leaves the last good save in place.
 func write_save(data: Dictionary) -> bool:
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	var tmp := save_path + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
-		push_warning("Game: cannot write %s" % save_path)
+		push_warning("Game: cannot write %s" % tmp)
 		return false
 	file.store_string(JSON.stringify(data, "\t"))
+	file.close()
+	if FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(backup_path())
+		DirAccess.rename_absolute(save_path, backup_path())
+	if DirAccess.rename_absolute(tmp, save_path) != OK:
+		push_warning("Game: cannot replace %s" % save_path)
+		return false
 	return true
 
 
-## Reads the save file, or returns {} if there is none or it doesn't parse.
+func backup_path() -> String:
+	return save_path + ".bak"
+
+
+## Reads the save, or the backup if the save is missing or damaged; {} if neither parses.
 func read_save() -> Dictionary:
-	if not has_save():
+	for path in [save_path, backup_path()]:
+		var data := _read_json(path)
+		if not data.is_empty():
+			return data
+	return {}
+
+
+func _read_json(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
 		return {}
-	var file := FileAccess.open(save_path, FileAccess.READ)
-	var data: Variant = JSON.parse_string(file.get_as_text()) if file else null
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != SAVE_VERSION:
+	# Older saves are upgraded in place; a newer build's save or a damaged file comes back {}.
+	var data := SaveMigrations.migrate(JSON.parse_string(FileAccess.get_file_as_string(path)))
+	if int(data.get("version", 0)) != SAVE_VERSION:
 		return {}
 	return data
 
 
 func delete_save() -> void:
-	if has_save():
-		DirAccess.remove_absolute(save_path)
+	for path in [save_path, backup_path(), save_path + ".tmp"]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 
 
 func add_scrap(amount: int) -> void:
@@ -520,6 +831,7 @@ func set_repaired(id: String, value: bool) -> void:
 	if is_repaired(id) == value:
 		return
 	repaired[id] = value
+	_open_by_repairs()
 	# A dev toggle can fix the part you're carrying: drop it rather than strand it.
 	if value and carrying != "" and Campaign.by_component(carrying).get("id", "") == id:
 		carrying = ""
@@ -548,7 +860,24 @@ func phase() -> String:
 	var id := current_repair()
 	if id == "":
 		return "launch"
-	return "return" if carrying == Campaign.get_repair(id)["component"] else "find"
+	var component: String = Campaign.get_repair(id)["component"]
+	return "return" if carrying == component or delivered(component) else "find"
+
+
+## A component salvaged in another region and sent to Kestrel: waiting at the install bay.
+func delivered(component: String) -> bool:
+	return bool(flags.get("delivered_" + component, false))
+
+
+func set_region_objective(text: String) -> void:
+	if text != region_objective:
+		region_objective = text
+		objective_changed.emit(objective_text())
+
+
+func deliver_component(component: String) -> void:
+	set_flag("delivered_" + component, true)
+	objective_changed.emit(objective_text())
 
 
 ## True when the fabricator can run this build at all, scrap aside.
@@ -584,13 +913,26 @@ func take_component(component: String) -> void:
 
 ## Fits the carried component. The caller repairs Kestrel, which mirrors back via set_repaired().
 func install_component() -> void:
-	var r := Campaign.by_component(carrying)
+	var component := carrying
+	if component == "":
+		component = String(Campaign.get_repair(current_repair()).get("component", ""))
+	var r := Campaign.by_component(component)
+	if flags.has("delivered_" + component):
+		set_flag("delivered_" + component, false)
 	carrying = ""
 	carrying_changed.emit(carrying)
 	message.emit(r.get("done", ""))
 
 
 ## Records a story log. Returns true if it's new.
+## Sets a world flag (quests, discoveries and dialogue read them; they save with the session).
+func set_flag(id: String, value: Variant = true) -> void:
+	if flags.get(id) == value:
+		return
+	flags[id] = value
+	flag_changed.emit(id, value)
+
+
 func find_log(id: String) -> bool:
 	if id == "" or id in logs or Story.get_log(id).is_empty():
 		return false
@@ -610,11 +952,19 @@ func launch() -> void:
 
 
 func objective_text() -> String:
+	if opening_objective != "":
+		return opening_objective
+	# A region mission running where Juno stands (Ferro-9's canopy or gear) has the line.
+	if region_objective != "" and phase() != "launch":
+		return region_objective
 	match phase():
 		"find":
 			if mission_objective != "":
 				return mission_objective
-			return Campaign.get_repair(current_repair())["find"]
+			var r := Campaign.get_repair(current_repair())
+			if Campaign.sourced(r["id"]) and region == Campaign.SOURCED[r["id"]]["region"]:
+				return r.get("find_there", r["find"])
+			return r["find"]
 		"return":
 			return Campaign.get_repair(current_repair())["return"]
 		"launch":

@@ -659,6 +659,23 @@ def hit_crit(v):
     return place(0.22, (0, crack * 0.8), (0, ping * 0.4))
 
 
+@sound("hit_armor", 3)
+def hit_armor(v):
+    """A shot glancing off a plate: a dull knock and a short metallic whine, no flesh."""
+    knock = place(0.3, (0, click(0.006, 1200, 6000) * 0.7), (0, clack(620 + 70 * v, 0.06, 0.12, 0.8)))
+    whine = osc(sweep(3900 + 300 * v, 2100 + 200 * v, 0.16), 0.16) * env(0.16, 0.004, 0.13) * 0.18
+    return place(0.3, (0, knock), (0.012, whine))
+
+
+@sound("arc_jolt", 2)
+def arc_jolt(v):
+    """A creature caught by the lance: a dense spitting crackle over a buzzing 120 Hz, cut short."""
+    d = 0.5
+    crackle = grains(d, 420 + 60 * v, lambda i: hp(white(0.003), 3000) * dsp.rng.uniform(0.2, 1.0)) * env(d, 0.002, 0.42)
+    buzz = bp(osc(120, d, "saw") + 0.4 * osc(240 + 10 * v, d, "saw"), 200, 3000) * env(d, 0.005, 0.4) * 0.35
+    return outdoor(place(d + 0.05, (0, crackle * 0.8), (0, buzz)), 0.2)
+
+
 @sound("skimmer_screech", 2)
 def skimmer_screech(v):
     """A thin rising scream as it hangs before the dive."""
@@ -728,8 +745,114 @@ def hull_groan(v):
     return outdoor(place(d, (0, moan), (0, bend), (0.6, scrape), (1.7, sat(jolt, 2.0))), 0.5)
 
 
+# --- The Loom Expanse (milestone C) ---------------------------------------------------------
+
+@sound("ridge_heave", 2)
+def ridge_heave(v):
+    """The swell throwing her: a dull fibrous whump, a rope-groan and a scatter of grit."""
+    d = 0.9
+    whump = place(d, (0, thud(62 + 6 * v, 0.45, 0.55) * 1.4), (0, lp(white(0.2), 500) * env(0.2, 0.002, 0.18)))
+    groan = creature(0.6, 140 + 15 * v, 90, "o", 0.5, 0.5, 1.2, 3) * env(0.6, 0.05, 0.5) * 0.35
+    grit = grains(0.5, 60, lambda i: bp(white(0.008), 1500, 6000) * dsp.rng.uniform(0.05, 0.4)) * np.linspace(1, 0, n(0.5))
+    return outdoor(place(d, (0, sat(whump, 1.6)), (0.02, groan), (0.08, grit)), 0.3)
+
+
+@sound("thread_snap", 2)
+def thread_snap(v):
+    """A thread cut or shot: a whip-crack and the line lashing back along its length."""
+    d = 0.8
+    crack = hp(white(0.02), 2500) * env(0.02, 0.0005, 0.018) * 1.4
+    lash = bp(white(0.4), 1200, 6000) * env(0.4, 0.003, 0.3) * np.linspace(1, 0.3, n(0.4)) * 0.5
+    twang = modal(0.7, [(420 + 40 * v, 0.5, 1.0), (850, 0.3, 0.4), (1300, 0.2, 0.2)]) * 0.5
+    return outdoor(place(d, (0, crack), (0, twang), (0.02, lash)), 0.3)
+
+
+def _hollow(f, d, vowel="o"):
+    """A blown, hollow voice: a breathy fundamental through a bell, the chord singer's throat."""
+    voice = osc(f, d) + 0.4 * osc(f * 2, d) + 0.2 * osc(f * 3, d)
+    breath = bp(white(d), 300, 2500) * 0.15
+    return formant(voice + breath, VOWELS[vowel])
+
+
+@sound("singer_drone")
+def singer_drone(v):
+    """The chord singer walking: a low, wavering hum from its fluted chest."""
+    d = 2.0
+    f = 98.0 * (1 + 0.006 * np.sin(2 * np.pi * 0.7 * t(d)))
+    x = (_hollow(f, d) + 0.5 * _hollow(f * 1.5, d, "u")) * adsr(d, 0.5, 0.2, 0.8, 0.6) * 0.5
+    return outdoor(x, 0.45)
+
+
+@sound("singer_pull")
+def singer_pull(v):
+    """The pull: a low tone that bends downward and draws in, rings collapsing on it."""
+    d = 1.8
+    f = sweep(130, 70, d)
+    x = (_hollow(f, d, "u") + 0.5 * osc(f * 0.5, d)) * adsr(d, 0.1, 0.2, 0.9, 0.6) * 0.7
+    whoosh = bp(white(d), 200, 1500) * np.linspace(0.2, 1, n(d)) * env(d, 0.3, 0.4) * 0.3
+    return outdoor(place(d, (0, x), (0, whoosh)), 0.45)
+
+
+def _bell(f, d, bright=1.0):
+    """A big hollow tuned tone: a fundamental with soft inharmonic partials, slow decay."""
+    x = osc(f, d) * 0.6 + osc(f * 2.01, d) * 0.25 * bright + osc(f * 2.98, d) * 0.12 * bright + osc(f * 4.2, d) * 0.05 * bright
+    return x * env(d, 0.02, d * 0.85)
+
+
+@sound("crown_tick")
+def crown_tick(v):
+    """The Crown's reference beat, far off and deep."""
+    d = 1.2
+    return outdoor(place(d, (0, thud(55, 0.4, 0.8)), (0, _bell(196, 1.1, 0.4) * 0.5)), 0.5)
+
+
+@sound("cantor_high")
+def cantor_high(v):
+    """The Cantor's first note: a high hollow vowel."""
+    d = 1.4
+    return outdoor(place(d, (0, _hollow(392, d, "e") * 0.7), (0, _bell(392, d, 0.3) * 0.4)), 0.5)
+
+
+@sound("cantor_mid")
+def cantor_mid(v):
+    """The Cantor's second note."""
+    d = 1.4
+    return outdoor(place(d, (0, _hollow(294, d, "a") * 0.7), (0, _bell(294, d, 0.3) * 0.4)), 0.5)
+
+
+@sound("cantor_low")
+def cantor_low(v):
+    """The Cantor's third, low note: the one the quiet gap follows."""
+    d = 1.8
+    return outdoor(place(d, (0, _hollow(147, d, "o") * 0.8), (0, _bell(147, d, 0.5) * 0.5), (0, thud(50, 0.6, 0.7))), 0.5)
+
+
+@sound("cantor_wave")
+def cantor_wave(v):
+    """A plucked chord: a twanging cable snap and a pressure wave rolling out."""
+    d = 1.6
+    snap = modal(0.8, metal_modes(180, 6, 2.0, 0.6)) * 0.8
+    roll = lp(brown(d), 300) * env(d, 0.05, 1.2) * 1.2
+    return outdoor(place(d, (0, sat(snap, 1.4)), (0.03, roll)), 0.4)
+
+
+# Replaced by Jake's recordings (2026-11-09 asset packs), no longer synthesised here: cantor_heart,
+# mirror_alarm, magnet_clamp, hoist_winch, boost_thrust, resonator_tick, resonator_lock, cage_drop,
+# diver_grind, diver_erupt, pinweaver_click, thread_spool, singer_inhale, singer_chord, singer_call, ridge_thrum.
+
+
+@sound("cantor_anchor")
+def cantor_anchor(v):
+    """An anchor breaking: a cable parting under huge tension."""
+    d = 1.3
+    crack = click(0.02, 400, 8000) * 0.5
+    whip = bp(white(0.4), 1500, 7000) * env(0.4, 0.002, 0.3) * 0.7
+    groan = creature(1.0, 90, 50, "o", 0.6, 0.5, 1.0, 2) * env(1.0, 0.05, 0.8) * 1.0
+    return outdoor(place(d, (0, crack), (0.01, whip), (0.1, groan)), 0.4)
+
+
 PEAKS = {
-    "hit_tick": 0.5, "hit_crit": 0.55, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
+    "hit_tick": 0.5, "hit_crit": 0.55, "hit_armor": 0.5, "arc_jolt": 0.45, "kill_tick": 0.6, "scrap_pickup": 0.5, "beacon_ping": 0.4, "footstep_0": 0.5, "footstep_1": 0.5,
     "step_metal": 0.5, "steam_hiss": 0.5, "arc_zap": 0.7, "spore_burst": 0.7, "turret_shot": 0.6, "weapon_switch": 0.6,
     "stim": 0.6, "acid_splash": 0.7, "spitter_charge": 0.6, "spitter_spit": 0.7, "ram_paw": 0.8, "ram_charge": 0.85,
     "ram_stun": 0.9, "warden_roar": 0.9, "siege_horn": 0.7, "crash_impact": 0.95, "repair_clunk": 0.85, "log_chime": 0.5,
@@ -741,6 +864,12 @@ PEAKS = {
     "charge_throw": 0.55, "charge_bounce": 0.5, "charge_blast": 0.95,
     "signal_ping": 0.4, "skimmer_flap": 0.45, "skimmer_rake": 0.7, "skimmer_hurt": 0.65, "skimmer_screech": 0.75,
     "hull_groan": 0.9, "aux_restart": 0.85, "lamp_strike": 0.45,
+    "ridge_heave": 0.6,
+    "thread_snap": 0.75, "singer_drone": 0.55,
+    "singer_pull": 0.75,
+   
+    "crown_tick": 0.6, "cantor_high": 0.75, "cantor_mid": 0.75,
+    "cantor_low": 0.85, "cantor_wave": 0.85, "cantor_anchor": 0.85,
 }
 
 # Sounds whose output should loop (a 'smpl' chunk in the WAV).

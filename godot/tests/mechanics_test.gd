@@ -417,6 +417,9 @@ func _difficulty_and_balance() -> void:
 
 func _save_load() -> void:
 	_clear_enemies()
+	# Drops from earlier fights would be picked up mid-check and change the scrap count.
+	for s in get_tree().get_nodes_in_group("scrap"):
+		s.queue_free()
 	# Build up a state worth saving.
 	for id in ["aux_power", "cooling", "canopy"]:
 		kestrel.set_repaired(id, true)
@@ -444,23 +447,47 @@ func _save_load() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	main.spawn_packs = false
+	# Hold the re-armed siege while the load settles: on a slow machine 20 frames is enough
+	# physics time for it to start and change the scrap being checked.
+	main.siege.set_physics_process(false)
 	kestrel = main.kestrel
 	player = main.player
 	await _frames(20)
 	_check("load restores repairs", kestrel.is_repaired("canopy") and not kestrel.is_repaired("landing_gear") and Game.current_repair() == "landing_gear")
-	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.carrying == "struts" and Game.phase() == "return")
+	_check("load restores scrap, upgrades, stims and what you carry", Game.scrap == 77 and Game.has_upgrade("extended_mag") and Game.stims == 2 and Game.charges == 2 and Game.phase() == "return",
+		"scrap %d, mag %s, stims %d, charges %d, carrying %s, phase %s" % [Game.scrap, Game.has_upgrade("extended_mag"), Game.stims, Game.charges, Game.carrying, Game.phase()])
+	# The gear is salvaged in the Gillwood now: a part carried home in the Kettle by an older save
+	# counts as sent home (see Main.load_state), waiting at the install bay.
+	_check("a sourced part carried in a Kettle save loads as delivered", Game.carrying == "" and Game.delivered("struts"))
 	_check("load restores weapons and ammo", Game.owns_weapon("scattergun") and Game.ammo_in_mag("scattergun") == 3 and Game.ammo_reserve("scattergun") == 20 and player.weapon.current == "scattergun")
 	var gear2: QuarryCrawler = main.sites["landing_gear"]
 	_check("load restores site state", not gear2.has_component() and gear2.crate_searched(1) and not gear2.crate_searched(0))
 	_check("load re-arms the pending siege", main.siege.pending == 1)
 	_check("loaded game starts at Kestrel", player.global_position.distance_to(main.SPAWN) < 2.0, str(player.global_position))
 	main.siege.pending = -1
+	main.siege.set_physics_process(true)
 	player.revive(main.install_point("bunk") + Vector3.UP * 0.2)
 	await _frames(10)
 	_check("bunk offers rest and save", _label().contains("Rest"), _label())
 	Game.delete_save()
 	await _press("interact")
 	_check("resting saves", Game.has_save())
+	# A damaged save falls back to the one before it.
+	main.save_game()
+	main.save_game()
+	var f := FileAccess.open(Game.save_path, FileAccess.WRITE)
+	f.store_string("{\"version\": ")
+	f.close()
+	_check("a damaged save falls back to the backup", not Game.read_save().is_empty())
+	Game.delete_save()
+	_check("deleting a save removes its backup too", not Game.has_save() and Game.read_save().is_empty())
+	var menu: PauseMenu = main.get_children().filter(func(c): return c is PauseMenu)[0]
+	menu.quit_to_desktop.emit()
+	_check("save and quit to desktop saves", Game.has_save())
+	Game.delete_save()
+	main._notification(NOTIFICATION_WM_CLOSE_REQUEST)
+	_check("closing the window saves", Game.has_save())
+	Game.delete_save()
 
 
 func _title() -> void:
@@ -469,6 +496,22 @@ func _title() -> void:
 	add_child(title)
 	await _frames(5)
 	_check("title: Continue is greyed out with no save", title.continue_button.disabled)
+	# Settings and credits open from the title without pausing it or offering quit-to-title.
+	(title.find_child("Settings", true, false) as Button).pressed.emit()
+	await _frames(2)
+	_check("title: Settings opens the settings menu, unpaused", title.settings.visible and not get_tree().paused and not title.settings._title_button.visible and title.settings._resume.text == "Back")
+	title.settings._resume.pressed.emit()
+	await _frames(2)
+	_check("title: Back closes it", not title.settings.visible)
+	(title.find_child("Credits", true, false) as Button).pressed.emit()
+	await _frames(2)
+	var credits: String = title.credits.text.get_parsed_text()
+	_check("title: credits name the typeface, the engine licence and the font licence", title.credits.visible and credits.contains("Barlow Project Authors") and credits.contains("Permission is hereby granted") and credits.contains("SIL OPEN FONT LICENSE"), credits.substr(0, 200))
+	var esc := InputEventAction.new()
+	esc.action = "ui_cancel"
+	esc.pressed = true
+	title.credits._unhandled_input(esc)
+	_check("title: Esc closes the credits", not title.credits.visible)
 	title.queue_free()
 	await _frames(2)
 	Game.write_save(main.save_state())
@@ -476,6 +519,14 @@ func _title() -> void:
 	add_child(title)
 	await _frames(5)
 	_check("title: Continue is offered with a save", not title.continue_button.disabled)
+	title.new_button.pressed.emit()
+	await _frames(2)
+	_check("title: New game over a save asks first", title._confirm_left > 0.0 and title._warning.visible and get_tree().current_scene == self)
+	title._process(title.CONFIRM_TIME + 0.1)
+	_check("title: the question lapses", title.new_button.text == "New game" and not title._warning.visible)
+	title._show_loading()
+	await _frames(1)
+	_check("title: a loading card with a tip covers the load", title.loading.visible and title.loading.find_child("Tip", true, false).text in title.TIPS)
 	title.queue_free()
 	Game.delete_save()
 	await _frames(2)

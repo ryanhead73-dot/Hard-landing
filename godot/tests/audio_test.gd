@@ -21,6 +21,7 @@ func _run() -> void:
 	_buses()
 	await _ducking()
 	_ledger()
+	await _hob_voice()
 	await _music()
 	await _ambience()
 	await _spool()
@@ -110,6 +111,39 @@ func _ducking() -> void:
 ## The licence ledger: every sound shipped has a row naming a known source, and every sound sits in
 ## its tier's loudness range (the loudest 100 ms of the file), so a replacement recording can't
 ## arrive far too hot or too quiet.
+## HOB speaks every fixed line he has in Story; the subtitle waits for him to finish.
+func _hob_voice() -> void:
+	var missing: PackedStringArray = []
+	var lines := 0
+	var consts: Dictionary = (load("res://scripts/story.gd") as Script).get_script_constant_map()
+	for k in consts:
+		var v = consts[k]
+		if not v is Array:
+			continue
+		var group: Array = v if (v as Array).size() > 0 and v[0] is Array else [v]
+		for line in group:
+			if line is Array and line.size() == 2 and line[0] is String and line[0] == Story.HOB and line[1] is String and not String(line[1]).contains("%"):
+				lines += 1
+				if Voice.take(Story.HOB, line[1]) == null:
+					missing.append(String(line[1]).left(40))
+	_check("every one of HOB's lines in Story has a spoken take", lines > 80 and missing.is_empty(), "%d lines; missing: %s" % [lines, ", ".join(missing)])
+	_check("nobody else is voiced", Voice.take(Story.JUNO, "Mark the knots. I'll cut us loose.") == null)
+	var v: Voice = main.voice
+	v.interrupt([Story.FINALE_READY])
+	await _frames(2)
+	_check("HOB is heard on the Voice bus", v.speaking() and v._speaker.bus == "Voice")
+	var take := Voice.take(Story.HOB, Story.FINALE_READY[1])
+	_check("and the subtitle stays until he's done", v._time >= take.get_length())
+	v.clear()
+	await _frames(2)
+	_check("clearing the subtitles stops him", not v.speaking())
+	Game.voice_volume = 0.5
+	Game.apply_settings()
+	_check("the voice slider sets the Voice bus", absf(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Voice")) - linear_to_db(0.5)) < 0.01)
+	Game.voice_volume = 1.0
+	Game.apply_settings()
+
+
 func _ledger() -> void:
 	var ledger: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/asset_ledger.json"))
 	var audio: Dictionary = ledger["audio"]
@@ -190,8 +224,8 @@ func _loudest_window_db(path: String) -> float:
 
 func _music() -> void:
 	var m: MusicDirector = main.music
-	var playing := m.players.values().all(func(p): return p.playing and p.bus == "Music")
-	_check("all three music layers play together", m.players.size() == 3 and playing)
+	var playing := ["music_calm", "music_combat", "music_finale"].all(func(id): return m.players[id].playing) and m.players.values().all(func(p): return p.bus == "Music")
+	_check("the stems play together", m.players.size() == MusicDirector.LAYERS.size() and playing)
 	player.revive(ARENA)
 	await get_tree().create_timer(0.6).timeout
 	_check("music starts calm", m.mood == "calm" and m.levels["music_combat"] < 0.1)
@@ -208,7 +242,12 @@ func _music() -> void:
 	_check("a siege is combat", main.siege.is_active() and m.mood == "combat")
 	main.siege.stand_down()
 	_clear_enemies()
-	_check("the finale has its own layer", m.targets("finale")["music_finale"] == 1.0 and m.targets("combat")["music_finale"] == 0.0)
+	_check("the finale has its own piece", m.targets("finale")["music_departure"] == 1.0 and m.targets("finale")["music_calm"] == 0.0 and not m.targets("combat").has("music_departure"))
+	_check("and so does the Cantor", m.targets("cantor")["music_cantor"] == 1.0 and m.targets("cantor")["music_combat"] == 0.0)
+	_check("the Long Patience and the Crown have their own", m.targets("long_patience")["music_patience"] == 1.0 and m.targets("tuning_crown")["music_crown"] == 1.0 and m.targets("tuning_crown")["music_calm"] == 0.0)
+	_check("the regions have exploration pieces and share a combat one", m.targets("gillwood")["music_gillwood"] == 1.0 and m.targets("loom_expanse")["music_loom"] == 1.0 and m.targets("shatterlands")["music_shatterlands"] == 1.0 and m.targets("region_combat")["music_region_combat"] == 1.0)
+	_check("the set pieces wait their turn", not m.players["music_cantor"].playing and not m.players["music_departure"].playing)
+	_check("the ending sting plays once", m.sting.stream != null and not Sfx.loops(m.sting.stream) and Sfx.loops(Sfx.stream("music_cantor")))
 
 
 func _ambience() -> void:
@@ -218,7 +257,10 @@ func _ambience() -> void:
 	_check("open ground is wind", a.zone == "wind")
 	player.revive(kestrel.to_global(kestrel.plan(6.0, 1.3, 13.0)))
 	await _frames(5)
-	_check("inside Kestrel is the interior", a.zone == "interior")
+	_check("inside the dark Kestrel is the cold wreck", a.zone == ("interior" if kestrel.is_repaired("aux_power") else "cold"), a.zone)
+	kestrel.set_repaired("aux_power", true)
+	await _frames(5)
+	_check("with aux power it is the interior", a.zone == "interior", a.zone)
 	player.revive(main.sites["cooling"].global_position + Vector3(0.0, 1.0, 6.0))
 	await _frames(5)
 	_check("the hauler wreck has the hot springs", a.zone == "springs", a.zone)

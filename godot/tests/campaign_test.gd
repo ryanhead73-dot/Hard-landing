@@ -12,6 +12,7 @@ func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
 	_check_sites()
+	_check_beacons()
 	await _check_routes()
 	await _check_hazards()
 	await _check_pack_wakes()
@@ -24,13 +25,18 @@ func _run() -> void:
 	player.revive(kestrel.to_global(kestrel.plan(10.1, -1.0, 17.8)) + Vector3.UP * 0.3)
 	await _frames(10)
 	_check("install points don't answer through the hull", not _label().contains("Canopy") and not _label().contains("bay"), _label())
-	_check("only the canopy site's beacon is active", main.sites.keys().all(func(id): return main.sites[id].active == (id == "canopy")))
+	# The canopy is salvaged in the Gillwood now (milestone B1): no Kettle site lights up for it,
+	# and the waypoint points at the canyon to the Shatterlands.
+	_check("no Kettle site's beacon is active for a part salvaged elsewhere", main.sites.keys().all(func(id): return not main.sites[id].active))
+	_check("the waypoint points to the Shatterlands canyon", main._waypoint() != null and main._waypoint().distance_to(main.regions.gates["shatterlands"].global_position) < 3.0)
+	_check("cooling opened the Shatterlands", main.regions.is_open("shatterlands"))
 
-	# Scanner is off until the canopy is sealed.
+	# Before the canopy only the suit scanner works: wildlife close by, no salvage.
 	player.revive(Vector3(45.0, 0.5, 45.0))
 	var probe: Node3D = main.spawn_scuttler(Vector3(45.0, 0.5, 30.0))
 	await _frames(5)
-	_check("no scanner before the canopy", main.scanner_marks().is_empty())
+	var marks: Array = main.scanner_marks()
+	_check("before the canopy the suit scanner sees wildlife, not salvage", marks.any(func(m): return m["kind"] == "enemy") and not marks.any(func(m): return m["kind"] == "crate"))
 	probe.queue_free()
 	_clear_enemies()
 
@@ -44,8 +50,10 @@ func _run() -> void:
 	_check("pilot's seat offers the engine spool", _label().contains("engine spool"), _label())
 	await _press("interact")
 	# The full finale is covered by story_test; here, skip to a full spool.
+	main.finale.skip_crises()
 	main.finale.spool = Finale.SPOOL_TIME
 	await _frames(3)
+	main.finale.pulse_t = Finale.GAP_FROM + 0.1
 	_check("pilot's seat offers launch", _label().contains("[E] Launch"), _label())
 	await _press("interact")
 	await get_tree().create_timer(main.LIFT_TIME + main.CLIMB_TIME + 2.0).timeout
@@ -212,7 +220,7 @@ func _repair_loop(r: Dictionary) -> void:
 	_clear_enemies()
 	# The next site's component can't be taken out of order.
 	var next := Campaign.index_of(id) + 1
-	if next < Campaign.REPAIRS.size():
+	if next < Campaign.REPAIRS.size() and not Campaign.sourced(Campaign.REPAIRS[next]["id"]):
 		var later: ExpeditionSite = main.sites[Campaign.REPAIRS[next]["id"]]
 		player.revive(later.component_point() + Vector3.UP * 0.2)
 		await _frames(10)
@@ -226,17 +234,28 @@ func _repair_loop(r: Dictionary) -> void:
 
 	player.revive(site.component_point() + Vector3.UP * 0.2)
 	await _frames(10)
-	_check("%s: component prompt at the site" % id, _label().contains(r["component_name"]), _label())
-	await _press("interact")
-	_check("%s: component is carried" % id, Game.carrying == r["component"] and not site.has_component() and Game.phase() == "return")
-	_check("%s: taking it springs an ambush" % id, _enemy_count() >= site.ambush_pts.size(), "enemies=%d" % _enemy_count())
+	if Campaign.sourced(id):
+		# Salvaged by its own mission in another region (expansion_test plays those through) and
+		# sent home by Reyes's runners: the old Kettle site no longer offers it.
+		_check("%s: the old Kettle site doesn't offer it" % id, not _label().contains(r["component_name"]), _label())
+		Game.deliver_component(r["component"])
+		await _frames(2)
+		_check("%s: delivered, it waits at the install bay" % id, Game.phase() == "return" and Game.carrying == "" and Game.objective_text() == r["return"], Game.objective_text())
+	else:
+		_check("%s: component prompt at the site" % id, _label().contains(r["component_name"]), _label())
+		await _press("interact")
+		_check("%s: component is carried" % id, Game.carrying == r["component"] and not site.has_component() and Game.phase() == "return")
+		_check("%s: taking it springs an ambush" % id, _enemy_count() >= site.ambush_pts.size(), "enemies=%d" % _enemy_count())
 	_clear_enemies()
 
 	player.revive(main.install_point(id) + Vector3.UP * 0.3)
 	await _frames(10)
 	_check("%s: install point accepts it" % id, _label().contains(r["install_label"]), _label())
 	await _press("interact")
-	_check("%s: installed" % id, kestrel.is_repaired(id) and Game.is_repaired(id) and Game.carrying == "")
+	_check("%s: installed" % id, kestrel.is_repaired(id) and Game.is_repaired(id) and Game.carrying == "" and not Game.delivered(r["component"]))
+	await get_tree().create_timer((Kestrel.POWER_UP_TIME if id == "aux_power" else main.REPAIR_BANNER_DELAY) + 0.3).timeout
+	var banner: Array = r["banner"]
+	_check("%s: a title card names it" % id, main.hud.banner_text() == banner[0], main.hud.banner_text())
 
 
 func _check_benefit(id: String) -> void:
@@ -293,3 +312,35 @@ func _check_benefit(id: String) -> void:
 			_check("engine: top fabricator tier unlocks", Game.can_fabricate("rapid_cycler") and Game.can_fabricate("plating_2"))
 		"navigation":
 			_check("navigation: departure is ready", Game.phase() == "launch" and Game.objective_text().contains("engine spool"))
+
+
+## Every site can be found from the walk out: along the route from the ship, its strobe or the
+## light column above it is in view most of the way. Only the site being headed for shows the
+## column.
+func _check_beacons() -> void:
+	var space := get_viewport().get_world_3d().direct_space_state
+	var ship: Vector3 = kestrel.global_position
+	for id in main.sites:
+		var s: ExpeditionSite = main.sites[id]
+		var at := s.to_global(s.beacon_pos)
+		var seen := 0
+		var total := 0
+		for k in range(3, 19):
+			var p: Vector3 = ship.lerp(s.global_position, k / 20.0)
+			p.y = main.site.height_at(p.x, p.z) + 1.6
+			total += 1
+			for lift in [0.0, 6.0, 12.0, 20.0]:
+				var target: Vector3 = at + Vector3.UP * lift
+				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p, target, Game.LAYER_WORLD))
+				if hit.is_empty() or hit.position.distance_to(target) < 2.0:
+					seen += 1
+					break
+		_check("%s: the beacon or its light column is in view along %d%% of the walk out" % [id, roundi(100.0 * seen / total)], seen >= total * 0.8, "%d/%d" % [seen, total])
+	var heading: ExpeditionSite = main.current_site()
+	_check_beam(heading)
+
+
+func _check_beam(heading: ExpeditionSite) -> void:
+	_check("the site being headed for sends up a light column", heading.beam != null and heading.active)
+	var others: Array = main.sites.values().filter(func(s): return s != heading)
+	_check("the others don't", others.all(func(s): return not s.active))

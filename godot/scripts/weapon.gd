@@ -9,6 +9,8 @@ signal ammo_changed(in_mag: int, mag_size: int, reloading: bool)
 signal hit_confirmed(killed: bool)
 ## A shot landed on a weak spot (emitted after hit_confirmed).
 signal crit_landed
+## A shot that only glanced off armour (no kill, no weak spot).
+signal deflected
 signal switched(id: String)
 
 const ORDER: Array[String] = ["rifle", "scattergun", "arc_lance"]
@@ -28,6 +30,8 @@ const SPECS := {
 	},
 }
 const SWITCH_TIME := 0.35
+## Switching dips the muzzle this far (radians) as the old gun goes down and the new one comes up.
+const SWITCH_DIP := 0.5
 ## Sustained fire blooms the spread (radians added per shot, and the most it can add); it settles
 ## once the trigger is let go.
 const BLOOM := {"rifle": 0.0022, "scattergun": 0.0, "arc_lance": 0.0}
@@ -61,6 +65,12 @@ var move_penalty := 0.0
 var bloom := 0.0
 var _since_shot := 9.0
 var _shots := 0
+## Seconds left in a weapon switch, and the gun being put away.
+var _swap_left := 0.0
+## Detuned by a chord singer's dissonance: reloads drag until this runs out.
+var detuned := 0.0
+const DETUNE_DRAG := 1.2
+var _swap_from := ""
 
 
 func _ready() -> void:
@@ -86,8 +96,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	_since_shot += delta
+	if _swap_left > 0.0:
+		_swap_left = maxf(_swap_left - delta, 0.0)
+		_show_model()
 	if _since_shot > 0.12:
 		bloom = move_toward(bloom, 0.0, BLOOM_SETTLE * delta)
+	detuned = maxf(detuned - delta, 0.0)
 	if reloading:
 		_reload_left -= delta
 		if _reload_left <= 0.0:
@@ -123,7 +137,17 @@ func reload_time() -> float:
 	var t: float = spec()["reload"]
 	if current == "arc_lance" and Game.has_upgrade("arc_capacitor"):
 		t *= 0.7
+	if detuned > 0.0:
+		t += DETUNE_DRAG
 	return t
+
+
+## A chord singer's dissonance: a reload under way drags, and so does one started in the next
+## `secs`.
+func detune(secs: float) -> void:
+	if reloading and detuned <= 0.0:
+		_reload_left += DETUNE_DRAG
+	detuned = maxf(detuned, secs)
 
 
 ## The spread a shot fired now would have: the weapon's base, widened by moving, plus bloom.
@@ -143,9 +167,11 @@ func spread(aiming: bool) -> float:
 func equip(id: String) -> bool:
 	if id == current or not Game.owns_weapon(id):
 		return false
+	_swap_from = current if _swap_left <= SWITCH_TIME * 0.5 else _swap_from
 	current = id
 	reloading = false
 	_cooldown = SWITCH_TIME
+	_swap_left = SWITCH_TIME
 	_show_model()
 	Sfx.play("weapon_switch", null, -8.0, 0.0)
 	switched.emit(id)
@@ -204,17 +230,23 @@ func try_fire(aiming: bool) -> bool:
 	var hit_any := false
 	var killed_any := false
 	var crit_any := false
+	var armored_all := true
 	for p in int(s["pellets"]):
 		var result := _trace(current_spread(aiming), float(s["range"]), int(s["pierce"]))
 		hit_any = hit_any or result[0]
 		killed_any = killed_any or result[1]
 		crit_any = crit_any or result[2]
+		armored_all = armored_all and (result[3] or not result[0])
 	if hit_any:
 		hit_confirmed.emit(killed_any)
 		if crit_any:
 			crit_landed.emit()
-		var tick := "kill_tick" if killed_any else ("hit_crit" if crit_any else "hit_tick")
-		Sfx.play(tick, null, -4.0, 0.0)
+		if armored_all and not killed_any and not crit_any:
+			# The glance itself (sparks, knock) plays at the plate; this is only the marker.
+			deflected.emit()
+		else:
+			var tick := "kill_tick" if killed_any else ("hit_crit" if crit_any else "hit_tick")
+			Sfx.play(tick, null, -4.0, 0.0)
 	bloom = minf(bloom + float(BLOOM.get(current, 0.0)), BLOOM_MAX)
 	_since_shot = 0.0
 	_shots += 1
@@ -228,7 +260,7 @@ func try_fire(aiming: bool) -> bool:
 	return true
 
 
-## One ray (or pellet). Returns [hit an enemy, killed one, hit a weak spot].
+## One ray (or pellet). Returns [hit an enemy, killed one, hit a weak spot, only glanced off armour].
 func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 	var dir := -camera.global_basis.z
 	dir = dir.rotated(camera.global_basis.x, randf_range(-spread_amount, spread_amount))
@@ -244,9 +276,10 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 	var hit := false
 	var killed := false
 	var crit := false
+	var armored := true
 	var damage := shot_damage()
 	for i in pierce:
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * max_range, Game.LAYER_WORLD | Game.LAYER_ENEMY)
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * max_range, Game.LAYER_WORLD | Game.LAYER_ENEMY | Game.LAYER_SHOT)
 		query.exclude = exclude
 		var result := space.intersect_ray(query)
 		if result.is_empty():
@@ -258,8 +291,13 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 			var falloff := 1.0
 			if current == "scattergun":
 				falloff = clampf(1.0 - (origin.distance_to(end) - 8.0) / 20.0, 0.35, 1.0)
-			killed = target.take_damage(damage * falloff, result.position, dir) or killed
+			var dropped: bool = target.take_damage(damage * falloff, result.position, dir)
+			killed = dropped or killed
+			# The lance's charge locks up whatever it passes through and doesn't kill.
+			if current == "arc_lance" and not dropped and target.has_method("shock"):
+				target.shock()
 			crit = crit or bool(target.get("last_hit_crit"))
+			armored = armored and bool(target.get("last_hit_armored"))
 			hit = true
 			_impact(result.position, result.normal, true, dir)
 			exclude.append((target as CollisionObject3D).get_rid())
@@ -272,7 +310,7 @@ func _trace(spread_amount: float, max_range: float, pierce: int) -> Array:
 		_beam(_muzzle.global_position, end)
 	else:
 		_tracer(_muzzle.global_position, end)
-	return [hit, killed, crit]
+	return [hit, killed, crit, hit and armored]
 
 
 func _emit_ammo() -> void:
@@ -303,9 +341,27 @@ func _model(id: String) -> Node3D:
 	return n
 
 
+## 0 normally; rises to 1 halfway through a switch (old gun down, new one about to come up).
+func swap_dip() -> float:
+	if _swap_left <= 0.0:
+		return 0.0
+	var k := 1.0 - _swap_left / SWITCH_TIME
+	return 1.0 - absf(2.0 * k - 1.0)
+
+
+## The gun in her hands: the old one until halfway through a switch, then the new one, each
+## tipped muzzle-down by the dip.
+func shown_model() -> String:
+	return _swap_from if _swap_left > SWITCH_TIME * 0.5 and _swap_from != "" else current
+
+
 func _show_model() -> void:
+	var shown := shown_model()
+	var dip := ease(swap_dip(), -2.0) * SWITCH_DIP
 	for id in _models:
-		_models[id].visible = id == current
+		var m: Node3D = _models[id]
+		m.visible = id == shown
+		m.rotation.x = -dip if id == shown else 0.0
 
 
 func _glow_mat(albedo: Color, emission: Color, energy: float) -> StandardMaterial3D:
