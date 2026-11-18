@@ -14,6 +14,7 @@ func _name() -> String:
 func _run() -> void:
 	await _frames(30)
 	_clear_enemies()
+	_juno_contacts()
 	await _juno_locomotion()
 	await _juno_upper_body()
 	await _juno_down()
@@ -32,6 +33,42 @@ func _rot(joint: String) -> Vector3:
 func _grip_gap(side: String) -> float:
 	var a := player.anim
 	return a.hand(side).distance_to(a.weapon_point(Vector3(0.0, -0.12, 0.17) if side == "R" else Vector3(0.0, -0.06, -0.12)))
+
+
+## Sample both boots through heel strike, flat support and toe-off on the imported rig.
+## Advance the rig by gameplay distance so a planted tread stays at one world point.
+func _juno_contacts() -> void:
+	var rig := Rig.spawn("juno_rigged", self)
+	var sk := rig.find_child("Skeleton3D", true, false) as Skeleton3D
+	var ap := rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	for gait in [["walk", JunoAnimator.WALK_CYCLE, .54], ["run", JunoAnimator.RUN_CYCLE, .375],
+			["crouch_walk", JunoAnimator.CROUCH_CYCLE, .58]]:
+		var distance := float(gait[1])
+		var stance := float(gait[2])
+		var worst := 0.0
+		var floor_error := 0.0
+		ap.play(gait[0])
+		for side in ["L", "R"]:
+			var b := sk.find_bone("Foot" + side)
+			var rest := sk.get_bone_global_rest(b)
+			var offset := 0.0 if side == "L" else .5
+			var first := Vector3.ZERO
+			for i in 121:
+				var u := i / 120.0
+				var phase := stance * u + offset
+				ap.seek(fmod(phase, 1.0) * JunoAnimator.CYCLE_TIME, true)
+				var pose := sk.get_bone_global_pose(b)
+				var pivot := Vector3(0, -.105, .073 if u < .5 else -.17)
+				var tread := pose * (rest.basis.inverse() * pivot) + Vector3.FORWARD * distance * phase
+				floor_error = maxf(floor_error, absf(tread.y))
+				# Both pivot locations are specified relative to the same flat footprint.
+				var footprint := tread - pivot
+				if i == 0:
+					first = footprint
+				worst = maxf(worst, footprint.distance_to(first))
+		_check("%s planted tread slide" % gait[0], worst <= .04 and floor_error <= .04,
+			"max %.2f cm, floor error %.2f cm" % [100*worst, 100*floor_error])
+	rig.queue_free()
 
 
 func _juno_locomotion() -> void:
@@ -76,7 +113,15 @@ func _juno_locomotion() -> void:
 	await _press("jump")
 	await _frames(4)
 	_check("jumping tucks her legs", (a.state == "jump" or a.state == "fall") and _rot("LegL").x > 10.0, "%s leg=%.0f" % [a.state, _rot("LegL").x])
-	await _frames(60)
+	var landed := false
+	var low_hips := 2.0
+	for i in 90:
+		await get_tree().physics_frame
+		if a.tree.get("parameters/land/active"):
+			landed = true
+			low_hips = minf(low_hips, a.bone_pos("Hips").y)
+	_check("touchdown absorbs weight and recovers", landed and low_hips < .81 and a.bone_pos("Hips").y > .86
+		and is_equal_approx(a._clips.get_animation("land").length, .35), "lowest hips %.2f" % low_hips)
 
 
 func _juno_upper_body() -> void:
