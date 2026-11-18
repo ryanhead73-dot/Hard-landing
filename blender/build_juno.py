@@ -359,8 +359,9 @@ def apply_atlas(c):
         tile = coords[0][0]
         wrap = [tile==1 and max(q[i] for q in coords)-min(q[i] for q in coords)>.5 for i in (1,2)]
         for loop,(_,u,v) in zip(poly.loop_indices,coords):
-            if wrap[0] and u<.5: u+=1
-            if wrap[1] and v<.5: v+=1
+            # Centre a crossing face on an interior repeat of the quilt.
+            if wrap[0]: u += .5 if u < .5 else -.5
+            if wrap[1]: v += 2/3 if v < .5 else -1/3
             def axis(x,cell):
                 return (cell*TILE_SIZE+TILE_PAD+.5+x*(TILE_SIZE-2*TILE_PAD-1))/(4*TILE_SIZE)
             uv.data[loop].uv = (axis(u,tile%4),axis(v,tile//4))
@@ -785,7 +786,7 @@ def build_model():
 # The rifle: where it sits in the hold and when aiming, as (position, Godot degrees) in the
 # spine's frame (so it rides the hips, lean and crouch, but not the chest's twist).
 HOLD_W = ((0.13, 1.27, -0.40), (-10, 0, 0))
-AIM_W = ((0.14, 1.44, -0.46), (0, 0, 0))
+AIM_W = ((0.095, 1.51, -0.40), (0, 0, 0))
 # Where the hands go on the rifle, in the weapon's own frame (-z is the muzzle).
 GRIP_R = (0.0, -0.12, 0.17)
 GRIP_L = (0.0, -0.06, -0.12)
@@ -824,7 +825,27 @@ def _carried(arm, posed, name):
     return posed[p.name] @ p.matrix_local.inverted()
 
 
-def _solve_arm(arm, posed, rots, side, target):
+def _plant(arm, posed, rots, side, ankle, pitch):
+    """Solve hip and knee to the ankle hinge, then level the boot independently."""
+    leg, shin, foot = (arm.data.bones[name + side] for name in ("Leg", "Shin", "Foot"))
+    thigh = shin.head_local - leg.head_local
+    calf = foot.head_local - shin.head_local
+    delta = ankle - posed[leg.name].translation
+    a, b = thigh.length, calf.length
+    d = min(delta.length, a + b - .0001)
+    direction = delta.normalized()
+    forward = bm.g(0, 0, -1)
+    pole = (forward - direction * direction.dot(forward)).normalized()
+    along = (a*a + d*d - b*b) / (2*d)
+    knee = direction * along + pole * math.sqrt(max(0, a*a - along*along))
+    hip_rot = thigh.rotation_difference(knee).to_matrix()
+    shin_rot = calf.rotation_difference(direction*d - knee).to_matrix()
+    rots[leg.name] = _carried(arm, posed, leg.name).to_3x3().inverted() @ hip_rot
+    rots[shin.name] = hip_rot.inverted() @ shin_rot
+    rots[foot.name] = shin_rot.inverted() @ _godot_rot((pitch, 0, 0))
+
+
+def _solve_arm(arm, posed, rots, side, target, pole_direction):
     """Two-bone IK: turns Arm<side> and Forearm<side> so the hand lands on `target` (Blender)."""
     up = arm.data.bones["Arm" + side]
     lo = arm.data.bones["Forearm" + side]
@@ -835,7 +856,7 @@ def _solve_arm(arm, posed, rots, side, target):
     d_vec = target - s
     d = min(max(d_vec.length, abs(a - b) + 1e-3), (a + b) * 0.995)
     dirv = d_vec.normalized()
-    pole = c3 @ bm.g(*POLE[side])
+    pole = c3 @ bm.g(*pole_direction)
     n = (pole - dirv * pole.dot(dirv)).normalized()
     cos_a = (a * a + d * d - b * b) / (2 * a * d)
     sin_a = math.sqrt(max(0.0, 1 - cos_a * cos_a))
@@ -864,6 +885,8 @@ def solve(arm, pose, offsets):
     if w is None:
         return rots, locs
     posed = _fk(arm, rots, locs)
+    for side, (ankle, pitch) in pose.get("_feet", {}).items():
+        _plant(arm, posed, rots, side, ankle, pitch)
     spine = posed["Spine"] @ arm.data.bones["Spine"].matrix_local.inverted()
     frame = spine @ Matrix.Translation(bm.g(*w[0])) @ _godot_rot(w[1]).to_4x4()
     # The WeaponMount bone (parented to the chest) is turned and moved to put the rifle there.
@@ -880,7 +903,7 @@ def solve(arm, pose, offsets):
     for side in ("L", "R"):
         p = pose.get("_ik" + side, GRIP_L if side == "L" else GRIP_R)
         if p is not None:
-            _solve_arm(arm, posed, rots, side, frame @ bm.g(*p))
+            _solve_arm(arm, posed, rots, side, frame @ bm.g(*p), pose.get("_pole"+side, POLE[side]))
             # Flex the new digits around the grip. Released hands return to their
             # relaxed glove shape with the rest of the free-arm pose.
             sign = 1 if side == "R" else -1
@@ -915,7 +938,7 @@ def action(arm, name, keys, loop=True):
     arm.animation_data.action = act
     prev = {}
     for frame, pose, offsets in keys:
-        pose_key(arm, frame, pose, offsets, prev)
+        pose_key(arm, frame * 2, pose, offsets, prev)
     for fc in act.fcurves:
         for kp in fc.keyframe_points:
             kp.interpolation = "BEZIER"
@@ -923,7 +946,7 @@ def action(arm, name, keys, loop=True):
             kp.handle_right_type = "AUTO_CLAMPED"
     track = arm.animation_data.nla_tracks.new()
     track.name = name
-    strip = track.strips.new(name, int(keys[0][0]), act)
+    strip = track.strips.new(name, int(keys[0][0] * 2), act)
     strip.name = name
     track.mute = True
     arm.animation_data.action = None
@@ -948,133 +971,189 @@ def _merge(*dicts):
 # handguard, the head turns back to look ahead. The arms are solved onto the rifle.
 HOLD = {"Chest": (0, -18, 0), "Neck": (0, 8, 0), "Head": (0, 10, 0)}
 # Shouldered and raised for aiming, bladed further, cheek down to the sight.
-AIM = {"Chest": (0, -24, 0), "Neck": (0, 10, 0), "Head": (-4, 13, 0), "_w": AIM_W}
+AIM = {"Chest": (0, -24, 0), "Neck": (0, 10, 0), "Head": (-8, 13, -6), "_poleR": (1, -.55, .25), "_w": AIM_W}
 # Hands off the rifle: it stays on the chest at rest and the arms take their angles.
 FREE = {"_w": None, "_ikL": None, "_ikR": None}
 
 
-def _gait(phase, stride, bend, lean, bob):
-    """One frame of a walk/run cycle at `phase` (radians)."""
-    s = math.sin(phase)
-    p = dict(HOLD)
-    off = {"Hips": (0, -abs(math.sin(phase)) * bob * -1.0 - bob, 0)}
-    for side, ph in (("L", 0.0), ("R", math.pi)):
-        ls = math.sin(phase + ph)
-        lift = max(0.0, math.sin(phase + ph + 1.6))
-        p["Leg" + side] = (ls * stride, 0, 0)
-        p["Shin" + side] = (-lift * bend - 6.0, 0, 0)
-        p["Foot" + side] = (6.0 * ls + 7.0 * lift, 0, 0)
-    p = _merge(p, {
-        "Hips": (lean * 0.3, s * 6.0, -s * 3.0),
-        "Spine": (lean * 0.4, -s * 6.0, s * 1.5),
-        "Chest": (lean * 0.3, -s * 2.0, 0),
-        "Head": (-lean * 0.8, s * 4.0, 0),
-    })
-    return p, off
+def _foot_path(t, side, distance, stance, lift, heel=14, toe=29, long_stride=False):
+    # z increases behind the moving body. Roll about the heel and toe tread,
+    # keeping the active point stationary in the ground frame.
+    if t <= stance:
+        u = t / stance
+        z = distance * (t - stance/2)
+        height = 0
+        pitch = heel * (1 - smooth(0, .35 if long_stride else .22, u)) - toe * smooth(.55 if long_stride else .68, 1, u)
+    else:
+        u = (t - stance) / (1 - stance)
+        z = distance * (t - stance/2 - smooth(0, 1, u))
+        if long_stride:
+            # Match ground velocity at release and contact, braking quickly in swing.
+            carry = u*(1-u)**18 - (1-u)*u**18
+            z = distance * (stance*(.5 - smooth(0, 1, u)) + (1-stance)*carry)
+        height = lift * math.sin(math.pi*u)**1.4
+        pitch = -toe + (toe + heel) * smooth(.08, .86, u)
+    if long_stride:
+        z += .065  # Toe roll permits a longer reach behind the hip.
+    pivot = bm.g(0, -.105, .073 if pitch >= 0 else -.17)
+    ankle = bm.g(side*.108, .105 + height, z) + pivot - _godot_rot((pitch, 0, 0)) @ pivot
+    return ankle, pitch
 
 
 def build_actions(arm):
-    # Idle: breathing, weight shift, a slow look around. 4 s loop.
+    bpy.context.scene.render.fps = FPS * 2
     keys = []
-    for i in range(5):
-        t = i / 4.0 * math.tau
-        b = math.sin(t)
-        keys.append((1 + i * 30, _merge(HOLD, {
-            "Spine": (-2.0 + b * 1.5, 0, 0), "Chest": (b * 1.2, math.sin(t * 0.5) * 3.0, 0),
-            "Head": (-b * 1.0, math.sin(t * 0.5) * 9.0, 0),
-            "LegL": (2, 0, -2), "LegR": (-2, 0, 2), "ShinL": (-6, 0, 0), "ShinR": (-4, 0, 0),
-            "Hips": (0, 0, math.sin(t * 0.5) * 1.5),
-        }), {"Hips": (math.sin(t * 0.5) * 0.012, b * 0.006 - 0.01, 0)}))
+    feet = {side: (bm.g(sign*.115,.105,sign*.045),0) for side,sign in (("L",-1),("R",1))}
+    for i in range(33):
+        t = i % 32 / 32 * TAU
+        breath, shift = math.sin(2*t), math.sin(t)
+        adjust = max(0, -math.cos(t))**4
+        pose = _merge(HOLD, {
+            "_feet": feet, "_w": ((.13, 1.27+.022*adjust, -.40+.012*adjust), (-10+5*adjust,0,2*adjust)),
+            "Hips": (0, 2*shift, -2*shift), "Spine": (-2+1.7*breath, 0, 2.5*shift),
+            "Chest": (1.3*breath, 3*shift, 0), "Head": (-breath, 13*math.sin(t-.45), -shift),
+            "PackMount": (-1.1*math.sin(2*t-.5), -shift, 0)})
+        keys.append((1+i*120/32, pose, {"Hips": (.033*shift, -.035+.007*breath, 0)}))
     action(arm, "idle", keys)
 
-    # Walk and run share a 24-frame cycle (0.8 s) so the game can blend them in step; it plays
-    # them faster or slower to match her ground speed (walk covers 3.2 m, run 4.4 m per cycle).
-    for name, stride, bend, lean, bob in (("walk", 28.0, 30.0, 4.0, 0.03), ("run", 44.0, 66.0, 16.0, 0.06)):
+    leg, shin, foot = (arm.data.bones[name+"L"] for name in ("Leg", "Shin", "Foot"))
+    thigh = (shin.head_local - leg.head_local).length
+    calf = (foot.head_local - shin.head_local).length
+    reach = math.sqrt(thigh**2 + calf**2 + 2*thigh*calf*math.cos(math.radians(10)))
+    pelvis = arm.data.bones["Hips"].head_local
+    sockets = {side: arm.data.bones["Leg"+side].head_local - pelvis for side in ("L","R")}
+    for name, distance, stance, lift, heel, toe in (
+            ("walk", 2.72, 13/24, .16, 29, 54),
+            ("run", 4.32, .25, .39, 18, 57),
+            ("crouch_walk", 1.4, .58, .075, 14, 29)):
         keys = []
-        n = 8
-        for i in range(n + 1):
-            ph = i / n * math.tau
-            pose, off = _gait(ph, stride, bend, -lean, bob)
-            keys.append((1 + i * 24 / n, pose, off))
+        for i in range(49):
+            t = i % 48 / 48
+            shift = math.sin(TAU*t)
+            twist = math.cos(TAU*t)
+            gait_feet = {side: _foot_path((t+offset)%1, sign, distance, stance, lift, heel, toe, name != "crouch_walk")
+                    for side, sign, offset in (("L",-1,0),("R",1,.5))}
+            if name == "crouch_walk":
+                hip = (-2, -7*twist, 3*shift)
+                lean, counter, head_pitch = -19, 5*twist, 15.2
+                height = -.405 - .022*math.cos(2*TAU*t)
+            else:
+                running = name == "run"
+                hip = (0, -(15 if running else 18)*twist, 2*shift)
+                lean, counter = (-8 if running else -2), -hip[1]*.65
+                head_pitch = -lean
+                # Walk vaults over the support leg. Allow the pelvis to descend
+                # into the long split at exchange, using the actual ankle reach.
+                # Running compresses at loading and rises through toe-off.
+                if running:
+                    height = -.066 - .060*math.cos(2*TAU*(t-.08))
+                else:
+                    height = -.101 - .103*math.cos(2*TAU*(t-.01))
+                for side, offset in (("L",0), ("R",.5)):
+                    if (t + offset) % 1 > stance:
+                        continue
+                    socket = _godot_rot(hip) @ sockets[side]
+                    ankle = gait_feet[side][0]
+                    dx = ankle.x - (socket.x - .024*shift)
+                    dy = ankle.y - socket.y
+                    ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
+                    height = min(height, ceiling - (pelvis.z + socket.z))
+            pose = _merge(HOLD, {
+                "_feet": gait_feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
+                "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
+                "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
+            keys.append((i/2, pose, {"Hips": (-.024*shift, height, 0)}))
+        # Keep the GLB duration, with its extra frame after the gameplay loop.
+        keys.append((25, *keys[-1][1:]))
         action(arm, name, keys)
 
-    # Crouch idle and crouch walk.
-    crouch = {"LegL": (70, 0, -4), "LegR": (78, 0, 4), "ShinL": (-112, 0, 0), "ShinR": (-120, 0, 0),
+    # Keep the soles down as the crouched torso breathes.
+    crouch = {"_feet": feet,
               "Spine": (-20, 0, 0), "Chest": (-4, 0, 0), "Head": (18, 0, 0), "_w": ((0.13, 1.27, -0.40), (14, 0, 0))}
     action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
                            (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
                            (61, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)})])
-    keys = []
-    for i in range(9):
-        ph = i / 8 * math.tau
-        pose, _ = _gait(ph, 22.0, 26.0, 0.0, 0.0)
-        pose = _merge(pose, crouch)
-        keys.append((1 + i * 3, pose, {"Hips": (0, -0.42 - abs(math.sin(ph)) * 0.02, 0)}))
-    action(arm, "crouch_walk", keys)
-
-    # Air: rising tuck and falling reach.
-    action(arm, "jump", [(1, _merge(HOLD, {"LegL": (40, 0, 0), "ShinL": (-70, 0, 0), "LegR": (-10, 0, 0),
-                                           "ShinR": (-30, 0, 0), "Spine": (6, 0, 0)}), {})], loop=False)
+    # Preserve the original two-frame jump take. The air blend carries the tuck
+    # into flight while the one-shot landing takes the weight on fixed soles.
+    brace = _merge(HOLD, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
+    action(arm, "jump", [(1, brace, {"Hips": (0,-.135,0)}),
+                         (2, _merge(HOLD, {"LegL": (47,0,-3), "ShinL": (-75,0,0),
+                                          "LegR": (19,0,4), "ShinR": (-46,0,0)}), {})], loop=False)
+    action(arm, "land", [(0, brace, {"Hips": (0,-.035,0)}),
+                         (3, _merge(brace, {"Spine": (-9,0,0)}), {"Hips": (0,-.23,.045)}),
+                         (5, _merge(brace, {"PackMount": (-11,0,0)}), {"Hips": (0,-.205,.035)}),
+                         (10.5, _merge(HOLD, {"_feet": feet}), {"Hips": (0,-.035,0)})], loop=False)
     fall_a = {"LegL": (22, 0, -6), "ShinL": (-40, 0, 0), "LegR": (8, 0, 6), "ShinR": (-26, 0, 0),
               "Spine": (-4, 0, 0), "Head": (6, 0, 0)}
     fall_b = {"LegL": (18, 0, -8), "ShinL": (-34, 0, 0), "LegR": (12, 0, 8), "ShinR": (-30, 0, 0),
               "Spine": (-6, 0, 0), "Head": (8, 0, 0)}
-    action(arm, "fall", [(1, _merge(HOLD, fall_a), {}), (13, _merge(HOLD, fall_b), {}), (25, _merge(HOLD, fall_a), {})])
+    balance = _merge(HOLD, {"_ikL": None, "ArmL": (18,0,-53), "ForearmL": (35,0,-9),
+                            "_poleR": (.9,-.5,.2)})
+    action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
 
     # Aim: an upper-body hold, layered over the legs in the game.
-    action(arm, "aim", [(1, AIM, {}), (31, _merge(AIM, {"Chest": (0.8, 0, 0)}), {}), (61, AIM, {})])
+    sight = _merge(AIM, {"_feet": {side: (bm.g(sign*.15, .105, sign*.12), 0)
+                                   for side, sign in (("L",-1),("R",1))}})
+    settled = {"Hips": (.015,-.055,0)}
+    action(arm, "aim", [(1, sight, settled), (31, _merge(sight, {"Chest": (.8,0,0)}), settled),
+                        (61, sight, settled)])
 
     # Reload (1.6 s): tilt the rifle, the left hand drops to the belt, pulls a cell, slaps it into
     # the magazine well, racks the bolt, back to the hold.
     tilt = {"_w": ((0.1, 1.22, -0.36), (-16, 18, 30)), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
-    belt = {"_ikL": None, "ArmL": (-6, 0, -16), "ForearmL": (-60, 30, 0)}
+    belt = {"_ikL": (-.44, -.24, .24)}
     insert = {"_ikL": (0.0, -0.24, 0.06)}
     slap = {"_ikL": (0.0, -0.17, 0.05)}
     rack = {"_ikL": (0.07, 0.03, 0.12)}
     action(arm, "reload", [
-        (1, HOLD, {}), (8, _merge(HOLD, tilt), {}), (16, _merge(HOLD, tilt, belt), {}),
-        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "ForearmL": (-8, 0, 0)}), {}),
+        (1, HOLD, {}), (7, _merge(HOLD, tilt, slap), {}),
+        (11, _merge(HOLD, tilt, insert), {}), (18, _merge(HOLD, tilt, belt), {}),
+        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.42, -.25, .20)}), {}),
         (31, _merge(HOLD, tilt, insert), {}), (35, _merge(HOLD, tilt, slap, {"Chest": (2, 0, 0)}), {}),
-        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (49, HOLD, {}),
+        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (.04,.015,.22)}), {}), (49, HOLD, {}),
     ], loop=False)
 
     # Hurt flinch (0.4 s).
-    action(arm, "hurt", [(1, HOLD, {}), (4, _merge(HOLD, {"Spine": (10, 8, 5), "Chest": (6, 0, 0), "Head": (-10, -10, 0)}), {}),
+    action(arm, "hurt", [(1, HOLD, {}), (3, _merge(HOLD, {"Spine": (14, 11, 7), "Chest": (6, 0, 0), "Head": (-10, -10, 0)}), {}),
+                         (6, _merge(HOLD, {"Chest": (-4,-3,-2), "PackMount": (7,3,0)}), {}),
                          (12, HOLD, {})], loop=False)
 
     # Dodge roll (0.5 s): tuck the rifle in, roll forward over the shoulder, come up.
     tuck = {"LegL": (100, 0, 0), "LegR": (100, 0, 0), "ShinL": (-130, 0, 0), "ShinR": (-130, 0, 0),
-            "Spine": (40, 0, 0), "Chest": (30, 0, 0), "Head": (-20, 0, 0),
-            "_w": ((0.08, 1.3, -0.3), (40, 0, 0))}
+            "Spine": (-25, 0, 0), "Chest": (-18, 9, 0), "Head": (-9, 0, 0),
+            "_w": ((0.08, 1.3, -0.3), (20, 0, 0))}
     action(arm, "roll", [
         (1, HOLD, {}),
-        (4, _merge(tuck, {"Hips": (-60, 0, 0)}), {"Hips": (0, -0.4, 0)}),
-        (8, _merge(tuck, {"Hips": (-180, 0, 0)}), {"Hips": (0, -0.45, 0)}),
-        (12, _merge(tuck, {"Hips": (-300, 0, 0)}), {"Hips": (0, -0.4, 0)}),
-        (16, _merge(HOLD, {"Hips": (-360, 0, 0), "LegL": (40, 0, 0), "ShinL": (-60, 0, 0), "Spine": (10, 0, 0)}), {"Hips": (0, -0.12, 0)}),
+        (4, _merge(tuck, {"Hips": (-60, 12, 21)}), {"Hips": (0, -0.4, 0)}),
+        (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.36, 0)}),
+        (12, _merge(tuck, {"Hips": (-300, -8, 16)}), {"Hips": (.03, -0.4, 0)}),
+        (16, _merge(HOLD, crouch), {"Hips": (0,-.34,.035)}),
     ], loop=False)
 
     # Interact (0.8 s): the rifle drops to the right hand, the left reaches out and works a panel.
     lowered = {"_w": ((0.18, 1.12, -0.3), (-40, 10, 10)), "_ikL": None}
     reach = _merge(lowered, {"ArmL": (80, 0, 6), "ForearmL": (10, 0, 0), "Spine": (-10, 0, 0), "Chest": (-4, 10, 0), "Head": (-8, 0, 0)})
-    action(arm, "interact", [(1, HOLD, {}), (8, reach, {}),
+    action(arm, "interact", [(1, HOLD, {}), (4, _merge(lowered, {"ArmL": (28,0,-14), "ForearmL": (48,0,0)}), {}), (10, reach, {}),
                              (14, _merge(reach, {"ForearmL": (-18, 0, 0)}), {}), (24, HOLD, {})], loop=False)
 
     # Install (1.4 s): rifle away, kneel, both hands push the part home.
     kneel = _merge(FREE, {"LegL": (85, 0, 0), "ShinL": (-90, 0, 0), "LegR": (-10, 0, 0), "ShinR": (-100, 0, 0),
                           "Spine": (-16, 0, 0), "Head": (-10, 0, 0), "ArmL": (75, 0, 10), "ArmR": (75, 0, -10), "ForearmL": (20, 0, 0), "ForearmR": (20, 0, 0)})
-    action(arm, "install", [(1, HOLD, {}), (10, kneel, {"Hips": (0, -0.38, 0)}),
+    action(arm, "install", [(1, HOLD, {}), (5, _merge(HOLD, {"Spine": (-6,0,0), "LegL": (24,0,0), "ShinL": (-42,0,0)}), {"Hips": (0,-.08,0)}),
+                            (12, kneel, {"Hips": (0, -0.38, 0)}),
                             (20, _merge(kneel, {"Spine": (-8, 0, 0), "ForearmL": (-20, 0, 0), "ForearmR": (-20, 0, 0)}), {"Hips": (0, -0.38, 0)}),
                             (30, kneel, {"Hips": (0, -0.38, 0)}), (42, HOLD, {})], loop=False)
 
     # Stim (0.9 s): the left hand slaps the injector into the thigh.
-    stab = _merge(lowered, {"ArmL": (16, 0, -4), "ForearmL": (8, 0, 0), "Spine": (-10, 0, 0), "Head": (-16, 0, 0)})
-    action(arm, "stim", [(1, HOLD, {}), (9, stab, {}), (13, _merge(stab, {"Spine": (-4, 0, 0), "ArmL": (-6, 0, 0)}), {}),
+    grasp = {"FingersL": (0,0,55), "ThumbL": (-18,0,-17)}
+    stab = _merge(lowered, grasp, {"ArmL": (16, 0, -4), "ForearmL": (8, 0, 0), "Spine": (-10, 0, 0), "Head": (-16, 0, 0)})
+    action(arm, "stim", [(1, HOLD, {}), (5, _merge(stab, {"ForearmL": (32,0,0), "ArmL": (-9,0,-9)}), {}), (10, stab, {}), (13, _merge(stab, {"Spine": (-4, 0, 0), "ArmL": (-6, 0, 0)}), {}),
                          (27, HOLD, {})], loop=False)
 
     # Throw (0.75 s): the left arm winds back over the shoulder and whips forward.
-    action(arm, "throw", [(1, HOLD, {}), (7, _merge(lowered, {"ArmL": (-40, 0, -60), "ForearmL": (-90, 0, 0), "Chest": (-6, 24, 0)}), {}),
+    action(arm, "throw", [(1, HOLD, {}), (7, _merge(lowered, grasp, {"ArmL": (-40, 0, -60), "ForearmL": (-90, 0, 0), "Chest": (-6, 24, 0)}), {}),
                           (12, _merge(lowered, {"ArmL": (110, 0, -10), "ForearmL": (0, 0, 0), "Chest": (6, -20, 0)}), {}),
+                          (16, _merge(lowered, {"ArmL": (80,-22,-9), "ForearmL": (13,0,0), "Chest": (-5,-14,0)}), {}),
                           (23, HOLD, {})], loop=False)
 
     # Down (1.4 s): knees buckle, she folds and topples onto her side. The game hides the rifle.
@@ -1082,10 +1161,13 @@ def build_actions(arm):
         (1, HOLD, {}),
         (9, _merge(FREE, {"LegL": (60, 0, 0), "LegR": (50, 0, 0), "ShinL": (-100, 0, 0), "ShinR": (-90, 0, 0),
                           "Spine": (20, 0, 0), "Head": (20, 0, 0), "ArmL": (20, 0, -20), "ArmR": (20, 0, 20)}), {"Hips": (0, -0.45, 0)}),
-        (20, _merge(FREE, {"Hips": (0, 0, 80), "LegL": (40, 0, 0), "LegR": (60, 0, 0), "ShinL": (-60, 0, 0), "ShinR": (-80, 0, 0),
-                           "Spine": (14, 0, 0), "Head": (10, 0, -20), "ArmL": (60, 0, -60), "ArmR": (30, 0, 40)}), {"Hips": (0, -0.75, 0)}),
+        (17, _merge(FREE, {"Hips": (0, 0, 66), "Spine": (-12,0,7), "ArmL": (28,0,-24),
+                           "LegL": (53,0,0), "ShinL": (-91,0,0), "LegR": (72,0,0), "ShinR": (-95,0,0)}), {"Hips": (-.11,-.62,0)}),
+        (23, _merge(FREE, {"Hips": (0, 0, 91), "LegL": (40, 0, 0), "LegR": (60, 0, 0), "ShinL": (-60, 0, 0), "ShinR": (-80, 0, 0),
+                           "Spine": (14, 0, 0), "Head": (10, 0, -20), "ArmL": (62, 0, 9), "ArmR": (47, 0, -8), "ForearmR": (28,0,-12)}), {"Hips": (-.17, -.70, 0)}),
         (42, _merge(FREE, {"Hips": (0, 0, 88), "LegL": (36, 0, 0), "LegR": (62, 0, 0), "ShinL": (-56, 0, 0), "ShinR": (-84, 0, 0),
-                           "Spine": (12, 0, 0), "Head": (6, 0, -26), "ArmL": (70, 0, -70), "ArmR": (24, 0, 40)}), {"Hips": (0, -0.78, 0)}),
+                           "Spine": (12, 0, 0), "Head": (6, 0, -26), "ArmL": (64, 0, 5), "ForearmL": (34,0,0),
+                           "ArmR": (68, 0, -38), "ForearmR": (18,0,-8)}), {"Hips": (-.19, -.68, 0)}),
     ], loop=False)
 
 
