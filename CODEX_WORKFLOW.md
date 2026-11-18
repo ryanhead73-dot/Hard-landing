@@ -18,6 +18,7 @@
 
 ## Efficiency rules
 - Default to Sol. Escalate to Astra only for Blender and genuinely hard problems, to conserve the Pro allowance.
+- Reasoning effort: `high` only for new creations or large iterations; `medium` for fix passes and follow-ups. Run one Astra job at a time.
 - One self-contained task per run. Don't batch unrelated changes.
 - Never let two agents edit the same files at once.
 - The model must run the tests itself and report results. No "should work".
