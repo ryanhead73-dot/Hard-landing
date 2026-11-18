@@ -786,11 +786,14 @@ def build_model():
 # The rifle: where it sits in the hold and when aiming, as (position, Godot degrees) in the
 # spine's frame (so it rides the hips, lean and crouch, but not the chest's twist).
 HOLD_W = ((0.13, 1.27, -0.40), (-10, 0, 0))
-AIM_W = ((0.095, 1.51, -0.40), (0, 0, 0))
+LOW_READY = ((.185, 1.33, -.285), (-19, 5, 0))
+CROUCH_ORIGIN = (.175, 1.49, -.33)
+AIM_W = ((0.19, 1.54, -0.34), (0, 0, 0))
+RELOAD_TURN = ((.16, 1.31, -.36), (-17, 10, 10))
+RELOAD_W = ((.1, 1.25, -.43), (-16, 18, 30))
 # Where the hands go on the rifle, in the weapon's own frame (-z is the muzzle).
 GRIP_R = (0.0, -0.12, 0.17)
-GRIP_L = (0.0, -0.06, -0.12)
-HAND = 0.35  # elbow to the middle of the glove
+GRIP_L = (0.0, -0.118, -0.27)
 # Elbows point down and out, the right one a little back (Godot axes, chest frame).
 POLE = {"L": (-0.45, -1.0, 0.05), "R": (0.55, -1.0, 0.35)}
 
@@ -845,18 +848,22 @@ def _plant(arm, posed, rots, side, ankle, pitch):
     rots[foot.name] = shin_rot.inverted() @ _godot_rot((pitch, 0, 0))
 
 
-def _solve_arm(arm, posed, rots, side, target, pole_direction):
+def _solve_arm(arm, posed, rots, side, target, pole, palm_rotation=None):
     """Two-bone IK: turns Arm<side> and Forearm<side> so the hand lands on `target` (Blender)."""
     up = arm.data.bones["Arm" + side]
     lo = arm.data.bones["Forearm" + side]
     a = (lo.head_local - up.head_local).length
-    b = HAND
+    palm = arm.data.bones["Hand" + side]
+    v0 = (palm.head_local + palm.tail_local) * .5 - lo.head_local
+    if palm_rotation is not None:
+        target -= palm_rotation @ ((palm.tail_local - palm.head_local) * .5)
+        v0 = palm.head_local - lo.head_local
+    b = v0.length
     c3 = _carried(arm, posed, "Arm" + side).to_3x3()
     s = posed["Arm" + side].translation
     d_vec = target - s
     d = min(max(d_vec.length, abs(a - b) + 1e-3), (a + b) * 0.995)
     dirv = d_vec.normalized()
-    pole = c3 @ bm.g(*pole_direction)
     n = (pole - dirv * pole.dot(dirv)).normalized()
     cos_a = (a * a + d * d - b * b) / (2 * a * d)
     sin_a = math.sqrt(max(0.0, 1 - cos_a * cos_a))
@@ -864,11 +871,12 @@ def _solve_arm(arm, posed, rots, side, target, pole_direction):
     hand = s + dirv * d
     u0 = lo.head_local - up.head_local
     w_up = u0.rotation_difference(c3.inverted() @ (elbow - s)).to_matrix()
-    v0 = bm.g(0, -HAND, 0)
     cf = c3 @ w_up
     w_lo = v0.rotation_difference(cf.inverted() @ (hand - elbow)).to_matrix()
     rots["Arm" + side] = w_up
     rots["Forearm" + side] = w_lo
+    if palm_rotation is not None:
+        rots[palm.name] = (cf @ w_lo).inverted() @ palm_rotation
 
 
 def solve(arm, pose, offsets):
@@ -882,11 +890,18 @@ def solve(arm, pose, offsets):
         rots[b.name] = _godot_rot(pose.get(b.name, (0, 0, 0)))
         locs[b.name] = bm.g(*(offsets or {}).get(b.name, (0, 0, 0)))
     w = pose.get("_w", HOLD_W)
-    if w is None:
-        return rots, locs
+    forward_hold = w is not None and w[0] in (LOW_READY[0], CROUCH_ORIGIN, AIM_W[0])
+    if forward_hold:
+        # Blade the shoulders so the trigger arm clears the ribs while the
+        # opposite shoulder reaches forward. Keep her gaze along her heading.
+        turn = _godot_rot((0, -34, 0))
+        rots["Chest"] = rots["Chest"] @ turn
+        rots["Neck"] = turn.inverted() @ rots["Neck"]
     posed = _fk(arm, rots, locs)
     for side, (ankle, pitch) in pose.get("_feet", {}).items():
         _plant(arm, posed, rots, side, ankle, pitch)
+    if w is None:
+        return rots, locs
     spine = posed["Spine"] @ arm.data.bones["Spine"].matrix_local.inverted()
     frame = spine @ Matrix.Translation(bm.g(*w[0])) @ _godot_rot(w[1]).to_4x4()
     # The WeaponMount bone (parented to the chest) is turned and moved to put the rifle there.
@@ -903,7 +918,23 @@ def solve(arm, pose, offsets):
     for side in ("L", "R"):
         p = pose.get("_ik" + side, GRIP_L if side == "L" else GRIP_R)
         if p is not None:
-            _solve_arm(arm, posed, rots, side, frame @ bm.g(*p), pose.get("_pole"+side, POLE[side]))
+            # Resting palm faces inward (+X on the left). Turn it up under
+            # the fore-end, with the knuckles reaching across its far edge.
+            palm_rotation = None
+            if side == "L" and p == GRIP_L:
+                palm_rotation = frame.to_3x3() @ _godot_rot((0, 0, 90))
+            chest = _carried(arm, posed, "Arm"+side).to_3x3()
+            pole = chest @ bm.g(*pose.get("_pole"+side, POLE[side]))
+            if side == "R" and (forward_hold or w in (RELOAD_TURN, RELOAD_W)):
+                # Keep the wrist outside the cassette as the low elbow folds.
+                wrist = (15, 0, -105)
+                if w in (RELOAD_TURN, RELOAD_W):
+                    pole = frame.to_3x3() @ bm.g(1, -.3, 1.7)
+                elif w != AIM_W:
+                    wrist = (15, -30, -120)
+                    pole = frame.to_3x3() @ bm.g(.8, -1, .4)
+                palm_rotation = frame.to_3x3() @ _godot_rot(wrist)
+            _solve_arm(arm, posed, rots, side, frame @ bm.g(*p), pole, palm_rotation)
             # Flex the new digits around the grip. Released hands return to their
             # relaxed glove shape with the rest of the free-arm pose.
             sign = 1 if side == "R" else -1
@@ -1000,6 +1031,15 @@ def _foot_path(t, side, distance, stance, lift, heel=14, toe=29, long_stride=Fal
     return ankle, pitch
 
 
+def free_arms(swing, elbow, spread, counter=0, flex=0):
+    pose = dict(FREE)
+    for side, sign in (("L", -1), ("R", 1)):
+        pose["Arm" + side] = (swing + sign*counter, 0, sign*spread)
+        pose["Forearm" + side] = (elbow + sign*flex, 0, 0)
+        pose["Fingers" + side] = (0, 0, -6*sign)
+    return pose
+
+
 def build_actions(arm):
     bpy.context.scene.render.fps = FPS * 2
     keys = []
@@ -1007,14 +1047,20 @@ def build_actions(arm):
     for i in range(33):
         t = i % 32 / 32 * TAU
         breath, shift = math.sin(2*t), math.sin(t)
-        adjust = max(0, -math.cos(t))**4
         pose = _merge(HOLD, {
-            "_feet": feet, "_w": ((.13, 1.27+.022*adjust, -.40+.012*adjust), (-10+5*adjust,0,2*adjust)),
+            "_feet": feet, "_w": LOW_READY,
             "Hips": (0, 2*shift, -2*shift), "Spine": (-2+1.7*breath, 0, 2.5*shift),
             "Chest": (1.3*breath, 3*shift, 0), "Head": (-breath, 13*math.sin(t-.45), -shift),
             "PackMount": (-1.1*math.sin(2*t-.5), -shift, 0)})
         keys.append((1+i*120/32, pose, {"Hips": (.033*shift, -.035+.007*breath, 0)}))
     action(arm, "idle", keys)
+    free_keys = []
+    for frame, pose, offsets in keys:
+        phase = TAU*(frame-1)/120
+        fidget = max(0, -math.cos(phase))**4
+        arms = free_arms(-6, 15, 5, 2*math.sin(phase), 4*fidget)
+        free_keys.append((frame, pose | arms, offsets))
+    action(arm, "idle_free", free_keys)
 
     leg, shin, foot = (arm.data.bones[name+"L"] for name in ("Leg", "Shin", "Foot"))
     thigh = (shin.head_local - leg.head_local).length
@@ -1059,6 +1105,7 @@ def build_actions(arm):
                     ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
                     height = min(height, ceiling - (pelvis.z + socket.z))
             pose = _merge(HOLD, {
+                "_w": (CROUCH_ORIGIN if name == "crouch_walk" else LOW_READY[0], (LOW_READY[1][0] - lean, LOW_READY[1][1], 0)),
                 "_feet": gait_feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
                 "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
                 "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
@@ -1066,30 +1113,49 @@ def build_actions(arm):
         # Keep the GLB duration, with its extra frame after the gameplay loop.
         keys.append((25, *keys[-1][1:]))
         action(arm, name, keys)
+        if name in ("walk", "run"):
+            free_keys = []
+            for frame, pose, offsets in keys[:-1]:
+                # Left heel strikes at phase zero; the right arm leads then.
+                lead = math.cos(TAU*(frame/24 - (.11 if running else .02)))
+                arms = free_arms(-23 if running else -8, 85 if running else 23,
+                                 7 if running else 5, (40 if running else 25)*lead,
+                                 (5 if running else 8)*lead)
+                free_keys.append((frame, pose | arms, offsets))
+            action(arm, name + "_free", free_keys)
 
     # Keep the soles down as the crouched torso breathes.
     crouch = {"_feet": feet,
               "Spine": (-20, 0, 0), "Chest": (-4, 0, 0), "Head": (18, 0, 0), "_w": ((0.13, 1.27, -0.40), (14, 0, 0))}
-    action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
-                           (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
-                           (61, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)})])
+    low_hold = _merge(HOLD, crouch, {"_w": (CROUCH_ORIGIN, (1, LOW_READY[1][1], 0))})
+    action(arm, "crouch", [(1, low_hold, {"Hips": (0, -0.42, 0)}),
+                           (31, _merge(low_hold, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
+                           (61, low_hold, {"Hips": (0, -0.42, 0)})])
+    # The retained torso turn puts the right shoulder farther outside its knee.
+    low = _merge(HOLD, crouch) | free_arms(24, 14, 0) | {"ArmR": (22, 0, -17)}
+    action(arm, "crouch_free", [(1, low, {"Hips": (0, -.42, 0)}),
+                                (31, _merge(low, {"Spine": (-2,0,0)}), {"Hips": (0, -.43, 0)}),
+                                (61, low, {"Hips": (0, -.42, 0)})])
     # Preserve the original two-frame jump take. The air blend carries the tuck
     # into flight while the one-shot landing takes the weight on fixed soles.
-    brace = _merge(HOLD, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
+    ready = HOLD | {"_w": LOW_READY}
+    brace = _merge(ready, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
     action(arm, "jump", [(1, brace, {"Hips": (0,-.135,0)}),
-                         (2, _merge(HOLD, {"LegL": (47,0,-3), "ShinL": (-75,0,0),
+                         (2, _merge(ready, {"LegL": (47,0,-3), "ShinL": (-75,0,0),
                                           "LegR": (19,0,4), "ShinR": (-46,0,0)}), {})], loop=False)
     action(arm, "land", [(0, brace, {"Hips": (0,-.035,0)}),
                          (3, _merge(brace, {"Spine": (-9,0,0)}), {"Hips": (0,-.23,.045)}),
                          (5, _merge(brace, {"PackMount": (-11,0,0)}), {"Hips": (0,-.205,.035)}),
-                         (10.5, _merge(HOLD, {"_feet": feet}), {"Hips": (0,-.035,0)})], loop=False)
+                         (10.5, _merge(ready, {"_feet": feet}), {"Hips": (0,-.035,0)})], loop=False)
     fall_a = {"LegL": (22, 0, -6), "ShinL": (-40, 0, 0), "LegR": (8, 0, 6), "ShinR": (-26, 0, 0),
               "Spine": (-4, 0, 0), "Head": (6, 0, 0)}
     fall_b = {"LegL": (18, 0, -8), "ShinL": (-34, 0, 0), "LegR": (12, 0, 8), "ShinR": (-30, 0, 0),
               "Spine": (-6, 0, 0), "Head": (8, 0, 0)}
-    balance = _merge(HOLD, {"_ikL": None, "ArmL": (18,0,-53), "ForearmL": (35,0,-9),
-                            "_poleR": (.9,-.5,.2)})
-    action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
+    action(arm, "fall", [(1, _merge(ready, fall_a), {}), (13, _merge(ready, fall_b), {}), (25, _merge(ready, fall_a), {})])
+
+    balance_a = _merge(HOLD, fall_a, free_arms(10, 24, 53, 5))
+    balance_b = _merge(HOLD, fall_b, free_arms(14, 30, 60, -4))
+    action(arm, "fall_free", [(1, balance_a, {}), (13, balance_b, {}), (25, balance_a, {})])
 
     # Aim: an upper-body hold, layered over the legs in the game.
     sight = _merge(AIM, {"_feet": {side: (bm.g(sign*.15, .105, sign*.12), 0)
@@ -1100,17 +1166,19 @@ def build_actions(arm):
 
     # Reload (1.6 s): tilt the rifle, the left hand drops to the belt, pulls a cell, slaps it into
     # the magazine well, racks the bolt, back to the hold.
-    tilt = {"_w": ((0.1, 1.22, -0.36), (-16, 18, 30)), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
-    belt = {"_ikL": (-.44, -.24, .24)}
-    insert = {"_ikL": (0.0, -0.24, 0.06)}
-    slap = {"_ikL": (0.0, -0.17, 0.05)}
-    rack = {"_ikL": (0.07, 0.03, 0.12)}
+    release = _merge(HOLD, {"_w": RELOAD_TURN, "Chest": (0, -18, 0), "_ikL": (-.075, -.15, -.09)})
+    tilt = {"_w": RELOAD_W, "_poleL": (-1, -.7, -.45), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
+    belt = {"_ikL": (-.58, -.18, .07)}
+    insert = {"_ikL": (-.08, -.24, .06)}
+    slap = {"_ikL": (-.08, -.17, .05)}
+    rack = {"_ikL": (-0.082, 0.03, 0.12)}
     action(arm, "reload", [
-        (1, HOLD, {}), (7, _merge(HOLD, tilt, slap), {}),
+        (1, ready, {}), (4, release, {}), (7, _merge(HOLD, tilt, slap), {}),
         (11, _merge(HOLD, tilt, insert), {}), (18, _merge(HOLD, tilt, belt), {}),
-        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.42, -.25, .20)}), {}),
+        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.56, -.20, .04)}), {}),
         (31, _merge(HOLD, tilt, insert), {}), (35, _merge(HOLD, tilt, slap, {"Chest": (2, 0, 0)}), {}),
-        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (.04,.015,.22)}), {}), (49, HOLD, {}),
+        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (-.082,.015,.22)}), {}),
+        (47, release, {}), (49, ready, {}),
     ], loop=False)
 
     # Hurt flinch (0.4 s).
@@ -1119,15 +1187,17 @@ def build_actions(arm):
                          (12, HOLD, {})], loop=False)
 
     # Dodge roll (0.5 s): tuck the rifle in, roll forward over the shoulder, come up.
+    # Carry the long axis across the belly with the stock angled down toward the hip.
+    roll_hold = {"_w": ((.015, 1.24, -.245), (10, 85, 0))}
     tuck = {"LegL": (100, 0, 0), "LegR": (100, 0, 0), "ShinL": (-130, 0, 0), "ShinR": (-130, 0, 0),
-            "Spine": (-25, 0, 0), "Chest": (-18, 9, 0), "Head": (-9, 0, 0),
-            "_w": ((0.08, 1.3, -0.3), (20, 0, 0))}
+            "Spine": (-25, 0, 0), "Chest": (0, -18, 0), "Head": (-9, 0, 0),
+            **roll_hold}
     action(arm, "roll", [
-        (1, HOLD, {}),
+        (1, HOLD | roll_hold, {}),
         (4, _merge(tuck, {"Hips": (-60, 12, 21)}), {"Hips": (0, -0.4, 0)}),
         (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.36, 0)}),
         (12, _merge(tuck, {"Hips": (-300, -8, 16)}), {"Hips": (.03, -0.4, 0)}),
-        (16, _merge(HOLD, crouch), {"Hips": (0,-.34,.035)}),
+        (16, _merge(HOLD, crouch, roll_hold), {"Hips": (0,-.34,.035)}),
     ], loop=False)
 
     # Interact (0.8 s): the rifle drops to the right hand, the left reaches out and works a panel.
