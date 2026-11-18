@@ -786,9 +786,10 @@ def build_model():
 # The rifle: where it sits in the hold and when aiming, as (position, Godot degrees) in the
 # spine's frame (so it rides the hips, lean and crouch, but not the chest's twist).
 HOLD_W = ((0.13, 1.27, -0.40), (-10, 0, 0))
-LOW_READY = ((.205, 1.405, -.33), (-19, 5, 0))
+LOW_READY = ((.185, 1.33, -.285), (-19, 5, 0))
 CROUCH_ORIGIN = (.175, 1.49, -.33)
 AIM_W = ((0.19, 1.54, -0.34), (0, 0, 0))
+RELOAD_TURN = ((.16, 1.31, -.36), (-17, 10, 10))
 RELOAD_W = ((.1, 1.25, -.43), (-16, 18, 30))
 # Where the hands go on the rifle, in the weapon's own frame (-z is the muzzle).
 GRIP_R = (0.0, -0.12, 0.17)
@@ -924,10 +925,15 @@ def solve(arm, pose, offsets):
                 palm_rotation = frame.to_3x3() @ _godot_rot((0, 0, 90))
             chest = _carried(arm, posed, "Arm"+side).to_3x3()
             pole = chest @ bm.g(*pose.get("_pole"+side, POLE[side]))
-            if side == "R" and (forward_hold or w == RELOAD_W):
-                # Approach the pistol grip from the outside of the cassette.
-                palm_rotation = frame.to_3x3() @ _godot_rot((15, 0, -105))
-                pole = frame.to_3x3() @ bm.g(1, -.3, 1.7)
+            if side == "R" and (forward_hold or w in (RELOAD_TURN, RELOAD_W)):
+                # Keep the wrist outside the cassette as the low elbow folds.
+                wrist = (15, 0, -105)
+                if w in (RELOAD_TURN, RELOAD_W):
+                    pole = frame.to_3x3() @ bm.g(1, -.3, 1.7)
+                elif w != AIM_W:
+                    wrist = (15, -30, -120)
+                    pole = frame.to_3x3() @ bm.g(.8, -1, .4)
+                palm_rotation = frame.to_3x3() @ _godot_rot(wrist)
             _solve_arm(arm, posed, rots, side, frame @ bm.g(*p), pole, palm_rotation)
             # Flex the new digits around the grip. Released hands return to their
             # relaxed glove shape with the rest of the free-arm pose.
@@ -1132,21 +1138,20 @@ def build_actions(arm):
                                 (61, low, {"Hips": (0, -.42, 0)})])
     # Preserve the original two-frame jump take. The air blend carries the tuck
     # into flight while the one-shot landing takes the weight on fixed soles.
-    brace = _merge(HOLD, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
+    ready = HOLD | {"_w": LOW_READY}
+    brace = _merge(ready, {"_feet": feet, "Spine": (-8,0,0), "PackMount": (5,0,0)})
     action(arm, "jump", [(1, brace, {"Hips": (0,-.135,0)}),
-                         (2, _merge(HOLD, {"LegL": (47,0,-3), "ShinL": (-75,0,0),
+                         (2, _merge(ready, {"LegL": (47,0,-3), "ShinL": (-75,0,0),
                                           "LegR": (19,0,4), "ShinR": (-46,0,0)}), {})], loop=False)
     action(arm, "land", [(0, brace, {"Hips": (0,-.035,0)}),
                          (3, _merge(brace, {"Spine": (-9,0,0)}), {"Hips": (0,-.23,.045)}),
                          (5, _merge(brace, {"PackMount": (-11,0,0)}), {"Hips": (0,-.205,.035)}),
-                         (10.5, _merge(HOLD, {"_feet": feet}), {"Hips": (0,-.035,0)})], loop=False)
+                         (10.5, _merge(ready, {"_feet": feet}), {"Hips": (0,-.035,0)})], loop=False)
     fall_a = {"LegL": (22, 0, -6), "ShinL": (-40, 0, 0), "LegR": (8, 0, 6), "ShinR": (-26, 0, 0),
               "Spine": (-4, 0, 0), "Head": (6, 0, 0)}
     fall_b = {"LegL": (18, 0, -8), "ShinL": (-34, 0, 0), "LegR": (12, 0, 8), "ShinR": (-30, 0, 0),
               "Spine": (-6, 0, 0), "Head": (8, 0, 0)}
-    balance = _merge(HOLD, {"_w": LOW_READY,
-                            "_poleR": (.9,-.5,.2)})
-    action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
+    action(arm, "fall", [(1, _merge(ready, fall_a), {}), (13, _merge(ready, fall_b), {}), (25, _merge(ready, fall_a), {})])
 
     balance_a = _merge(HOLD, fall_a, free_arms(10, 24, 53, 5))
     balance_b = _merge(HOLD, fall_b, free_arms(14, 30, 60, -4))
@@ -1161,17 +1166,19 @@ def build_actions(arm):
 
     # Reload (1.6 s): tilt the rifle, the left hand drops to the belt, pulls a cell, slaps it into
     # the magazine well, racks the bolt, back to the hold.
+    release = _merge(HOLD, {"_w": RELOAD_TURN, "Chest": (0, -18, 0), "_ikL": (-.075, -.15, -.09)})
     tilt = {"_w": RELOAD_W, "_poleL": (-1, -.7, -.45), "Chest": (0, 4, 0), "Head": (14, 10, 0)}
     belt = {"_ikL": (-.58, -.18, .07)}
     insert = {"_ikL": (-.08, -.24, .06)}
     slap = {"_ikL": (-.08, -.17, .05)}
     rack = {"_ikL": (-0.082, 0.03, 0.12)}
     action(arm, "reload", [
-        (1, HOLD | {"_w": LOW_READY}, {}), (7, _merge(HOLD, tilt, slap), {}),
+        (1, ready, {}), (4, release, {}), (7, _merge(HOLD, tilt, slap), {}),
         (11, _merge(HOLD, tilt, insert), {}), (18, _merge(HOLD, tilt, belt), {}),
         (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.56, -.20, .04)}), {}),
         (31, _merge(HOLD, tilt, insert), {}), (35, _merge(HOLD, tilt, slap, {"Chest": (2, 0, 0)}), {}),
-        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (-.082,.015,.22)}), {}), (49, HOLD | {"_w": LOW_READY}, {}),
+        (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (-.082,.015,.22)}), {}),
+        (47, release, {}), (49, ready, {}),
     ], loop=False)
 
     # Hurt flinch (0.4 s).
@@ -1181,14 +1188,14 @@ def build_actions(arm):
 
     # Dodge roll (0.5 s): tuck the rifle in, roll forward over the shoulder, come up.
     tuck = {"LegL": (100, 0, 0), "LegR": (100, 0, 0), "ShinL": (-130, 0, 0), "ShinR": (-130, 0, 0),
-            "Spine": (-25, 0, 0), "Chest": (-18, 9, 0), "Head": (-9, 0, 0),
-            "_w": ((0.08, 1.3, -0.3), (20, 0, 0))}
+            "Spine": (-25, 0, 0), "Chest": (0, -18, 0), "Head": (-9, 0, 0),
+            "_w": LOW_READY}
     action(arm, "roll", [
-        (1, HOLD, {}),
+        (1, ready, {}),
         (4, _merge(tuck, {"Hips": (-60, 12, 21)}), {"Hips": (0, -0.4, 0)}),
         (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.36, 0)}),
         (12, _merge(tuck, {"Hips": (-300, -8, 16)}), {"Hips": (.03, -0.4, 0)}),
-        (16, _merge(HOLD, crouch), {"Hips": (0,-.34,.035)}),
+        (16, _merge(ready, crouch, {"_w": LOW_READY}), {"Hips": (0,-.34,.035)}),
     ], loop=False)
 
     # Interact (0.8 s): the rifle drops to the right hand, the left reaches out and works a panel.
