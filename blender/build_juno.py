@@ -1031,8 +1031,8 @@ def build_actions(arm):
         keys.append((25, *keys[-1][1:]))
         action(arm, name, keys)
 
-    # Crouch idle and crouch walk.
-    crouch = {"LegL": (70, 0, -4), "LegR": (78, 0, 4), "ShinL": (-112, 0, 0), "ShinR": (-120, 0, 0),
+    # Keep the soles down as the crouched torso breathes.
+    crouch = {"_feet": feet,
               "Spine": (-20, 0, 0), "Chest": (-4, 0, 0), "Head": (18, 0, 0), "_w": ((0.13, 1.27, -0.40), (14, 0, 0))}
     action(arm, "crouch", [(1, _merge(HOLD, crouch), {"Hips": (0, -0.42, 0)}),
                            (31, _merge(HOLD, crouch, {"Spine": (-2, 0, 0)}), {"Hips": (0, -0.43, 0)}),
@@ -1056,7 +1056,11 @@ def build_actions(arm):
     action(arm, "fall", [(1, _merge(balance, fall_a), {}), (13, _merge(balance, fall_b), {}), (25, _merge(balance, fall_a), {})])
 
     # Aim: an upper-body hold, layered over the legs in the game.
-    action(arm, "aim", [(1, AIM, {}), (31, _merge(AIM, {"Chest": (0.8, 0, 0)}), {}), (61, AIM, {})])
+    sight = _merge(AIM, {"_feet": {side: (bm.g(sign*.15, .105, sign*.12), 0)
+                                   for side, sign in (("L",-1),("R",1))}})
+    settled = {"Hips": (.015,-.055,0)}
+    action(arm, "aim", [(1, sight, settled), (31, _merge(sight, {"Chest": (.8,0,0)}), settled),
+                        (61, sight, settled)])
 
     # Reload (1.6 s): tilt the rifle, the left hand drops to the belt, pulls a cell, slaps it into
     # the magazine well, racks the bolt, back to the hold.
@@ -1068,7 +1072,7 @@ def build_actions(arm):
     action(arm, "reload", [
         (1, HOLD, {}), (7, _merge(HOLD, tilt, slap), {}),
         (11, _merge(HOLD, tilt, insert), {}), (18, _merge(HOLD, tilt, belt), {}),
-        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "ForearmL": (-8, 0, 0)}), {}),
+        (24, _merge(HOLD, tilt, belt, {"Spine": (3, 0, 0), "_ikL": (-.42, -.25, .20)}), {}),
         (31, _merge(HOLD, tilt, insert), {}), (35, _merge(HOLD, tilt, slap, {"Chest": (2, 0, 0)}), {}),
         (41, _merge(HOLD, tilt, rack, {"Chest": (0, 6, 0)}), {}), (44, _merge(HOLD, tilt, {"_ikL": (.04,.015,.22)}), {}), (49, HOLD, {}),
     ], loop=False)
@@ -1085,9 +1089,9 @@ def build_actions(arm):
     action(arm, "roll", [
         (1, HOLD, {}),
         (4, _merge(tuck, {"Hips": (-60, 12, 21)}), {"Hips": (0, -0.4, 0)}),
-        (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.30, 0)}),
+        (8, _merge(tuck, {"Hips": (-180, 8, 25)}), {"Hips": (.06, -.36, 0)}),
         (12, _merge(tuck, {"Hips": (-300, -8, 16)}), {"Hips": (.03, -0.4, 0)}),
-        (16, _merge(HOLD, crouch, {"_feet": feet}), {"Hips": (0,-.34,.035)}),
+        (16, _merge(HOLD, crouch), {"Hips": (0,-.34,.035)}),
     ], loop=False)
 
     # Interact (0.8 s): the rifle drops to the right hand, the left reaches out and works a panel.
@@ -1124,9 +1128,10 @@ def build_actions(arm):
         (17, _merge(FREE, {"Hips": (0, 0, 66), "Spine": (-12,0,7), "ArmL": (28,0,-24),
                            "LegL": (53,0,0), "ShinL": (-91,0,0), "LegR": (72,0,0), "ShinR": (-95,0,0)}), {"Hips": (-.11,-.62,0)}),
         (23, _merge(FREE, {"Hips": (0, 0, 91), "LegL": (40, 0, 0), "LegR": (60, 0, 0), "ShinL": (-60, 0, 0), "ShinR": (-80, 0, 0),
-                           "Spine": (14, 0, 0), "Head": (10, 0, -20), "ArmL": (60, 0, -60), "ArmR": (30, 0, 40)}), {"Hips": (-.20, -.74, 0)}),
+                           "Spine": (14, 0, 0), "Head": (10, 0, -20), "ArmL": (62, 0, 9), "ArmR": (47, 0, -8), "ForearmR": (28,0,-12)}), {"Hips": (-.17, -.70, 0)}),
         (42, _merge(FREE, {"Hips": (0, 0, 88), "LegL": (36, 0, 0), "LegR": (62, 0, 0), "ShinL": (-56, 0, 0), "ShinR": (-84, 0, 0),
-                           "Spine": (12, 0, 0), "Head": (6, 0, -26), "ArmL": (70, 0, -70), "ArmR": (24, 0, 40)}), {"Hips": (-.22, -.73, 0)}),
+                           "Spine": (12, 0, 0), "Head": (6, 0, -26), "ArmL": (64, 0, 5), "ForearmL": (34,0,0),
+                           "ArmR": (68, 0, -38), "ForearmR": (18,0,-8)}), {"Hips": (-.19, -.68, 0)}),
     ], loop=False)
 
 
