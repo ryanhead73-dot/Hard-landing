@@ -34,6 +34,13 @@ func _ready() -> void:
 		var b := mi.global_transform * mi.get_aabb()
 		box = b if first else box.merge(b)
 		first = false
+	# The gameplay weapon aligns its rifle muzzle in _ready(). Keep the bare
+	# turnaround unobstructed and use the same mount and alignment for clip shots.
+	if model == "juno_rigged" and not shots.is_empty():
+		var mount := Rig.attach(inst, "WeaponMount")
+		var rifle := Weapon.new()
+		mount.add_child(rifle)
+		rifle.set_process(false)
 	var floor_mesh := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(60, 60)
