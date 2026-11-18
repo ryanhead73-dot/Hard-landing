@@ -1031,11 +1031,11 @@ def build_actions(arm):
             t = i % 48 / 48
             shift = math.sin(TAU*t)
             twist = math.cos(TAU*t)
-            feet = {side: _foot_path((t+offset)%1, sign, distance, stance, lift, heel, toe, name != "crouch_walk")
+            gait_feet = {side: _foot_path((t+offset)%1, sign, distance, stance, lift, heel, toe, name != "crouch_walk")
                     for side, sign, offset in (("L",-1,0),("R",1,.5))}
             if name == "crouch_walk":
                 hip = (-2, -7*twist, 3*shift)
-                lean, counter, head_pitch = -19, 5, 15.2
+                lean, counter, head_pitch = -19, 5*twist, 15.2
                 height = -.405 - .022*math.cos(2*TAU*t)
             else:
                 running = name == "run"
@@ -1053,13 +1053,13 @@ def build_actions(arm):
                     if (t + offset) % 1 > stance:
                         continue
                     socket = _godot_rot(hip) @ sockets[side]
-                    ankle = feet[side][0]
+                    ankle = gait_feet[side][0]
                     dx = ankle.x - (socket.x - .024*shift)
                     dy = ankle.y - socket.y
                     ceiling = ankle.z + math.sqrt(max(0, reach**2 - dx**2 - dy**2))
                     height = min(height, ceiling - (pelvis.z + socket.z))
             pose = _merge(HOLD, {
-                "_feet": feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
+                "_feet": gait_feet, "Hips": hip, "Spine": (lean, counter, -2*shift),
                 "Chest": (0, 6*twist, -shift), "Head": (head_pitch, -4*twist, 0),
                 "PackMount": (2*math.sin(2*TAU*t-.5), -3*math.cos(TAU*t-.55), shift)})
             keys.append((i/2, pose, {"Hips": (-.024*shift, height, 0)}))
